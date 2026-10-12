@@ -20,26 +20,27 @@ export const Profile: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // GET /me no devuelve la fecha de nacimiento: si no viene, el campo queda vacío en vez de
+  // mostrar una fecha inventada, y solo se envía si el usuario la carga.
   useEffect(() => {
     if (user) {
       setFirstName(user.first_name || '');
       setLastName(user.last_name || '');
-      setBirthDate(user.birth_date || '1995-05-15');
+      setBirthDate(user.birth_date || '');
     }
   }, [user]);
 
   if (!user) return null;
 
-  // Comprobar si hay cambios
-  const isDirty =
-    firstName.trim() !== user.first_name ||
-    lastName.trim() !== user.last_name ||
-    (birthDate !== (user.birth_date || '1995-05-15'));
+  const nameChanged = firstName.trim() !== user.first_name;
+  const lastNameChanged = lastName.trim() !== user.last_name;
+  const birthDateChanged = birthDate !== (user.birth_date || '');
+  const isDirty = nameChanged || lastNameChanged || birthDateChanged;
 
   const handleCancel = () => {
     setFirstName(user.first_name);
     setLastName(user.last_name);
-    setBirthDate(user.birth_date || '1995-05-15');
+    setBirthDate(user.birth_date || '');
     setErrorMessage(null);
     navigate(-1);
   };
@@ -69,10 +70,11 @@ export const Profile: React.FC = () => {
 
     setIsLoading(true);
     try {
+      // PATCH: solo lo que cambió; lo no enviado el backend lo deja como está
       await api.updateMe({
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        birth_date: birthDate,
+        ...(nameChanged && { first_name: firstName.trim() }),
+        ...(lastNameChanged && { last_name: lastName.trim() }),
+        ...(birthDateChanged && birthDate && { birth_date: birthDate }),
       });
       await refreshUser();
       success('Datos actualizados');
@@ -126,12 +128,11 @@ export const Profile: React.FC = () => {
           <div>
             <Input
               label="Fecha de nacimiento"
-              requiredAsterisk
               type="date"
               value={birthDate}
               onChange={(e) => setBirthDate(e.target.value)}
               disabled={isLoading}
-              required
+              helperText={user.birth_date ? undefined : 'Completala solo si querés actualizarla'}
             />
           </div>
 
