@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', sans-serif;
+  --font-serif: 'Source Serif 4', Georgia, serif;
+
+  --color-app-bg: #F5F9FF;
+  --color-card-bg: #FFFFFF;
+  --color-primary-blue: #1D4ED8;
+  --color-primary-hover: #1E40AF;
+  --color-navy-title: #0B2A66;
+  --color-sky-hover: #E0F2FE;
+  --color-sky-focus: #BAE6FD;
+  --color-sky-accent: #7DD3FC;
+  --color-sky-header: #EFF6FF;
+  --color-border-blue: #D6E4F7;
+  --color-text-main: #0F1F3D;
+  --color-text-muted: #51607A;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #0F1F3D;
+  background-color: #F5F9FF;
+}
+
+.font-serif {
+  font-family: 'Source Serif 4', Georgia, serif;
+}
+
+.fluted-column-pattern {
+  background-image: repeating-linear-gradient(
+    to right,
+    #BAE6FD 0px,
+    #BAE6FD 1px,
+    transparent 1px,
+    transparent 12px
+  );
+}
+
+.title-line {
+  height: 2px;
+  width: 48px;
+  background-color: #7DD3FC;
+}
