@@ -351,6 +351,26 @@ function delay(ms: number = 180): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// El backend rota el refresh token en cada uso: si dos pedidos reciben 401 a la vez y cada uno
+// llamara a /auth/refresh, el segundo llegaría con una cookie ya consumida y expulsaría al usuario.
+// Por eso todos los 401 simultáneos esperan la misma renovación.
+let refreshInFlight: Promise<string | null> | null = null;
+
+function refreshAccessToken(): Promise<string | null> {
+  if (!refreshInFlight) {
+    refreshInFlight = fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+      .then(async (res) => (res.ok ? ((await res.json()) as AccessToken).access_token : null))
+      .catch(() => null)
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+  return refreshInFlight;
+}
+
 // Helper HTTP real con reintento automático de refresh token en 401
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   if (USE_MOCK) {
@@ -376,11 +396,8 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   if (response.status === 401 && endpoint !== '/auth/login' && endpoint !== '/auth/refresh') {
     // Intentar renovar el token llamando a POST /auth/refresh (la cookie viaja sola)
-    const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-    });
-    if (!refreshRes.ok) {
+    const newToken = await refreshAccessToken();
+    if (!newToken) {
       // Sin sesión válida: se avisa a AuthContext, que limpia el usuario y el router manda al
       // login. No se recarga la página: eso volvía a pedir /me y entraba en un bucle.
       currentAccessToken = null;
@@ -389,8 +406,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
       err.status = 401;
       throw err;
     }
-    const tokenData: AccessToken = await refreshRes.json();
-    currentAccessToken = tokenData.access_token;
+    currentAccessToken = newToken;
     headers.set('Authorization', `Bearer ${currentAccessToken}`);
     response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...fetchOptions,
