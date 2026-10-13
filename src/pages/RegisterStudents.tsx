@@ -39,7 +39,7 @@ export const RegisterStudents: React.FC = () => {
   const [legajo, setLegajo] = useState<number | ''>('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [birthDate, setBirthDate] = useState('2003-05-15');
+  const [birthDate, setBirthDate] = useState('');
   const [enrollmentYear, setEnrollmentYear] = useState<number>(new Date().getFullYear());
   const [manualError, setManualError] = useState<string | null>(null);
   const [isSubmittingManual, setIsSubmittingManual] = useState(false);
@@ -72,14 +72,14 @@ export const RegisterStudents: React.FC = () => {
       setManualError('Ingrese nombre y apellido');
       return;
     }
-    if (birthDate) {
-      const bDate = new Date(birthDate);
-      const today = new Date();
-      today.setHours(23, 59, 59, 999);
-      if (bDate > today) {
-        setManualError('La fecha no puede ser posterior a hoy');
-        return;
-      }
+    // La fecha es obligatoria en el backend: sin valor precargado, para no registrar una inventada
+    if (!birthDate) {
+      setManualError('Ingrese la fecha de nacimiento');
+      return;
+    }
+    if (birthDate > new Date().toISOString().slice(0, 10)) {
+      setManualError('La fecha no puede ser posterior a hoy');
+      return;
     }
     if (!enrollmentYear || enrollmentYear < 1950 || enrollmentYear > 2100) {
       setManualError('El año de ingreso no es válido');
