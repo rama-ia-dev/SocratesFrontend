@@ -53,6 +53,7 @@ export const Users: React.FC = () => {
   const [profCreateLastName, setProfCreateLastName] = useState('');
   const [profCreateEmail, setProfCreateEmail] = useState('');
   const [profCreateLegajo, setProfCreateLegajo] = useState<number | ''>('');
+  const [profCreateBirthDate, setProfCreateBirthDate] = useState('');
   const [profCreateIsSuperAdmin, setProfCreateIsSuperAdmin] = useState(false);
   const [profCreateError, setProfCreateError] = useState<string | null>(null);
   const [isSavingProfCreate, setIsSavingProfCreate] = useState(false);
@@ -115,6 +116,7 @@ export const Users: React.FC = () => {
     setProfCreateLastName('');
     setProfCreateEmail('');
     setProfCreateLegajo('');
+    setProfCreateBirthDate('');
     setProfCreateIsSuperAdmin(false);
     setProfCreateError(null);
     setIsProfCreateModalOpen(true);
@@ -145,6 +147,15 @@ export const Users: React.FC = () => {
       return;
     }
 
+    if (!profCreateBirthDate) {
+      setProfCreateError('Ingrese la fecha de nacimiento');
+      return;
+    }
+    if (profCreateBirthDate > new Date().toISOString().slice(0, 10)) {
+      setProfCreateError('La fecha de nacimiento no puede ser posterior a hoy');
+      return;
+    }
+
     setIsSavingProfCreate(true);
     try {
       await api.createProfessor({
@@ -152,7 +163,7 @@ export const Users: React.FC = () => {
         last_name: profCreateLastName.trim(),
         mail: mailLower,
         legajo: Number(profCreateLegajo),
-        birth_date: '1980-01-01',
+        birth_date: profCreateBirthDate,
         is_super_admin: profCreateIsSuperAdmin,
       });
       success('Docente registrado. Recibirá un correo para crear su contraseña');
@@ -223,15 +234,23 @@ export const Users: React.FC = () => {
       return;
     }
 
+    // PATCH: solo lo que cambió. Cambiar el mail cierra las sesiones del docente, así que
+    // no se reenvía si quedó igual. Sin cambios no se llama al backend (rechaza el body vacío).
+    const changes = {
+      ...(profEditFirstName.trim() !== editingProf.first_name && { first_name: profEditFirstName.trim() }),
+      ...(profEditLastName.trim() !== editingProf.last_name && { last_name: profEditLastName.trim() }),
+      ...(mailLower !== editingProf.email.toLowerCase() && { mail: mailLower }),
+      ...(Number(profEditLegajo) !== editingProf.legajo && { legajo: Number(profEditLegajo) }),
+      ...(profEditIsSuperAdmin !== Boolean(editingProf.is_super_admin) && { is_super_admin: profEditIsSuperAdmin }),
+    };
+    if (Object.keys(changes).length === 0) {
+      setIsProfEditModalOpen(false);
+      return;
+    }
+
     setIsSavingProfEdit(true);
     try {
-      await api.updateProfessor(editingProf.id_user, {
-        first_name: profEditFirstName.trim(),
-        last_name: profEditLastName.trim(),
-        mail: mailLower,
-        legajo: Number(profEditLegajo),
-        is_super_admin: profEditIsSuperAdmin,
-      });
+      await api.updateProfessor(editingProf.id_user, changes);
       success('Docente actualizado');
       setIsProfEditModalOpen(false);
       fetchUsers();
@@ -258,7 +277,8 @@ export const Users: React.FC = () => {
     setStudentEditLegajo(u.legajo);
     setStudentEditOriginalLegajo(u.legajo);
     setStudentEditEnrollmentYear(u.enrollment_year || 2022);
-    setStudentEditBirthDate('2002-05-15');
+    // El listado no trae la fecha de nacimiento: el campo arranca vacío y solo se envía si se carga
+    setStudentEditBirthDate('');
     setStudentEditError(null);
     setOpenMenuId(null);
     setIsStudentEditModalOpen(true);
@@ -278,15 +298,21 @@ export const Users: React.FC = () => {
       return;
     }
 
+    const changes = {
+      ...(studentEditFirstName.trim() !== editingStudent.first_name && { first_name: studentEditFirstName.trim() }),
+      ...(studentEditLastName.trim() !== editingStudent.last_name && { last_name: studentEditLastName.trim() }),
+      ...(Number(studentEditLegajo) !== editingStudent.legajo && { legajo: Number(studentEditLegajo) }),
+      ...(studentEditEnrollmentYear !== editingStudent.enrollment_year && { enrollment_year: studentEditEnrollmentYear }),
+      ...(studentEditBirthDate && { birth_date: studentEditBirthDate }),
+    };
+    if (Object.keys(changes).length === 0) {
+      setIsStudentEditModalOpen(false);
+      return;
+    }
+
     setIsSavingStudentEdit(true);
     try {
-      await api.updateStudent(editingStudent.id_user, {
-        first_name: studentEditFirstName.trim(),
-        last_name: studentEditLastName.trim(),
-        legajo: Number(studentEditLegajo),
-        enrollment_year: studentEditEnrollmentYear,
-        birth_date: studentEditBirthDate,
-      });
+      await api.updateStudent(editingStudent.id_user, changes);
       success('Datos del estudiante actualizados');
       setIsStudentEditModalOpen(false);
       fetchUsers();
@@ -535,6 +561,18 @@ export const Users: React.FC = () => {
             />
           </div>
 
+          <div>
+            <Input
+              label="Fecha de nacimiento"
+              requiredAsterisk
+              type="date"
+              value={profCreateBirthDate}
+              onChange={(e) => setProfCreateBirthDate(e.target.value)}
+              disabled={isSavingProfCreate}
+              required
+            />
+          </div>
+
           <div className="pt-2">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
@@ -742,12 +780,11 @@ export const Users: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Fecha de nacimiento"
-              requiredAsterisk
               type="date"
               value={studentEditBirthDate}
               onChange={(e) => setStudentEditBirthDate(e.target.value)}
               disabled={isSavingStudentEdit}
-              required
+              helperText="Completala solo si querés corregirla"
             />
             <Input
               label="Año de ingreso"
