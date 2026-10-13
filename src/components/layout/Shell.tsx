@@ -231,7 +231,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       {/* ========================================================= */}
       {/* Contenedor principal                                      */}
       {/* ========================================================= */}
-      <div className="flex-1 md:pl-[264px] flex flex-col min-h-screen">
+      <div className="flex-1 min-w-0 md:pl-[264px] flex flex-col min-h-screen">
         {/* Barra superior de 64 px con el azul más oscuro #061A3D y borde literal del mismo color */}
         <header className="h-16 bg-[#061A3D] border-b border-[#061A3D] px-4 sm:px-8 flex items-center justify-between sticky top-0 z-20 shadow-[0_4px_18px_rgba(6,26,61,0.22)]">
           <div className="flex items-center gap-3">
