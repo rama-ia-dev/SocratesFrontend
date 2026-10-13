@@ -11,7 +11,7 @@ export const ResetPassword: React.FC = () => {
   const navigate = useNavigate();
   const { success } = useToast();
 
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -35,7 +35,6 @@ export const ResetPassword: React.FC = () => {
     setIsLoading(true);
     try {
       await api.requestPassword({ email: email.trim() });
-      setInfoMessage('Si el correo está registrado, recibirá un código');
       setStep(2);
     } catch (err: any) {
       setErrorMessage(err.message || 'Error al solicitar el código');
@@ -44,14 +43,36 @@ export const ResetPassword: React.FC = () => {
     }
   };
 
-  const handleStep2Submit = async (e: React.FormEvent) => {
+  const handleResendCode = async () => {
+    setErrorMessage(null);
+    setIsLoading(true);
+    try {
+      await api.requestPassword({ email: email.trim() });
+      setCode('');
+      setInfoMessage('Si el correo está registrado, recibirá un código nuevo. Puede tardar hasta un minuto');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Error al solicitar el código');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleStep2Submit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!code.trim()) {
-      setErrorMessage('El código es inválido o ya fue usado');
+    if (!/^\d{6}$/.test(code)) {
+      setErrorMessage('El código tiene 6 dígitos');
       return;
     }
+
+    setInfoMessage(null);
+    setStep(3);
+  };
+
+  const handleStep3Submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
 
     if (newPassword.length < 8) {
       setErrorMessage('La contraseña debe tener al menos 8 caracteres');
@@ -73,8 +94,13 @@ export const ResetPassword: React.FC = () => {
       success('Contraseña guardada');
       navigate('/login');
     } catch (err: any) {
-      if (err.status === 400 || err.message?.includes('código')) {
-        setErrorMessage('El código es inválido o ya fue usado');
+      if (err.status === 400) {
+        // El backend valida el código recién al guardar: si falla, se vuelve a cargarlo
+        setCode('');
+        setNewPassword('');
+        setRepeatPassword('');
+        setStep(2);
+        setErrorMessage('El código es incorrecto, venció o ya se usó. Revíselo o pida uno nuevo');
       } else if (err.status === 429 || err.message?.includes('Demasiados')) {
         setErrorMessage('Demasiados intentos. Solicite un código nuevo');
       } else if (err.status === 422 || err.message?.includes('8 caracteres')) {
@@ -109,6 +135,11 @@ export const ResetPassword: React.FC = () => {
           <div
             className={`flex-1 h-1.5 rounded-full transition-colors ${
               step >= 2 ? 'bg-[#1D4ED8]' : 'bg-[#D6E4F7]'
+            }`}
+          />
+          <div
+            className={`flex-1 h-1.5 rounded-full transition-colors ${
+              step >= 3 ? 'bg-[#1D4ED8]' : 'bg-[#D6E4F7]'
             }`}
           />
         </div>
@@ -164,24 +195,71 @@ export const ResetPassword: React.FC = () => {
               </Link>
             </div>
           </form>
-        ) : (
-          <form onSubmit={handleStep2Submit} className="space-y-4" noValidate>
+        ) : step === 2 ? (
+          <form onSubmit={handleStep2Submit} className="space-y-5" noValidate>
+            <p className="text-sm text-[#51607A]">
+              Si <span className="font-medium text-[#0F1F3D] break-all">{email.trim()}</span> está
+              registrado, le enviamos un código de 6 dígitos.
+            </p>
+
             <div>
               <Input
                 label="Código"
                 requiredAsterisk
                 type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                autoFocus
+                maxLength={6}
                 placeholder="Ingrese el código de 6 dígitos"
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 disabled={isLoading}
                 required
               />
             </div>
 
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              className="w-full mt-2"
+              disabled={isLoading}
+            >
+              Continuar
+            </Button>
+
+            <div className="flex flex-col items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleResendCode}
+                disabled={isLoading}
+                className="text-sm font-medium text-[#1D4ED8] hover:underline cursor-pointer disabled:opacity-50"
+              >
+                Reenviar código
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep(1);
+                  setCode('');
+                  setInfoMessage(null);
+                  setErrorMessage(null);
+                }}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-[#51607A] hover:text-[#0F1F3D] cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Modificar correo electrónico
+              </button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={handleStep3Submit} className="space-y-4" noValidate>
+
             <div>
               <Input
                 label="Nueva contraseña"
+                autoFocus
                 requiredAsterisk
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Mínimo 8 caracteres"
@@ -247,13 +325,15 @@ export const ResetPassword: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
-                  setStep(1);
+                  setStep(2);
+                  setNewPassword('');
+                  setRepeatPassword('');
                   setErrorMessage(null);
                 }}
                 className="inline-flex items-center gap-1.5 text-sm font-medium text-[#51607A] hover:text-[#0F1F3D] cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4" />
-                Modificar correo electrónico
+                Volver al código
               </button>
             </div>
           </form>
