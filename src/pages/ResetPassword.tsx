@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useToast } from '../components/ui/Toast';
@@ -6,6 +6,8 @@ import { SocratesLogo } from '../components/ui/SocratesLogo';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Eye, EyeOff, AlertCircle, ArrowLeft } from 'lucide-react';
+
+const RESEND_WAIT_SECONDS = 60;
 
 export const ResetPassword: React.FC = () => {
   const navigate = useNavigate();
@@ -22,6 +24,15 @@ export const ResetPassword: React.FC = () => {
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  // El backend ignora pedidos del mismo usuario con menos de 60 s de diferencia
+  const [resendIn, setResendIn] = useState(0);
+  const [requestedEmail, setRequestedEmail] = useState('');
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = setTimeout(() => setResendIn(resendIn - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendIn]);
 
   const handleStep1Submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,9 +43,17 @@ export const ResetPassword: React.FC = () => {
       return;
     }
 
+    // Mismo correo dentro de la espera: el backend no mandaría otro, sigue valiendo el anterior
+    if (email.trim() === requestedEmail && resendIn > 0) {
+      setStep(2);
+      return;
+    }
+
     setIsLoading(true);
     try {
       await api.requestPassword({ email: email.trim() });
+      setRequestedEmail(email.trim());
+      setResendIn(RESEND_WAIT_SECONDS);
       setStep(2);
     } catch (err: any) {
       setErrorMessage(err.message || 'Error al solicitar el código');
@@ -48,8 +67,8 @@ export const ResetPassword: React.FC = () => {
     setIsLoading(true);
     try {
       await api.requestPassword({ email: email.trim() });
-      setCode('');
-      setInfoMessage('Si el correo está registrado, recibirá un código nuevo. Puede tardar hasta un minuto');
+      setResendIn(RESEND_WAIT_SECONDS);
+      setInfoMessage('Si el correo está registrado, le enviamos un código nuevo. El anterior deja de servir');
     } catch (err: any) {
       setErrorMessage(err.message || 'Error al solicitar el código');
     } finally {
@@ -233,10 +252,10 @@ export const ResetPassword: React.FC = () => {
               <button
                 type="button"
                 onClick={handleResendCode}
-                disabled={isLoading}
+                disabled={isLoading || resendIn > 0}
                 className="text-sm font-medium text-[#1D4ED8] hover:underline cursor-pointer disabled:opacity-50"
               >
-                Reenviar código
+                {resendIn > 0 ? `Reenviar código en ${resendIn} s` : 'Reenviar código'}
               </button>
               <button
                 type="button"
