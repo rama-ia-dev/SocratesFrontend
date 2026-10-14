@@ -7,7 +7,6 @@ import {
   UserCheck,
   GraduationCap,
   Users,
-  FolderKanban,
   ArrowRight,
 } from 'lucide-react';
 
@@ -32,12 +31,6 @@ export const Home: React.FC = () => {
           path: '/usuarios',
           icon: Users,
         },
-        {
-          title: 'Equipos de trabajo',
-          desc: 'Seguimiento de proyectos por curso lectivo, comisiones y privacidad.',
-          path: '/equipos',
-          icon: FolderKanban,
-        },
       ];
     }
 
@@ -49,24 +42,11 @@ export const Home: React.FC = () => {
           path: '/estudiantes',
           icon: GraduationCap,
         },
-        {
-          title: 'Equipos de trabajo',
-          desc: 'Creación de grupos de proyectos y seguimiento de propuestas académicas.',
-          path: '/equipos',
-          icon: FolderKanban,
-        },
       ];
     }
 
     // Alumno
-    return [
-      {
-        title: 'Equipos de trabajo',
-        desc: 'Consulta de proyectos asignados, integrantes y problemática del seminario.',
-        path: '/equipos',
-        icon: FolderKanban,
-      },
-    ];
+    return [];
   };
 
   const modules = getAvailableModules();
@@ -77,6 +57,10 @@ export const Home: React.FC = () => {
         title="Inicio"
         subtitle="Plataforma de gestión del Seminario Integrador"
       />
+
+      {modules.length === 0 && (
+        <p className="text-sm text-[#51607A]">Todavía no hay módulos disponibles para su rol.</p>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {modules.map((mod) => {
