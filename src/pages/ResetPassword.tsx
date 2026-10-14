@@ -13,7 +13,7 @@ export const ResetPassword: React.FC = () => {
   const navigate = useNavigate();
   const { success } = useToast();
 
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2>(1);
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -40,6 +40,16 @@ export const ResetPassword: React.FC = () => {
 
     if (!email.trim()) {
       setErrorMessage('Ingrese su correo electrónico');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setErrorMessage('La contraseña debe tener al menos 8 caracteres');
+      return;
+    }
+
+    if (newPassword !== repeatPassword) {
+      setErrorMessage('Las contraseñas no coinciden');
       return;
     }
 
@@ -76,7 +86,7 @@ export const ResetPassword: React.FC = () => {
     }
   };
 
-  const handleStep2Submit = (e: React.FormEvent) => {
+  const handleStep2Submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -85,47 +95,27 @@ export const ResetPassword: React.FC = () => {
       return;
     }
 
-    setInfoMessage(null);
-    setStep(3);
-  };
-
-  const handleStep3Submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-
-    if (newPassword.length < 8) {
-      setErrorMessage('La contraseña debe tener al menos 8 caracteres');
-      return;
-    }
-
-    if (newPassword !== repeatPassword) {
-      setErrorMessage('Las contraseñas no coinciden');
-      return;
-    }
-
     setIsLoading(true);
     try {
       await api.confirmPassword({
         email: email.trim(),
-        code: code.trim(),
+        code,
         new_password: newPassword,
       });
       success('Contraseña guardada');
       navigate('/login');
     } catch (err: any) {
       if (err.status === 400) {
-        // El backend valida el código recién al guardar: si falla, se vuelve a cargarlo
         setCode('');
-        setNewPassword('');
-        setRepeatPassword('');
-        setStep(2);
-        setErrorMessage('El código es incorrecto, venció o ya se usó. Revíselo o pida uno nuevo');
-      } else if (err.status === 429 || err.message?.includes('Demasiados')) {
-        setErrorMessage('Demasiados intentos. Solicite un código nuevo');
-      } else if (err.status === 422 || err.message?.includes('8 caracteres')) {
+        setInfoMessage(null);
+        setErrorMessage(
+          'El código es incorrecto, venció, ya se usó o se bloqueó por demasiados intentos. Revíselo o pida uno nuevo'
+        );
+      } else if (err.status === 422) {
+        setStep(1);
         setErrorMessage('La contraseña debe tener al menos 8 caracteres');
       } else {
-        setErrorMessage(err.message || 'Error al actualizar contraseña');
+        setErrorMessage(err.message || 'Error al guardar la contraseña');
       }
     } finally {
       setIsLoading(false);
@@ -156,11 +146,6 @@ export const ResetPassword: React.FC = () => {
               step >= 2 ? 'bg-[#1D4ED8]' : 'bg-[#D6E4F7]'
             }`}
           />
-          <div
-            className={`flex-1 h-1.5 rounded-full transition-colors ${
-              step >= 3 ? 'bg-[#1D4ED8]' : 'bg-[#D6E4F7]'
-            }`}
-          />
         </div>
 
         {infoMessage && (
@@ -180,7 +165,7 @@ export const ResetPassword: React.FC = () => {
         )}
 
         {step === 1 ? (
-          <form onSubmit={handleStep1Submit} className="space-y-5" noValidate>
+          <form onSubmit={handleStep1Submit} className="space-y-4" noValidate>
             <div>
               <Input
                 label="Correo electrónico"
@@ -194,93 +179,12 @@ export const ResetPassword: React.FC = () => {
               />
             </div>
 
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              className="w-full mt-2"
-              isLoading={isLoading}
-            >
-              Enviar código
-            </Button>
-
-            <div className="text-center pt-2">
-              <Link
-                to="/login"
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-[#51607A] hover:text-[#0F1F3D]"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Volver al inicio de sesión
-              </Link>
-            </div>
-          </form>
-        ) : step === 2 ? (
-          <form onSubmit={handleStep2Submit} className="space-y-5" noValidate>
-            <p className="text-sm text-[#51607A]">
-              Si <span className="font-medium text-[#0F1F3D] break-all">{email.trim()}</span> está
-              registrado, le enviamos un código de 6 dígitos.
-            </p>
-
-            <div>
-              <Input
-                label="Código"
-                requiredAsterisk
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                autoFocus
-                maxLength={6}
-                placeholder="Ingrese el código de 6 dígitos"
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                disabled={isLoading}
-                required
-              />
-            </div>
-
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              className="w-full mt-2"
-              disabled={isLoading}
-            >
-              Continuar
-            </Button>
-
-            <div className="flex flex-col items-center gap-2 pt-2">
-              <button
-                type="button"
-                onClick={handleResendCode}
-                disabled={isLoading || resendIn > 0}
-                className="text-sm font-medium text-[#1D4ED8] hover:underline cursor-pointer disabled:opacity-50"
-              >
-                {resendIn > 0 ? `Reenviar código en ${resendIn} s` : 'Reenviar código'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setStep(1);
-                  setCode('');
-                  setInfoMessage(null);
-                  setErrorMessage(null);
-                }}
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-[#51607A] hover:text-[#0F1F3D] cursor-pointer"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Modificar correo electrónico
-              </button>
-            </div>
-          </form>
-        ) : (
-          <form onSubmit={handleStep3Submit} className="space-y-4" noValidate>
-
             <div>
               <Input
                 label="Nueva contraseña"
-                autoFocus
                 requiredAsterisk
                 type={showPassword ? 'text' : 'password'}
+                autoComplete="new-password"
                 placeholder="Mínimo 8 caracteres"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -308,6 +212,7 @@ export const ResetPassword: React.FC = () => {
                 label="Repetir contraseña"
                 requiredAsterisk
                 type={showRepeatPassword ? 'text' : 'password'}
+                autoComplete="new-password"
                 placeholder="Repita la nueva contraseña"
                 value={repeatPassword}
                 onChange={(e) => setRepeatPassword(e.target.value)}
@@ -337,22 +242,74 @@ export const ResetPassword: React.FC = () => {
               className="w-full mt-2"
               isLoading={isLoading}
             >
-              Guardar contraseña
+              Enviar código
             </Button>
 
             <div className="text-center pt-2">
+              <Link
+                to="/login"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-[#51607A] hover:text-[#0F1F3D]"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Volver al inicio de sesión
+              </Link>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={handleStep2Submit} className="space-y-5" noValidate>
+            <p className="text-sm text-[#51607A]">
+              Si <span className="font-medium text-[#0F1F3D] break-all">{email.trim()}</span> está
+              registrado, le enviamos un código de 6 dígitos.
+            </p>
+
+            <div>
+              <Input
+                label="Código"
+                requiredAsterisk
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                autoFocus
+                maxLength={6}
+                placeholder="Ingrese el código de 6 dígitos"
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                disabled={isLoading}
+                required
+              />
+            </div>
+
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              className="w-full mt-2"
+              isLoading={isLoading}
+            >
+              Guardar contraseña
+            </Button>
+
+            <div className="flex flex-col items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleResendCode}
+                disabled={isLoading || resendIn > 0}
+                className="text-sm font-medium text-[#1D4ED8] hover:underline cursor-pointer disabled:opacity-50"
+              >
+                {resendIn > 0 ? `Reenviar código en ${resendIn} s` : 'Reenviar código'}
+              </button>
               <button
                 type="button"
                 onClick={() => {
-                  setStep(2);
-                  setNewPassword('');
-                  setRepeatPassword('');
+                  setStep(1);
+                  setCode('');
+                  setInfoMessage(null);
                   setErrorMessage(null);
                 }}
                 className="inline-flex items-center gap-1.5 text-sm font-medium text-[#51607A] hover:text-[#0F1F3D] cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4" />
-                Volver al código
+                Modificar correo o contraseña
               </button>
             </div>
           </form>
