@@ -8,7 +8,6 @@ import {
   Layers,
   GraduationCap,
   Users,
-  FolderKanban,
   UserCheck,
   User,
   LogOut,
@@ -64,21 +63,17 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       return [
         { label: 'Comisiones', path: '/comisiones', icon: Layers },
         { label: 'Usuarios', path: '/usuarios', icon: Users },
-        { label: 'Equipos de trabajo', path: '/equipos', icon: FolderKanban },
       ];
     }
 
     if (user.role === 'professor') {
       return [
         { label: 'Estudiantes', path: '/estudiantes', icon: GraduationCap },
-        { label: 'Equipos de trabajo', path: '/equipos', icon: FolderKanban },
       ];
     }
 
     // Alumno
-    return [
-      { label: 'Equipos de trabajo', path: '/equipos', icon: FolderKanban },
-    ];
+    return [];
   };
 
   const navItems = getNavItems();
