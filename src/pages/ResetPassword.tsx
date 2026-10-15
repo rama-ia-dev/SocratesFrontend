@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useToast } from '../components/ui/Toast';
@@ -6,6 +6,8 @@ import { SocratesLogo } from '../components/ui/SocratesLogo';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Eye, EyeOff, AlertCircle, ArrowLeft } from 'lucide-react';
+
+const RESEND_WAIT_SECONDS = 60;
 
 export const ResetPassword: React.FC = () => {
   const navigate = useNavigate();
@@ -22,6 +24,15 @@ export const ResetPassword: React.FC = () => {
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  // El backend ignora pedidos del mismo usuario con menos de 60 s de diferencia
+  const [resendIn, setResendIn] = useState(0);
+  const [requestedEmail, setRequestedEmail] = useState('');
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = setTimeout(() => setResendIn(resendIn - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendIn]);
 
   const handleStep1Submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,27 +40,6 @@ export const ResetPassword: React.FC = () => {
 
     if (!email.trim()) {
       setErrorMessage('Ingrese su correo electrónico');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      await api.requestPassword({ email: email.trim() });
-      setInfoMessage('Si el correo está registrado, recibirá un código');
-      setStep(2);
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Error al solicitar el código');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleStep2Submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-
-    if (!code.trim()) {
-      setErrorMessage('El código es inválido o ya fue usado');
       return;
     }
 
@@ -63,24 +53,69 @@ export const ResetPassword: React.FC = () => {
       return;
     }
 
+    // Mismo correo dentro de la espera: el backend no mandaría otro, sigue valiendo el anterior
+    if (email.trim() === requestedEmail && resendIn > 0) {
+      setStep(2);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await api.requestPassword({ email: email.trim() });
+      setRequestedEmail(email.trim());
+      setResendIn(RESEND_WAIT_SECONDS);
+      setStep(2);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Error al solicitar el código');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    setErrorMessage(null);
+    setIsLoading(true);
+    try {
+      await api.requestPassword({ email: email.trim() });
+      setResendIn(RESEND_WAIT_SECONDS);
+      setInfoMessage('Si el correo está registrado, le enviamos un código nuevo. El anterior deja de servir');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Error al solicitar el código');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleStep2Submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+
+    if (!/^\d{6}$/.test(code)) {
+      setErrorMessage('El código tiene 6 dígitos');
+      return;
+    }
+
     setIsLoading(true);
     try {
       await api.confirmPassword({
         email: email.trim(),
-        code: code.trim(),
+        code,
         new_password: newPassword,
       });
       success('Contraseña guardada');
       navigate('/login');
     } catch (err: any) {
-      if (err.status === 400 || err.message?.includes('código')) {
-        setErrorMessage('El código es inválido o ya fue usado');
-      } else if (err.status === 429 || err.message?.includes('Demasiados')) {
-        setErrorMessage('Demasiados intentos. Solicite un código nuevo');
-      } else if (err.status === 422 || err.message?.includes('8 caracteres')) {
+      if (err.status === 400) {
+        setCode('');
+        setInfoMessage(null);
+        setErrorMessage(
+          'El código es incorrecto, venció, ya se usó o se bloqueó por demasiados intentos. Revíselo o pida uno nuevo'
+        );
+      } else if (err.status === 422) {
+        setStep(1);
         setErrorMessage('La contraseña debe tener al menos 8 caracteres');
       } else {
-        setErrorMessage(err.message || 'Error al actualizar contraseña');
+        setErrorMessage(err.message || 'Error al guardar la contraseña');
       }
     } finally {
       setIsLoading(false);
@@ -130,7 +165,7 @@ export const ResetPassword: React.FC = () => {
         )}
 
         {step === 1 ? (
-          <form onSubmit={handleStep1Submit} className="space-y-5" noValidate>
+          <form onSubmit={handleStep1Submit} className="space-y-4" noValidate>
             <div>
               <Input
                 label="Correo electrónico"
@@ -144,46 +179,12 @@ export const ResetPassword: React.FC = () => {
               />
             </div>
 
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              className="w-full mt-2"
-              isLoading={isLoading}
-            >
-              Enviar código
-            </Button>
-
-            <div className="text-center pt-2">
-              <Link
-                to="/login"
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-[#51607A] hover:text-[#0F1F3D]"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Volver al inicio de sesión
-              </Link>
-            </div>
-          </form>
-        ) : (
-          <form onSubmit={handleStep2Submit} className="space-y-4" noValidate>
-            <div>
-              <Input
-                label="Código"
-                requiredAsterisk
-                type="text"
-                placeholder="Ingrese el código de 6 dígitos"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                disabled={isLoading}
-                required
-              />
-            </div>
-
             <div>
               <Input
                 label="Nueva contraseña"
                 requiredAsterisk
                 type={showPassword ? 'text' : 'password'}
+                autoComplete="new-password"
                 placeholder="Mínimo 8 caracteres"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -211,6 +212,7 @@ export const ResetPassword: React.FC = () => {
                 label="Repetir contraseña"
                 requiredAsterisk
                 type={showRepeatPassword ? 'text' : 'password'}
+                autoComplete="new-password"
                 placeholder="Repita la nueva contraseña"
                 value={repeatPassword}
                 onChange={(e) => setRepeatPassword(e.target.value)}
@@ -240,20 +242,74 @@ export const ResetPassword: React.FC = () => {
               className="w-full mt-2"
               isLoading={isLoading}
             >
-              Guardar contraseña
+              Enviar código
             </Button>
 
             <div className="text-center pt-2">
+              <Link
+                to="/login"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-[#51607A] hover:text-[#0F1F3D]"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Volver al inicio de sesión
+              </Link>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={handleStep2Submit} className="space-y-5" noValidate>
+            <p className="text-sm text-[#51607A]">
+              Si <span className="font-medium text-[#0F1F3D] break-all">{email.trim()}</span> está
+              registrado, le enviamos un código de 6 dígitos.
+            </p>
+
+            <div>
+              <Input
+                label="Código"
+                requiredAsterisk
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                autoFocus
+                maxLength={6}
+                placeholder="Ingrese el código de 6 dígitos"
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                disabled={isLoading}
+                required
+              />
+            </div>
+
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              className="w-full mt-2"
+              isLoading={isLoading}
+            >
+              Guardar contraseña
+            </Button>
+
+            <div className="flex flex-col items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleResendCode}
+                disabled={isLoading || resendIn > 0}
+                className="text-sm font-medium text-[#1D4ED8] hover:underline cursor-pointer disabled:opacity-50"
+              >
+                {resendIn > 0 ? `Reenviar código en ${resendIn} s` : 'Reenviar código'}
+              </button>
               <button
                 type="button"
                 onClick={() => {
                   setStep(1);
+                  setCode('');
+                  setInfoMessage(null);
                   setErrorMessage(null);
                 }}
                 className="inline-flex items-center gap-1.5 text-sm font-medium text-[#51607A] hover:text-[#0F1F3D] cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4" />
-                Modificar correo electrónico
+                Modificar correo o contraseña
               </button>
             </div>
           </form>
