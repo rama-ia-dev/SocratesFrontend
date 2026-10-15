@@ -28,6 +28,9 @@ services:
     env_file:
       - path: .env.backend
         required: false
+    # Publicado para desarrollar: `docker compose up -d backend` + `npm run dev` (el proxy apunta a 8000).
+    ports:
+      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy

@@ -33,8 +33,9 @@ cp .env.example .env.local   # y ajustar si hace falta
 npm run dev                  # http://localhost:3000
 ```
 
-- **Con backend:** levantar `SocratesBackend` (`docker compose up -d`) y dejar `VITE_USE_MOCK=false`.
-  Vite reenvía `/api/...` a `http://localhost:8000`.
+- **Con backend:** desde esta misma carpeta, `docker compose up -d backend` (levanta la base y el
+  backend, sin el contenedor del frontend) y dejar `VITE_USE_MOCK=false`. Vite reenvía `/api/...` a
+  `http://localhost:8000`.
 - **Sin backend:** `VITE_USE_MOCK=true`. Las pantallas usan datos simulados y aparece el selector
   "Rol en vista" para recorrerlas como admin, profesor o alumno.
 
