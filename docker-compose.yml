@@ -1,0 +1,48 @@
+# Levanta Sócrates completo (base, backend y frontend) con `docker compose up --build`.
+# El backend se construye directo desde su repo de GitHub: no hace falta clonarlo.
+# Si el backend suma o cambia variables de entorno, se actualizan acá.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: socrates
+      POSTGRES_PASSWORD: socrates
+      POSTGRES_DB: socrates
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U socrates -d socrates"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: https://github.com/JoaquinMorais/SocratesBackend.git#main
+    environment:
+      DATABASE_URL: postgresql+asyncpg://socrates:socrates@db:5432/socrates
+      SECRET_KEY: solo-para-desarrollo-local
+    # Opcional: para mandar mails de verdad, crear .env.backend (ver .env.backend.example).
+    # Sin ese archivo, los mails se imprimen en `docker compose logs backend`.
+    # Lo de `environment` le gana a este archivo: la base siempre es la del contenedor.
+    env_file:
+      - path: .env.backend
+        required: false
+    # Publicado para desarrollar: `docker compose up -d backend` + `npm run dev` (el proxy apunta a 8000).
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: .
+    environment:
+      VITE_BACKEND_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

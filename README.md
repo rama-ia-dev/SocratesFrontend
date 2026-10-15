@@ -6,7 +6,24 @@ Parte del prototipo de UX/UI de Mateo Fernández (repo `MateoFernandez04/proyect
 siendo la referencia de diseño. Este repo es el producto: se conecta al backend
 (`JoaquinMorais/SocratesBackend`).
 
-## Arrancar
+## Levantar todo con Docker (para probar)
+
+Solo requiere Docker Desktop. Levanta la base, el backend (se baja de su repo de GitHub) y el
+frontend:
+
+```bash
+docker compose up --build -d   # http://localhost:3000
+```
+
+- Los usuarios de prueba son los de `data/seed.json` del backend.
+- Sin configurar nada, los mails (por ejemplo, el código para crear o restablecer la contraseña)
+  no se envían: se leen con `docker compose logs backend`. Para mandarlos de verdad, guardar el
+  `.env` del backend (se pasa por privado) como `.env.backend` en esta carpeta y poner tu correo
+  institucional en `EMAIL_DEV_REDIRECT`.
+- Para traer la última versión del backend o del frontend: `docker compose up --build -d` de nuevo.
+- Para apagar: `docker compose down` (agregar `-v` borra también la base).
+
+## Arrancar para desarrollar
 
 Requiere Node 20 o superior.
 
@@ -16,8 +33,9 @@ cp .env.example .env.local   # y ajustar si hace falta
 npm run dev                  # http://localhost:3000
 ```
 
-- **Con backend:** levantar `SocratesBackend` (`docker compose up -d`) y dejar `VITE_USE_MOCK=false`.
-  Vite reenvía `/api/...` a `http://localhost:8000`.
+- **Con backend:** desde esta misma carpeta, `docker compose up -d backend` (levanta la base y el
+  backend, sin el contenedor del frontend) y dejar `VITE_USE_MOCK=false`. Vite reenvía `/api/...` a
+  `http://localhost:8000`.
 - **Sin backend:** `VITE_USE_MOCK=true`. Las pantallas usan datos simulados y aparece el selector
   "Rol en vista" para recorrerlas como admin, profesor o alumno.
 
