@@ -22,9 +22,9 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://socrates:socrates@db:5432/socrates
       SECRET_KEY: solo-para-desarrollo-local
-      # Sin credenciales, los mails (códigos de contraseña) se imprimen en `docker compose logs backend`.
-      EMAIL_BACKEND: console
-    # Opcional: para mandar mails de verdad, crear .env.backend a partir de .env.backend.example.
+    # Opcional: para mandar mails de verdad, crear .env.backend (ver .env.backend.example).
+    # Sin ese archivo, los mails se imprimen en `docker compose logs backend`.
+    # Lo de `environment` le gana a este archivo: la base siempre es la del contenedor.
     env_file:
       - path: .env.backend
         required: false
