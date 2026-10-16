@@ -68,6 +68,10 @@ export const Sections: React.FC = () => {
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [targetSYForAssign, setTargetSYForAssign] = useState<SectionYearPublic | null>(null);
   const [allProfessors, setAllProfessors] = useState<UserListItem[]>([]);
+  // Docentes que ya están asignados al curso lectivo (se muestran marcados y no se pueden elegir)
+  const [assignedProfIds, setAssignedProfIds] = useState<number[]>([]);
+  const [loadingAssigned, setLoadingAssigned] = useState(false);
+  // Docentes nuevos elegidos para asignar
   const [selectedProfIds, setSelectedProfIds] = useState<number[]>([]);
   const [assignModalError, setAssignModalError] = useState<string | null>(null);
   const [savingAssign, setSavingAssign] = useState(false);
@@ -249,13 +253,27 @@ export const Sections: React.FC = () => {
   // ==========================================
   // Handlers Asignar Docentes
   // ==========================================
-  const handleOpenAssignModal = (sy: SectionYearPublic) => {
+  const handleOpenAssignModal = async (sy: SectionYearPublic) => {
     setTargetSYForAssign(sy);
-    const currentAssigned = (sy.assigned_professors || []).map((p) => p.id_professor);
-    setSelectedProfIds(currentAssigned);
+    setAssignedProfIds([]);
+    setSelectedProfIds([]);
     setAssignModalError(null);
     setOpenMenuId(null);
     setIsAssignModalOpen(true);
+
+    // El curso lectivo no trae sus docentes: se consultan las asignaciones
+    setLoadingAssigned(true);
+    try {
+      const res = await api.getProfessorSectionYears({
+        id_section_year: sy.id_section_year,
+        limit: 100,
+      });
+      setAssignedProfIds(res.items.map((a) => a.id_professor));
+    } catch {
+      setAssignModalError('No se pudieron cargar los docentes asignados');
+    } finally {
+      setLoadingAssigned(false);
+    }
   };
 
   const handleSaveAssign = async (e: React.FormEvent) => {
@@ -264,13 +282,12 @@ export const Sections: React.FC = () => {
     setAssignModalError(null);
 
     if (selectedProfIds.length === 0) {
-      setAssignModalError('Seleccione al menos un docente');
+      setAssignModalError('Seleccione al menos un docente para asignar');
       return;
     }
 
     setSavingAssign(true);
     try {
-      // Registrar cada profesor seleccionado
       for (const profId of selectedProfIds) {
         try {
           await api.createProfessorSectionYear({
@@ -278,20 +295,24 @@ export const Sections: React.FC = () => {
             id_section_year: targetSYForAssign.id_section_year,
           });
         } catch (err: any) {
-          // Si ya estaba asignado ignoramos o mostramos advertencia
+          // Si otro usuario lo asignó mientras tanto, el resultado buscado ya se cumple
           if (err.status !== 409) {
             throw err;
           }
         }
       }
-      success('Docentes asignados al curso lectivo');
+      success(
+        selectedProfIds.length === 1
+          ? 'Docente asignado al curso lectivo'
+          : 'Docentes asignados al curso lectivo'
+      );
       setIsAssignModalOpen(false);
       fetchSectionYears();
     } catch (err: any) {
-      if (err.status === 409) {
-        setAssignModalError('El docente ya está asignado a este curso lectivo');
+      if (err.status === 404) {
+        setAssignModalError('El docente o el curso lectivo ya no existe');
       } else {
-        setAssignModalError(err.message || 'Error al asignar docentes');
+        setAssignModalError('Error al asignar docentes');
       }
     } finally {
       setSavingAssign(false);
@@ -299,6 +320,7 @@ export const Sections: React.FC = () => {
   };
 
   const toggleSelectProfessor = (profId: number) => {
+    if (assignedProfIds.includes(profId)) return;
     setSelectedProfIds((prev) =>
       prev.includes(profId) ? prev.filter((id) => id !== profId) : [...prev, profId]
     );
@@ -734,35 +756,48 @@ export const Sections: React.FC = () => {
             <label className="block text-sm font-medium text-[#0F1F3D] mb-2">
               Docentes <span className="text-[#B91C1C]">*</span>
             </label>
-            <div className="max-h-56 overflow-y-auto border border-[#D6E4F7] rounded-lg divide-y divide-[#D6E4F7] bg-white">
-              {allProfessors.map((prof) => {
-                const isSelected = selectedProfIds.includes(prof.id_user);
-                return (
-                  <div
-                    key={prof.id_user}
-                    onClick={() => toggleSelectProfessor(prof.id_user)}
-                    className={`flex items-center justify-between px-3.5 py-2.5 text-sm cursor-pointer transition-colors ${
-                      isSelected ? 'bg-[#EFF6FF]' : 'hover:bg-[#F5F9FF]'
-                    }`}
-                  >
-                    <div>
-                      <span className="font-medium text-[#0F1F3D]">
-                        {prof.last_name}, {prof.first_name}
-                      </span>
-                      <span className="text-xs text-[#51607A] ml-2">
-                        Leg. {prof.legajo}
-                      </span>
+            {loadingAssigned ? (
+              <p className="text-sm text-[#51607A] py-4 text-center">Cargando docentes...</p>
+            ) : (
+              <div className="max-h-56 overflow-y-auto border border-[#D6E4F7] rounded-lg divide-y divide-[#D6E4F7] bg-white">
+                {allProfessors.map((prof) => {
+                  const isAssigned = assignedProfIds.includes(prof.id_user);
+                  const isSelected = isAssigned || selectedProfIds.includes(prof.id_user);
+                  return (
+                    <div
+                      key={prof.id_user}
+                      onClick={() => toggleSelectProfessor(prof.id_user)}
+                      className={`flex items-center justify-between px-3.5 py-2.5 text-sm transition-colors ${
+                        isAssigned
+                          ? 'bg-[#F8FAFC] cursor-default'
+                          : isSelected
+                            ? 'bg-[#EFF6FF] cursor-pointer'
+                            : 'hover:bg-[#F5F9FF] cursor-pointer'
+                      }`}
+                    >
+                      <div>
+                        <span className="font-medium text-[#0F1F3D]">
+                          {prof.last_name}, {prof.first_name}
+                        </span>
+                        <span className="text-xs text-[#51607A] ml-2">
+                          Leg. {prof.legajo}
+                        </span>
+                        {isAssigned && (
+                          <span className="text-xs text-[#51607A] italic ml-2">Ya asignado</span>
+                        )}
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        disabled={isAssigned}
+                        onChange={() => {}} // controlado por el div onClick
+                        className="rounded border-[#D6E4F7] text-[#1D4ED8] focus:ring-[#BAE6FD] pointer-events-none disabled:opacity-50"
+                      />
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => {}} // controlado por el div onClick
-                      className="rounded border-[#D6E4F7] text-[#1D4ED8] focus:ring-[#BAE6FD] pointer-events-none"
-                    />
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-3 pt-3 border-t border-[#D6E4F7]">
@@ -778,6 +813,7 @@ export const Sections: React.FC = () => {
               type="submit"
               variant="primary"
               isLoading={savingAssign}
+              disabled={loadingAssigned}
             >
               Asignar
             </Button>
