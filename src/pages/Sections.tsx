@@ -177,8 +177,11 @@ export const Sections: React.FC = () => {
     } catch (err: any) {
       if (err.status === 409 || err.message?.includes('existe')) {
         setSectionModalError('Ya existe una comisión con ese nombre');
+      } else if (err.status === 422) {
+        // El backend detalla la validación en una lista, en inglés: se muestra la regla en español
+        setSectionModalError('El nombre debe tener entre 1 y 20 caracteres');
       } else {
-        setSectionModalError(err.message || 'Error al guardar la comisión');
+        setSectionModalError('Error al guardar la comisión');
       }
     } finally {
       setSavingSection(false);
