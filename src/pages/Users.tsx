@@ -29,6 +29,27 @@ import {
   UserCheck,
   GraduationCap,
 } from 'lucide-react';
+import {
+  useField,
+  validateName,
+  validateProfessorEmail,
+  validateLegajo,
+  validateBirthDate,
+  validateEnrollmentYear,
+  enrollmentYearRange,
+  maxBirthDate,
+  minBirthDate,
+  digitsOnly,
+} from '../lib/validation';
+
+// El backend responde 409 tanto por correo como por legajo repetido; el detalle dice cuál.
+const professorSaveError = (err: any, fallback: string): string => {
+  const detail = String(err.message || '').toLowerCase();
+  if (err.status === 409 && detail.includes('legajo')) return 'Ya existe un docente con ese legajo';
+  if (err.status === 409 && detail.includes('mail')) return 'Ya existe un docente con ese correo';
+  if (err.status === 422 && detail.includes('reserved for students')) return 'Los correos de alumnos no se pueden usar para un docente';
+  return err.message || fallback;
+};
 
 export const Users: React.FC = () => {
   const navigate = useNavigate();
@@ -49,11 +70,11 @@ export const Users: React.FC = () => {
   // Diálogo Alta Docente
   // ==========================================
   const [isProfCreateModalOpen, setIsProfCreateModalOpen] = useState(false);
-  const [profCreateFirstName, setProfCreateFirstName] = useState('');
-  const [profCreateLastName, setProfCreateLastName] = useState('');
-  const [profCreateEmail, setProfCreateEmail] = useState('');
-  const [profCreateLegajo, setProfCreateLegajo] = useState<number | ''>('');
-  const [profCreateBirthDate, setProfCreateBirthDate] = useState('');
+  const profCreateFirstName = useField('', validateName('nombre'));
+  const profCreateLastName = useField('', validateName('apellido'));
+  const profCreateEmail = useField('', validateProfessorEmail);
+  const profCreateLegajo = useField('', validateLegajo);
+  const profCreateBirthDate = useField('', (v) => validateBirthDate(v), { validateOnChange: true });
   const [profCreateIsSuperAdmin, setProfCreateIsSuperAdmin] = useState(false);
   const [profCreateError, setProfCreateError] = useState<string | null>(null);
   const [isSavingProfCreate, setIsSavingProfCreate] = useState(false);
@@ -63,11 +84,10 @@ export const Users: React.FC = () => {
   // ==========================================
   const [isProfEditModalOpen, setIsProfEditModalOpen] = useState(false);
   const [editingProf, setEditingProf] = useState<UserListItem | null>(null);
-  const [profEditFirstName, setProfEditFirstName] = useState('');
-  const [profEditLastName, setProfEditLastName] = useState('');
-  const [profEditEmail, setProfEditEmail] = useState('');
-  const [profEditOriginalEmail, setProfEditOriginalEmail] = useState('');
-  const [profEditLegajo, setProfEditLegajo] = useState<number | ''>('');
+  const profEditFirstName = useField('', validateName('nombre'));
+  const profEditLastName = useField('', validateName('apellido'));
+  const profEditEmail = useField('', validateProfessorEmail);
+  const profEditLegajo = useField('', validateLegajo);
   const [profEditIsSuperAdmin, setProfEditIsSuperAdmin] = useState(false);
   const [profEditError, setProfEditError] = useState<string | null>(null);
   const [isSavingProfEdit, setIsSavingProfEdit] = useState(false);
@@ -77,12 +97,19 @@ export const Users: React.FC = () => {
   // ==========================================
   const [isStudentEditModalOpen, setIsStudentEditModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<UserListItem | null>(null);
-  const [studentEditFirstName, setStudentEditFirstName] = useState('');
-  const [studentEditLastName, setStudentEditLastName] = useState('');
-  const [studentEditLegajo, setStudentEditLegajo] = useState<number | ''>('');
-  const [studentEditOriginalLegajo, setStudentEditOriginalLegajo] = useState<number | ''>('');
-  const [studentEditBirthDate, setStudentEditBirthDate] = useState('2002-01-01');
-  const [studentEditEnrollmentYear, setStudentEditEnrollmentYear] = useState<number>(2022);
+  const studentEditFirstName = useField('', validateName('nombre'));
+  const studentEditLastName = useField('', validateName('apellido'));
+  const studentEditLegajo = useField('', validateLegajo);
+  // El listado no trae la fecha de nacimiento: es opcional al modificar y, si se carga, el año
+  // de ingreso se valida contra ella.
+  const studentEditBirthDate = useField('', (v) => validateBirthDate(v, false), { validateOnChange: true });
+  const studentEditEnrollmentYear = useField('', (v) =>
+    studentEditBirthDate.value
+      ? validateEnrollmentYear(v, studentEditBirthDate.value)
+      : /^\d{4}$/.test(v) && Number(v) <= new Date().getFullYear()
+        ? null
+        : 'Ingrese un año de cuatro cifras, no posterior al actual'
+  );
   const [studentEditError, setStudentEditError] = useState<string | null>(null);
   const [isSavingStudentEdit, setIsSavingStudentEdit] = useState(false);
 
@@ -112,11 +139,11 @@ export const Users: React.FC = () => {
   // Handlers Alta Docente
   // ==========================================
   const handleOpenCreateProf = () => {
-    setProfCreateFirstName('');
-    setProfCreateLastName('');
-    setProfCreateEmail('');
-    setProfCreateLegajo('');
-    setProfCreateBirthDate('');
+    profCreateFirstName.reset('');
+    profCreateLastName.reset('');
+    profCreateEmail.reset('');
+    profCreateLegajo.reset('');
+    profCreateBirthDate.reset('');
     setProfCreateIsSuperAdmin(false);
     setProfCreateError(null);
     setIsProfCreateModalOpen(true);
@@ -126,57 +153,25 @@ export const Users: React.FC = () => {
     e.preventDefault();
     setProfCreateError(null);
 
-    if (!profCreateFirstName.trim() || !profCreateLastName.trim()) {
-      setProfCreateError('Ingrese nombre y apellido');
-      return;
-    }
-
-    const mailLower = profCreateEmail.trim().toLowerCase();
-    if (!mailLower) {
-      setProfCreateError('Ingrese un correo electrónico');
-      return;
-    }
-
-    if (mailLower.endsWith('@sistemas.frc.utn.edu.ar')) {
-      setProfCreateError('No puede usar el dominio de los alumnos');
-      return;
-    }
-
-    if (!profCreateLegajo || profCreateLegajo <= 0) {
-      setProfCreateError('El legajo debe ser un número positivo');
-      return;
-    }
-
-    if (!profCreateBirthDate) {
-      setProfCreateError('Ingrese la fecha de nacimiento');
-      return;
-    }
-    if (profCreateBirthDate > new Date().toISOString().slice(0, 10)) {
-      setProfCreateError('La fecha de nacimiento no puede ser posterior a hoy');
-      return;
-    }
+    // Se revisan todos (no se corta en el primero) para marcar cada campo con error a la vez
+    const checks = [profCreateFirstName, profCreateLastName, profCreateEmail, profCreateLegajo, profCreateBirthDate].map((f) => f.check());
+    if (checks.includes(false)) return;
 
     setIsSavingProfCreate(true);
     try {
       await api.createProfessor({
-        first_name: profCreateFirstName.trim(),
-        last_name: profCreateLastName.trim(),
-        mail: mailLower,
-        legajo: Number(profCreateLegajo),
-        birth_date: profCreateBirthDate,
+        first_name: profCreateFirstName.value.trim(),
+        last_name: profCreateLastName.value.trim(),
+        mail: profCreateEmail.value.trim().toLowerCase(),
+        legajo: Number(profCreateLegajo.value),
+        birth_date: profCreateBirthDate.value,
         is_super_admin: profCreateIsSuperAdmin,
       });
       success('Docente registrado. Recibirá un correo para crear su contraseña');
       setIsProfCreateModalOpen(false);
       fetchUsers();
     } catch (err: any) {
-      if (err.status === 409 || err.message?.includes('existe')) {
-        setProfCreateError('Ya existe un docente con ese correo');
-      } else if (err.status === 422 || err.message?.includes('dominio')) {
-        setProfCreateError('No puede usar el dominio de los alumnos');
-      } else {
-        setProfCreateError(err.message || 'Error al guardar docente');
-      }
+      setProfCreateError(professorSaveError(err, 'Error al guardar docente'));
     } finally {
       setIsSavingProfCreate(false);
     }
@@ -187,11 +182,10 @@ export const Users: React.FC = () => {
   // ==========================================
   const handleOpenEditProf = (u: UserListItem) => {
     setEditingProf(u);
-    setProfEditFirstName(u.first_name);
-    setProfEditLastName(u.last_name);
-    setProfEditEmail(u.email);
-    setProfEditOriginalEmail(u.email);
-    setProfEditLegajo(u.legajo);
+    profEditFirstName.reset(u.first_name);
+    profEditLastName.reset(u.last_name);
+    profEditEmail.reset(u.email);
+    profEditLegajo.reset(String(u.legajo));
     setProfEditIsSuperAdmin(Boolean(u.is_super_admin));
     setProfEditError(null);
     setOpenMenuId(null);
@@ -203,26 +197,8 @@ export const Users: React.FC = () => {
     if (!editingProf) return;
     setProfEditError(null);
 
-    if (!profEditFirstName.trim() || !profEditLastName.trim()) {
-      setProfEditError('Ingrese nombre y apellido');
-      return;
-    }
-
-    const mailLower = profEditEmail.trim().toLowerCase();
-    if (!mailLower) {
-      setProfEditError('Ingrese un correo electrónico');
-      return;
-    }
-
-    if (mailLower.endsWith('@sistemas.frc.utn.edu.ar')) {
-      setProfEditError('No puede usar el dominio de los alumnos');
-      return;
-    }
-
-    if (!profEditLegajo || profEditLegajo <= 0) {
-      setProfEditError('El legajo debe ser un número positivo');
-      return;
-    }
+    const checks = [profEditFirstName, profEditLastName, profEditEmail, profEditLegajo].map((f) => f.check());
+    if (checks.includes(false)) return;
 
     if (
       currentUser &&
@@ -236,11 +212,12 @@ export const Users: React.FC = () => {
 
     // PATCH: solo lo que cambió. Cambiar el mail cierra las sesiones del docente, así que
     // no se reenvía si quedó igual. Sin cambios no se llama al backend (rechaza el body vacío).
+    const mailLower = profEditEmail.value.trim().toLowerCase();
     const changes = {
-      ...(profEditFirstName.trim() !== editingProf.first_name && { first_name: profEditFirstName.trim() }),
-      ...(profEditLastName.trim() !== editingProf.last_name && { last_name: profEditLastName.trim() }),
+      ...(profEditFirstName.value.trim() !== editingProf.first_name && { first_name: profEditFirstName.value.trim() }),
+      ...(profEditLastName.value.trim() !== editingProf.last_name && { last_name: profEditLastName.value.trim() }),
       ...(mailLower !== editingProf.email.toLowerCase() && { mail: mailLower }),
-      ...(Number(profEditLegajo) !== editingProf.legajo && { legajo: Number(profEditLegajo) }),
+      ...(Number(profEditLegajo.value) !== editingProf.legajo && { legajo: Number(profEditLegajo.value) }),
       ...(profEditIsSuperAdmin !== Boolean(editingProf.is_super_admin) && { is_super_admin: profEditIsSuperAdmin }),
     };
     if (Object.keys(changes).length === 0) {
@@ -255,13 +232,7 @@ export const Users: React.FC = () => {
       setIsProfEditModalOpen(false);
       fetchUsers();
     } catch (err: any) {
-      if (err.status === 409 || err.message?.includes('existe')) {
-        setProfEditError('Ya existe un docente con ese correo');
-      } else if (err.status === 422 || err.message?.includes('dominio')) {
-        setProfEditError('No puede usar el dominio de los alumnos');
-      } else {
-        setProfEditError(err.message || 'Error al actualizar docente');
-      }
+      setProfEditError(professorSaveError(err, 'Error al actualizar docente'));
     } finally {
       setIsSavingProfEdit(false);
     }
@@ -272,13 +243,11 @@ export const Users: React.FC = () => {
   // ==========================================
   const handleOpenEditStudent = (u: UserListItem) => {
     setEditingStudent(u);
-    setStudentEditFirstName(u.first_name);
-    setStudentEditLastName(u.last_name);
-    setStudentEditLegajo(u.legajo);
-    setStudentEditOriginalLegajo(u.legajo);
-    setStudentEditEnrollmentYear(u.enrollment_year || 2022);
-    // El listado no trae la fecha de nacimiento: el campo arranca vacío y solo se envía si se carga
-    setStudentEditBirthDate('');
+    studentEditFirstName.reset(u.first_name);
+    studentEditLastName.reset(u.last_name);
+    studentEditLegajo.reset(String(u.legajo));
+    studentEditEnrollmentYear.reset(u.enrollment_year ? String(u.enrollment_year) : '');
+    studentEditBirthDate.reset('');
     setStudentEditError(null);
     setOpenMenuId(null);
     setIsStudentEditModalOpen(true);
@@ -289,21 +258,22 @@ export const Users: React.FC = () => {
     if (!editingStudent) return;
     setStudentEditError(null);
 
-    if (!studentEditLegajo || studentEditLegajo <= 0) {
-      setStudentEditError('El legajo debe ser un número positivo');
-      return;
-    }
-    if (!studentEditFirstName.trim() || !studentEditLastName.trim()) {
-      setStudentEditError('Ingrese nombre y apellido');
-      return;
-    }
+    const checks = [
+      studentEditLegajo,
+      studentEditFirstName,
+      studentEditLastName,
+      studentEditBirthDate,
+      studentEditEnrollmentYear,
+    ].map((f) => f.check());
+    if (checks.includes(false)) return;
 
+    const enrollmentYear = Number(studentEditEnrollmentYear.value);
     const changes = {
-      ...(studentEditFirstName.trim() !== editingStudent.first_name && { first_name: studentEditFirstName.trim() }),
-      ...(studentEditLastName.trim() !== editingStudent.last_name && { last_name: studentEditLastName.trim() }),
-      ...(Number(studentEditLegajo) !== editingStudent.legajo && { legajo: Number(studentEditLegajo) }),
-      ...(studentEditEnrollmentYear !== editingStudent.enrollment_year && { enrollment_year: studentEditEnrollmentYear }),
-      ...(studentEditBirthDate && { birth_date: studentEditBirthDate }),
+      ...(studentEditFirstName.value.trim() !== editingStudent.first_name && { first_name: studentEditFirstName.value.trim() }),
+      ...(studentEditLastName.value.trim() !== editingStudent.last_name && { last_name: studentEditLastName.value.trim() }),
+      ...(Number(studentEditLegajo.value) !== editingStudent.legajo && { legajo: Number(studentEditLegajo.value) }),
+      ...(enrollmentYear !== editingStudent.enrollment_year && { enrollment_year: enrollmentYear }),
+      ...(studentEditBirthDate.value && { birth_date: studentEditBirthDate.value }),
     };
     if (Object.keys(changes).length === 0) {
       setIsStudentEditModalOpen(false);
@@ -331,9 +301,10 @@ export const Users: React.FC = () => {
     editingProf && currentUser && editingProf.id_user === currentUser.id_user
   );
   const profEmailChanged =
-    editingProf && profEditEmail.trim().toLowerCase() !== profEditOriginalEmail.toLowerCase();
+    editingProf && profEditEmail.value.trim().toLowerCase() !== editingProf.email.toLowerCase();
   const studentLegajoChanged =
-    studentEditLegajo !== studentEditOriginalLegajo && studentEditLegajo !== '';
+    editingStudent && studentEditLegajo.value !== '' && studentEditLegajo.value !== String(editingStudent.legajo);
+  const studentEnrollmentRange = enrollmentYearRange(studentEditBirthDate.value);
 
   return (
     <div className="space-y-6">
@@ -417,7 +388,8 @@ export const Users: React.FC = () => {
                 <TableHead>Legajo</TableHead>
                 <TableHead>Rol</TableHead>
                 <TableHead>Año de ingreso</TableHead>
-                <TableHead className="w-20 text-right">Acciones</TableHead>
+                {/* Fija a la derecha: con la tabla más ancha que la pantalla, las acciones siguen a la vista */}
+                <TableHead className="w-20 text-right sticky right-0 bg-[#EFF6FF]">Acciones</TableHead>
               </tr>
             </TableHeader>
             <tbody>
@@ -450,7 +422,7 @@ export const Users: React.FC = () => {
                   <TableCell className="text-[#51607A]">
                     {u.role === 'student' ? u.enrollment_year || '—' : '—'}
                   </TableCell>
-                  <TableCell className="text-right relative">
+                  <TableCell className="text-right sticky right-0 bg-white border-b border-[#D6E4F7]">
                     <button
                       type="button"
                       onClick={() =>
@@ -513,23 +485,19 @@ export const Users: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleSaveProfCreate} className="space-y-4">
+        <form onSubmit={handleSaveProfCreate} className="space-y-4" noValidate>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Nombre"
               requiredAsterisk
-              value={profCreateFirstName}
-              onChange={(e) => setProfCreateFirstName(e.target.value)}
+              {...profCreateFirstName.inputProps}
               disabled={isSavingProfCreate}
-              required
             />
             <Input
               label="Apellido"
               requiredAsterisk
-              value={profCreateLastName}
-              onChange={(e) => setProfCreateLastName(e.target.value)}
+              {...profCreateLastName.inputProps}
               disabled={isSavingProfCreate}
-              required
             />
           </div>
 
@@ -538,12 +506,9 @@ export const Users: React.FC = () => {
               label="Correo electrónico"
               requiredAsterisk
               type="email"
-              value={profCreateEmail}
-              onChange={(e) => setProfCreateEmail(e.target.value)}
+              {...profCreateEmail.inputProps}
               disabled={isSavingProfCreate}
               placeholder="docente@ejemplo.com"
-              helperText="Se guarda en minúsculas. No puede usar el dominio de alumnos."
-              required
             />
           </div>
 
@@ -551,13 +516,11 @@ export const Users: React.FC = () => {
             <Input
               label="Legajo"
               requiredAsterisk
-              type="number"
-              min={1}
-              value={profCreateLegajo}
-              onChange={(e) => setProfCreateLegajo(Number(e.target.value))}
+              inputMode="numeric"
+              {...profCreateLegajo.inputProps}
+              onChange={(e) => profCreateLegajo.setValue(digitsOnly(e.target.value))}
               disabled={isSavingProfCreate}
               placeholder="Ej. 10423"
-              required
             />
           </div>
 
@@ -566,10 +529,10 @@ export const Users: React.FC = () => {
               label="Fecha de nacimiento"
               requiredAsterisk
               type="date"
-              value={profCreateBirthDate}
-              onChange={(e) => setProfCreateBirthDate(e.target.value)}
+              min={minBirthDate()}
+              max={maxBirthDate()}
+              {...profCreateBirthDate.inputProps}
               disabled={isSavingProfCreate}
-              required
             />
           </div>
 
@@ -632,23 +595,19 @@ export const Users: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleSaveProfEdit} className="space-y-4">
+        <form onSubmit={handleSaveProfEdit} className="space-y-4" noValidate>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Nombre"
               requiredAsterisk
-              value={profEditFirstName}
-              onChange={(e) => setProfEditFirstName(e.target.value)}
+              {...profEditFirstName.inputProps}
               disabled={isSavingProfEdit}
-              required
             />
             <Input
               label="Apellido"
               requiredAsterisk
-              value={profEditLastName}
-              onChange={(e) => setProfEditLastName(e.target.value)}
+              {...profEditLastName.inputProps}
               disabled={isSavingProfEdit}
-              required
             />
           </div>
 
@@ -657,10 +616,8 @@ export const Users: React.FC = () => {
               label="Correo electrónico"
               requiredAsterisk
               type="email"
-              value={profEditEmail}
-              onChange={(e) => setProfEditEmail(e.target.value)}
+              {...profEditEmail.inputProps}
               disabled={isSavingProfEdit}
-              required
             />
           </div>
 
@@ -668,12 +625,10 @@ export const Users: React.FC = () => {
             <Input
               label="Legajo"
               requiredAsterisk
-              type="number"
-              min={1}
-              value={profEditLegajo}
-              onChange={(e) => setProfEditLegajo(Number(e.target.value))}
+              inputMode="numeric"
+              {...profEditLegajo.inputProps}
+              onChange={(e) => profEditLegajo.setValue(digitsOnly(e.target.value))}
               disabled={isSavingProfEdit}
-              required
             />
           </div>
 
@@ -739,22 +694,20 @@ export const Users: React.FC = () => {
           <div className="mb-4 p-3 rounded-lg bg-[#EFF6FF] border border-[#BAE6FD] text-[#1D4ED8] text-xs">
             El correo de ingreso pasará a ser{' '}
             <span className="font-mono font-semibold">
-              {studentEditLegajo}@sistemas.frc.utn.edu.ar
+              {studentEditLegajo.value}@sistemas.frc.utn.edu.ar
             </span>
           </div>
         )}
 
-        <form onSubmit={handleSaveStudentEdit} className="space-y-4">
+        <form onSubmit={handleSaveStudentEdit} className="space-y-4" noValidate>
           <div>
             <Input
               label="Legajo"
               requiredAsterisk
-              type="number"
-              min={1}
-              value={studentEditLegajo}
-              onChange={(e) => setStudentEditLegajo(Number(e.target.value))}
+              inputMode="numeric"
+              {...studentEditLegajo.inputProps}
+              onChange={(e) => studentEditLegajo.setValue(digitsOnly(e.target.value))}
               disabled={isSavingStudentEdit}
-              required
             />
           </div>
 
@@ -762,18 +715,14 @@ export const Users: React.FC = () => {
             <Input
               label="Nombre"
               requiredAsterisk
-              value={studentEditFirstName}
-              onChange={(e) => setStudentEditFirstName(e.target.value)}
+              {...studentEditFirstName.inputProps}
               disabled={isSavingStudentEdit}
-              required
             />
             <Input
               label="Apellido"
               requiredAsterisk
-              value={studentEditLastName}
-              onChange={(e) => setStudentEditLastName(e.target.value)}
+              {...studentEditLastName.inputProps}
               disabled={isSavingStudentEdit}
-              required
             />
           </div>
 
@@ -781,21 +730,25 @@ export const Users: React.FC = () => {
             <Input
               label="Fecha de nacimiento"
               type="date"
-              value={studentEditBirthDate}
-              onChange={(e) => setStudentEditBirthDate(e.target.value)}
+              min={minBirthDate()}
+              max={maxBirthDate()}
+              {...studentEditBirthDate.inputProps}
               disabled={isSavingStudentEdit}
               helperText="Completala solo si querés corregirla"
             />
             <Input
               label="Año de ingreso"
               requiredAsterisk
-              type="number"
-              min={1950}
-              max={2100}
-              value={studentEditEnrollmentYear}
-              onChange={(e) => setStudentEditEnrollmentYear(Number(e.target.value))}
+              inputMode="numeric"
+              maxLength={4}
+              {...studentEditEnrollmentYear.inputProps}
+              onChange={(e) => studentEditEnrollmentYear.setValue(digitsOnly(e.target.value))}
               disabled={isSavingStudentEdit}
-              required
+              helperText={
+                studentEnrollmentRange
+                  ? `Entre ${studentEnrollmentRange.min} y ${studentEnrollmentRange.max}`
+                  : undefined
+              }
             />
           </div>
 

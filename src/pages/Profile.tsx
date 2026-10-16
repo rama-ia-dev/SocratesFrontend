@@ -8,39 +8,38 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { useToast } from '../components/ui/Toast';
 import { AlertCircle } from 'lucide-react';
+import { useField, validateName, validateBirthDate, maxBirthDate, minBirthDate } from '../lib/validation';
 
 export const Profile: React.FC = () => {
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const { success } = useToast();
 
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [birthDate, setBirthDate] = useState('');
+  const firstName = useField('', validateName('nombre'));
+  const lastName = useField('', validateName('apellido'));
+  const birthDate = useField('', (v) => validateBirthDate(v, false), { validateOnChange: true });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   // GET /me no devuelve la fecha de nacimiento: si no viene, el campo queda vacío en vez de
   // mostrar una fecha inventada, y solo se envía si el usuario la carga.
-  useEffect(() => {
-    if (user) {
-      setFirstName(user.first_name || '');
-      setLastName(user.last_name || '');
-      setBirthDate(user.birth_date || '');
-    }
-  }, [user]);
+  const resetFields = () => {
+    if (!user) return;
+    firstName.reset(user.first_name || '');
+    lastName.reset(user.last_name || '');
+    birthDate.reset(user.birth_date || '');
+  };
+  useEffect(resetFields, [user]);
 
   if (!user) return null;
 
-  const nameChanged = firstName.trim() !== user.first_name;
-  const lastNameChanged = lastName.trim() !== user.last_name;
-  const birthDateChanged = birthDate !== (user.birth_date || '');
+  const nameChanged = firstName.value.trim() !== user.first_name;
+  const lastNameChanged = lastName.value.trim() !== user.last_name;
+  const birthDateChanged = birthDate.value !== (user.birth_date || '');
   const isDirty = nameChanged || lastNameChanged || birthDateChanged;
 
   const handleCancel = () => {
-    setFirstName(user.first_name);
-    setLastName(user.last_name);
-    setBirthDate(user.birth_date || '');
+    resetFields();
     setErrorMessage(null);
     navigate(-1);
   };
@@ -49,32 +48,16 @@ export const Profile: React.FC = () => {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!firstName.trim()) {
-      setErrorMessage('El nombre no puede estar vacío');
-      return;
-    }
-    if (!lastName.trim()) {
-      setErrorMessage('El apellido no puede estar vacío');
-      return;
-    }
-
-    if (birthDate) {
-      const selected = new Date(birthDate);
-      const today = new Date();
-      today.setHours(23, 59, 59, 999);
-      if (selected > today) {
-        setErrorMessage('La fecha no puede ser posterior a hoy');
-        return;
-      }
-    }
+    const checks = [firstName, lastName, birthDate].map((f) => f.check());
+    if (checks.includes(false)) return;
 
     setIsLoading(true);
     try {
       // PATCH: solo lo que cambió; lo no enviado el backend lo deja como está
       await api.updateMe({
-        ...(nameChanged && { first_name: firstName.trim() }),
-        ...(lastNameChanged && { last_name: lastName.trim() }),
-        ...(birthDateChanged && birthDate && { birth_date: birthDate }),
+        ...(nameChanged && { first_name: firstName.value.trim() }),
+        ...(lastNameChanged && { last_name: lastName.value.trim() }),
+        ...(birthDateChanged && birthDate.value && { birth_date: birthDate.value }),
       });
       await refreshUser();
       success('Datos actualizados');
@@ -109,19 +92,15 @@ export const Profile: React.FC = () => {
               label="Nombre"
               requiredAsterisk
               type="text"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
+              {...firstName.inputProps}
               disabled={isLoading}
-              required
             />
             <Input
               label="Apellido"
               requiredAsterisk
               type="text"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
+              {...lastName.inputProps}
               disabled={isLoading}
-              required
             />
           </div>
 
@@ -129,8 +108,9 @@ export const Profile: React.FC = () => {
             <Input
               label="Fecha de nacimiento"
               type="date"
-              value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
+              min={minBirthDate()}
+              max={maxBirthDate()}
+              {...birthDate.inputProps}
               disabled={isLoading}
               helperText={user.birth_date ? undefined : 'Completala solo si querés actualizarla'}
             />
@@ -163,7 +143,7 @@ export const Profile: React.FC = () => {
                     Año de ingreso
                   </label>
                   <div className="w-full rounded-lg border border-[#D6E4F7] bg-[#F1F5F9] px-3 py-2 text-sm text-[#51607A] select-none">
-                    {user.enrollment_year || 2022}
+                    {user.enrollment_year ?? '—'}
                   </div>
                 </div>
               )}
