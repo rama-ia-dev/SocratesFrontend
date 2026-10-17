@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Lock, RefreshCw } from 'lucide-react';
 import { api } from '../lib/api';
@@ -31,8 +31,13 @@ export const ProjectDetail: React.FC = () => {
   const [project, setProject] = useState<ProjectPublic | null>(null);
   const [sectionYear, setSectionYear] = useState<SectionYearPublic | null>(null);
   const [state, setState] = useState<LoadState>('loading');
+  const requestId = useRef(0);
 
   const load = useCallback(async () => {
+    const current = ++requestId.current;
+    const isCurrent = () => current === requestId.current;
+    setProject(null);
+    setSectionYear(null);
     const idProject = Number(id);
     if (!Number.isInteger(idProject) || idProject <= 0) {
       setState('not-found');
@@ -41,11 +46,16 @@ export const ProjectDetail: React.FC = () => {
     setState('loading');
     try {
       const p = await api.getProject(idProject);
+      if (!isCurrent()) return;
       setProject(p);
       setState('ok');
       // El cupo vive en el curso lectivo; si no se puede leer, el detalle se muestra igual
-      api.getSectionYear(p.id_section_year).then(setSectionYear).catch(() => setSectionYear(null));
+      api
+        .getSectionYear(p.id_section_year)
+        .then((sy) => isCurrent() && setSectionYear(sy))
+        .catch(() => undefined);
     } catch (err: any) {
+      if (!isCurrent()) return;
       setState(err.status === 403 ? 'forbidden' : err.status === 404 ? 'not-found' : 'error');
     }
   }, [id]);

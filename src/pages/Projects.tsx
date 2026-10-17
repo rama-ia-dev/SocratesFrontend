@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, RefreshCw } from 'lucide-react';
 import { api } from '../lib/api';
@@ -48,7 +48,10 @@ export const Projects: React.FC = () => {
     return [...byId].sort((a, b) => a[1].localeCompare(b[1], 'es'));
   }, [sectionYears]);
 
+  const requestId = useRef(0);
   const fetchProjects = useCallback(async () => {
+    // Si se cambian los filtros rápido, una respuesta vieja no pisa la nueva
+    const current = ++requestId.current;
     setIsLoading(true);
     setLoadError(false);
     try {
@@ -59,12 +62,14 @@ export const Projects: React.FC = () => {
         limit: PAGE_SIZE,
         offset,
       });
+      if (current !== requestId.current) return;
       setProjects(res.items);
       setTotal(res.total);
     } catch {
+      if (current !== requestId.current) return;
       setLoadError(true);
     } finally {
-      setIsLoading(false);
+      if (current === requestId.current) setIsLoading(false);
     }
   }, [year, section, privacy, offset]);
 
