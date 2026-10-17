@@ -6,6 +6,9 @@ import type { ProjectMember, ProjectOverview, SectionYearPublic } from '../types
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
+import { useToast } from '../components/ui/Toast';
+import { TeamSizeModal } from '../components/TeamSizeModal';
+import { useAuth } from '../context/AuthContext';
 import { PRIVACY_HELP, PRIVACY_LABEL, STATUS_VARIANT, studentEmail, teamLabel } from '../lib/projects';
 
 type LoadState = 'loading' | 'ok' | 'forbidden' | 'not-found' | 'error';
@@ -69,6 +72,10 @@ export const ProjectDetail: React.FC = () => {
   const [sectionYear, setSectionYear] = useState<SectionYearPublic | null>(null);
   const [state, setState] = useState<LoadState>('loading');
   const requestId = useRef(0);
+  const { user } = useAuth();
+  const { success } = useToast();
+  // Cupo (SCRUM-19): el backend se lo permite solo al super administrador
+  const [isSizeOpen, setIsSizeOpen] = useState(false);
 
   const load = useCallback(async () => {
     const current = ++requestId.current;
@@ -167,6 +174,18 @@ export const ProjectDetail: React.FC = () => {
             <>
               {' '}
               · Cupo: de {sectionYear.min_students} a {sectionYear.max_students} integrantes
+              {user?.is_super_admin && (
+                <>
+                  {' '}
+                  <button
+                    type="button"
+                    onClick={() => setIsSizeOpen(true)}
+                    className="text-primary font-medium hover:underline cursor-pointer"
+                  >
+                    Modificar cupo
+                  </button>
+                </>
+              )}
             </>
           )}
         </p>
@@ -189,6 +208,20 @@ export const ProjectDetail: React.FC = () => {
       )}
 
       <Members members={project.members} />
+
+      {isSizeOpen && sectionYear && (
+        <TeamSizeModal
+          sectionYear={sectionYear}
+          onClose={() => setIsSizeOpen(false)}
+          onSaved={(updated) => {
+            setSectionYear(updated);
+            setIsSizeOpen(false);
+            success(
+              `Cupo de ${updated.section_name} (${updated.year}): de ${updated.min_students} a ${updated.max_students} integrantes`
+            );
+          }}
+        />
+      )}
     </div>
   );
 };
