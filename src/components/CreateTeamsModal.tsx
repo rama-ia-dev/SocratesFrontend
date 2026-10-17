@@ -99,7 +99,7 @@ export const CreateTeamsModal: React.FC<{
   };
 
   return (
-    <Modal isOpen onClose={onClose} title="Crear equipos de trabajo">
+    <Modal isOpen onClose={() => !isSaving && onClose()} title="Crear equipos de trabajo">
       {error && (
         <div
           role="alert"
