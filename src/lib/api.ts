@@ -1288,6 +1288,14 @@ export const api = {
       }
       if (payload.min_students !== undefined) sy.min_students = payload.min_students;
       if (payload.max_students !== undefined) sy.max_students = payload.max_students;
+      // El cupo es del curso lectivo: los equipos que ya existen pasan a usar el nuevo
+      mockDB.projects
+        .filter((p) => p.id_section_year === id_section_year)
+        .forEach((p) => {
+          p.min_members = sy.min_students;
+          p.max_members = sy.max_students;
+          p.is_secured = (p.members?.length || 0) >= (p.min_members || 3);
+        });
 
       return {
         id_section_year: sy.id_section_year,
