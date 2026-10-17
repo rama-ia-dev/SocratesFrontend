@@ -1174,6 +1174,21 @@ export const api = {
     return request<SectionYearList>(`/section-years?${query.toString()}`);
   },
 
+  async getSectionYear(id_section_year: number): Promise<SectionYearPublic> {
+    if (USE_MOCK) {
+      await delay();
+      const sy = mockDB.sectionYears.find((x) => x.id_section_year === id_section_year);
+      if (!sy) {
+        const err: any = new Error('No existe el curso lectivo');
+        err.status = 404;
+        throw err;
+      }
+      return sy;
+    }
+
+    return request<SectionYearPublic>(`/section-years/${id_section_year}`);
+  },
+
   async createSectionYear(payload: SectionYearCreate): Promise<SectionYearPublic> {
     if (USE_MOCK) {
       await delay();

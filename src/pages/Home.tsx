@@ -10,6 +10,7 @@ import {
   ChevronRight,
   BarChart3,
   Compass,
+  FolderKanban,
 } from 'lucide-react';
 
 const greeting = () => {
@@ -45,6 +46,12 @@ export const Home: React.FC = () => {
           path: '/usuarios',
           icon: Users,
         },
+        {
+          title: 'Equipos de trabajo',
+          desc: 'Equipos de cada comisión y el proyecto de cada uno.',
+          path: '/equipos',
+          icon: FolderKanban,
+        },
       ];
     }
 
@@ -56,11 +63,24 @@ export const Home: React.FC = () => {
           path: '/estudiantes',
           icon: GraduationCap,
         },
+        {
+          title: 'Equipos de trabajo',
+          desc: 'Equipos de sus comisiones y el proyecto de cada uno.',
+          path: '/equipos',
+          icon: FolderKanban,
+        },
       ];
     }
 
     // Alumno
-    return [];
+    return [
+      {
+        title: 'Equipos de trabajo',
+        desc: 'Equipos de trabajo de la cátedra y sus proyectos.',
+        path: '/equipos',
+        icon: FolderKanban,
+      },
+    ];
   };
 
   const modules = getAvailableModules();
