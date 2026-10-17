@@ -241,15 +241,11 @@ export interface StatusPublic {
 export interface ProjectCreate {
   id_section_year: number;
   group_number?: number | null;
-  min_members?: number | null;
-  max_members?: number | null;
 }
 
 export interface ProjectBulkCreate {
   id_section_year: number;
   quantity: number;
-  min_members?: number | null;
-  max_members?: number | null;
 }
 
 export interface ProjectPublic {
