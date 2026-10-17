@@ -38,6 +38,8 @@ export const Professors: React.FC = () => {
   const [email, setEmail] = useState('');
   const [originalEmail, setOriginalEmail] = useState('');
   const [legajo, setLegajo] = useState<number | ''>('');
+  // Solo al registrar: el listado no trae la fecha de nacimiento (dato privado)
+  const [birthDate, setBirthDate] = useState('');
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -74,6 +76,7 @@ export const Professors: React.FC = () => {
     setEmail('');
     setOriginalEmail('');
     setLegajo('');
+    setBirthDate('');
     setIsSuperAdmin(false);
     setModalError(null);
     setIsModalOpen(true);
@@ -117,6 +120,11 @@ export const Professors: React.FC = () => {
       return;
     }
 
+    if (!editingProf && !birthDate) {
+      setModalError('Ingrese la fecha de nacimiento');
+      return;
+    }
+
     // Comprobar si el superadmin se quita el rol a sí mismo
     if (
       editingProf &&
@@ -146,7 +154,7 @@ export const Professors: React.FC = () => {
           last_name: lastName.trim(),
           mail: mailLower,
           legajo: Number(legajo),
-          birth_date: '1980-01-01',
+          birth_date: birthDate,
           is_super_admin: isSuperAdmin,
         });
         success('Docente registrado. Recibirá un correo para crear su contraseña');
@@ -157,10 +165,12 @@ export const Professors: React.FC = () => {
     } catch (err: any) {
       if (err.status === 409 || err.message?.includes('existe')) {
         setModalError('Ya existe un docente con ese correo');
-      } else if (err.status === 422 || err.message?.includes('dominio')) {
-        setModalError('No puede usar el dominio de los alumnos');
+      } else if (err.status === 422) {
+        // El dominio de alumnos ya se valida antes de enviar; el backend detalla el resto en
+        // una lista, en inglés
+        setModalError('Revise los datos: correo válido y nombre y apellido de hasta 100 caracteres');
       } else {
-        setModalError(err.message || 'Error al guardar docente');
+        setModalError('Error al guardar el docente');
       }
     } finally {
       setIsSaving(false);
@@ -350,6 +360,21 @@ export const Professors: React.FC = () => {
               required
             />
           </div>
+
+          {!editingProf && (
+            <div>
+              <Input
+                label="Fecha de nacimiento"
+                requiredAsterisk
+                type="date"
+                max={new Date().toISOString().slice(0, 10)}
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                disabled={isSaving}
+                required
+              />
+            </div>
+          )}
 
           <div className="pt-2">
             <label className="flex items-center gap-3 cursor-pointer">
