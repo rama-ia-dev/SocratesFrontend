@@ -20,6 +20,18 @@ import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { useToast } from '../components/ui/Toast';
 import { Search, MoreVertical, Plus, Edit2, AlertCircle } from 'lucide-react';
 
+// El backend exige al menos 18 años a la fecha del alta
+const MIN_AGE = 18;
+
+// Fecha de nacimiento más reciente permitida (hoy hace MIN_AGE años), en hora local y como
+// texto AAAA-MM-DD: se compara como texto, igual que el backend compara (mes, día)
+const latestBirthDate = (): string => {
+  const today = new Date();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  return `${today.getFullYear() - MIN_AGE}-${mm}-${dd}`;
+};
+
 export const Professors: React.FC = () => {
   const { user: currentUser } = useAuth();
   const { success, error: toastError } = useToast();
@@ -125,6 +137,11 @@ export const Professors: React.FC = () => {
       return;
     }
 
+    if (!editingProf && birthDate > latestBirthDate()) {
+      setModalError(`El docente debe tener al menos ${MIN_AGE} años`);
+      return;
+    }
+
     // Comprobar si el superadmin se quita el rol a sí mismo
     if (
       editingProf &&
@@ -164,11 +181,18 @@ export const Professors: React.FC = () => {
       fetchProfessors();
     } catch (err: any) {
       if (err.status === 409 || err.message?.includes('existe')) {
-        setModalError('Ya existe un docente con ese correo');
+        // El backend distingue mail y legajo repetidos
+        setModalError(
+          err.message?.includes('legajo')
+            ? 'Ya existe un docente con ese legajo'
+            : 'Ya existe un docente con ese correo'
+        );
       } else if (err.status === 422) {
-        // El dominio de alumnos ya se valida antes de enviar; el backend detalla el resto en
-        // una lista, en inglés
-        setModalError('Revise los datos: correo válido y nombre y apellido de hasta 100 caracteres');
+        // El dominio de alumnos y la edad ya se validan antes de enviar; el backend detalla el
+        // resto en una lista, en inglés
+        setModalError(
+          `Revise los datos: correo válido, nombre y apellido de hasta 100 caracteres y al menos ${MIN_AGE} años`
+        );
       } else {
         setModalError('Error al guardar el docente');
       }
@@ -367,7 +391,7 @@ export const Professors: React.FC = () => {
                 label="Fecha de nacimiento"
                 requiredAsterisk
                 type="date"
-                max={new Date().toISOString().slice(0, 10)}
+                max={latestBirthDate()}
                 value={birthDate}
                 onChange={(e) => setBirthDate(e.target.value)}
                 disabled={isSaving}
