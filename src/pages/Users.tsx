@@ -40,16 +40,8 @@ import {
   maxBirthDate,
   minBirthDate,
   digitsOnly,
+  professorSaveError,
 } from '../lib/validation';
-
-// El backend responde 409 tanto por correo como por legajo repetido; el detalle dice cuál.
-const professorSaveError = (err: any, fallback: string): string => {
-  const detail = String(err.message || '').toLowerCase();
-  if (err.status === 409 && detail.includes('legajo')) return 'Ya existe un docente con ese legajo';
-  if (err.status === 409 && detail.includes('mail')) return 'Ya existe un docente con ese correo';
-  if (err.status === 422 && detail.includes('reserved for students')) return 'Los correos de alumnos no se pueden usar para un docente';
-  return err.message || fallback;
-};
 
 export const Users: React.FC = () => {
   const navigate = useNavigate();
@@ -74,7 +66,7 @@ export const Users: React.FC = () => {
   const profCreateLastName = useField('', validateName('apellido'));
   const profCreateEmail = useField('', validateProfessorEmail);
   const profCreateLegajo = useField('', validateLegajo);
-  const profCreateBirthDate = useField('', (v) => validateBirthDate(v), { validateOnChange: true });
+  const profCreateBirthDate = useField('', (v) => validateBirthDate(v, 'professor'), { validateOnChange: true });
   const [profCreateIsSuperAdmin, setProfCreateIsSuperAdmin] = useState(false);
   const [profCreateError, setProfCreateError] = useState<string | null>(null);
   const [isSavingProfCreate, setIsSavingProfCreate] = useState(false);
@@ -102,7 +94,7 @@ export const Users: React.FC = () => {
   const studentEditLegajo = useField('', validateLegajo);
   // El listado no trae la fecha de nacimiento: es opcional al modificar y, si se carga, el año
   // de ingreso se valida contra ella.
-  const studentEditBirthDate = useField('', (v) => validateBirthDate(v, false), { validateOnChange: true });
+  const studentEditBirthDate = useField('', (v) => validateBirthDate(v, 'student', { required: false }), { validateOnChange: true });
   const studentEditEnrollmentYear = useField('', (v) =>
     studentEditBirthDate.value
       ? validateEnrollmentYear(v, studentEditBirthDate.value)
@@ -530,7 +522,7 @@ export const Users: React.FC = () => {
               requiredAsterisk
               type="date"
               min={minBirthDate()}
-              max={maxBirthDate()}
+              max={maxBirthDate('professor')}
               {...profCreateBirthDate.inputProps}
               disabled={isSavingProfCreate}
             />
@@ -731,7 +723,7 @@ export const Users: React.FC = () => {
               label="Fecha de nacimiento"
               type="date"
               min={minBirthDate()}
-              max={maxBirthDate()}
+              max={maxBirthDate('student')}
               {...studentEditBirthDate.inputProps}
               disabled={isSavingStudentEdit}
               helperText="Completala solo si querés corregirla"
