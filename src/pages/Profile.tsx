@@ -42,13 +42,12 @@ export const Profile: React.FC = () => {
   const navigate = useNavigate();
   const { success } = useToast();
 
-  const person = user?.role === 'student' ? 'student' : 'professor';
   // Correo y legajo los cambia un super administrador; si es uno, puede cambiar los suyos desde acá.
   const canEditAccount = Boolean(user?.role === 'professor' && user.is_super_admin);
 
   const firstName = useField('', validateName('nombre'));
   const lastName = useField('', validateName('apellido'));
-  const birthDate = useField('', (v) => validateBirthDate(v, person, { required: false }), {
+  const birthDate = useField('', (v) => validateBirthDate(v, { required: false }), {
     validateOnChange: true,
   });
   const email = useField('', validateProfessorEmail);
@@ -56,8 +55,8 @@ export const Profile: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // GET /me no devuelve la fecha de nacimiento: si no viene, el campo queda vacío en vez de
-  // mostrar una fecha inventada, y solo se envía si el usuario la carga.
+  // Si un usuario no tiene fecha de nacimiento cargada, el campo queda vacío y solo se envía si
+  // la completa.
   const resetFields = () => {
     if (!user) return;
     firstName.reset(user.first_name || '');
@@ -172,7 +171,7 @@ export const Profile: React.FC = () => {
               label="Fecha de nacimiento"
               type="date"
               min={minBirthDate()}
-              max={maxBirthDate(person)}
+              max={maxBirthDate()}
               {...birthDate.inputProps}
               disabled={isLoading}
               helperText={user.birth_date ? undefined : 'Completala solo si querés actualizarla'}

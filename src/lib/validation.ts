@@ -18,15 +18,9 @@ const yearsAgo = (years: number) => {
   return isoDate(d);
 };
 
-// Edad mínima, distinta según el rol:
-// - Docente: 18 años cumplidos al día de hoy.
-// - Estudiante: cumple 18 a más tardar este año. Se puede ingresar a la facultad con 17 y
-//   cumplir 18 durante el primer año; la misma regla define el año de ingreso más temprano.
-export type Person = 'professor' | 'student';
-
+// Edad mínima, igual que en el backend: 18 años cumplidos al día de hoy, docentes y estudiantes.
 // Fecha de nacimiento más reciente permitida (límite del selector de fecha).
-export const maxBirthDate = (person: Person) =>
-  person === 'student' ? `${new Date().getFullYear() - MIN_AGE}-12-31` : yearsAgo(MIN_AGE);
+export const maxBirthDate = () => yearsAgo(MIN_AGE);
 export const minBirthDate = () => yearsAgo(MAX_AGE);
 
 export const validateEmail = (value: string): string | null => {
@@ -55,25 +49,17 @@ export const validateLegajo = (value: string): string | null => {
   return null;
 };
 
-export const validateBirthDate = (
-  value: string,
-  person: Person,
-  { required = true } = {}
-): string | null => {
+export const validateBirthDate = (value: string, { required = true } = {}): string | null => {
   if (!value) return required ? 'Ingrese la fecha de nacimiento' : null;
   if (value > isoDate(new Date())) return 'La fecha no puede ser posterior a hoy';
-  if (value > maxBirthDate(person)) {
-    return person === 'student'
-      ? `Debe cumplir al menos ${MIN_AGE} años durante ${new Date().getFullYear()}`
-      : `Debe tener al menos ${MIN_AGE} años`;
-  }
+  if (value > maxBirthDate()) return `Debe tener al menos ${MIN_AGE} años`;
   if (value < minBirthDate()) return 'Revise la fecha: indica más de 100 años';
   return null;
 };
 
 // Rango de años de ingreso posibles: desde el año en que cumplió 18 hasta el actual.
 export const enrollmentYearRange = (birthDate: string): { min: number; max: number } | null => {
-  if (!birthDate || validateBirthDate(birthDate, 'student')) return null;
+  if (!birthDate || validateBirthDate(birthDate)) return null;
   return { min: Number(birthDate.slice(0, 4)) + MIN_AGE, max: new Date().getFullYear() };
 };
 

@@ -50,7 +50,7 @@ export const RegisterStudents: React.FC = () => {
   const legajo = useField('', validateLegajo);
   const firstName = useField('', validateName('nombre'));
   const lastName = useField('', validateName('apellido'));
-  const birthDate = useField('', (v) => validateBirthDate(v, 'student'), { validateOnChange: true });
+  const birthDate = useField('', (v) => validateBirthDate(v), { validateOnChange: true });
   const enrollmentYear = useField('', (v) => validateEnrollmentYear(v, birthDate.value));
   // El año de ingreso se habilita recién con una fecha de nacimiento válida: el rango posible depende de ella
   const enrollmentRange = enrollmentYearRange(birthDate.value);
@@ -291,7 +291,7 @@ export const RegisterStudents: React.FC = () => {
                 requiredAsterisk
                 type="date"
                 min={minBirthDate()}
-                max={maxBirthDate('student')}
+                max={maxBirthDate()}
                 {...birthDate.inputProps}
                 disabled={isSubmittingManual}
               />

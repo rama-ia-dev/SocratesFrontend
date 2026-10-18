@@ -66,7 +66,7 @@ export const Users: React.FC = () => {
   const profCreateLastName = useField('', validateName('apellido'));
   const profCreateEmail = useField('', validateProfessorEmail);
   const profCreateLegajo = useField('', validateLegajo);
-  const profCreateBirthDate = useField('', (v) => validateBirthDate(v, 'professor'), { validateOnChange: true });
+  const profCreateBirthDate = useField('', (v) => validateBirthDate(v), { validateOnChange: true });
   const [profCreateIsSuperAdmin, setProfCreateIsSuperAdmin] = useState(false);
   const [profCreateError, setProfCreateError] = useState<string | null>(null);
   const [isSavingProfCreate, setIsSavingProfCreate] = useState(false);
@@ -80,6 +80,7 @@ export const Users: React.FC = () => {
   const profEditLastName = useField('', validateName('apellido'));
   const profEditEmail = useField('', validateProfessorEmail);
   const profEditLegajo = useField('', validateLegajo);
+  const profEditBirthDate = useField('', (v) => validateBirthDate(v), { validateOnChange: true });
   const [profEditIsSuperAdmin, setProfEditIsSuperAdmin] = useState(false);
   const [profEditError, setProfEditError] = useState<string | null>(null);
   const [isSavingProfEdit, setIsSavingProfEdit] = useState(false);
@@ -92,16 +93,9 @@ export const Users: React.FC = () => {
   const studentEditFirstName = useField('', validateName('nombre'));
   const studentEditLastName = useField('', validateName('apellido'));
   const studentEditLegajo = useField('', validateLegajo);
-  // El listado no trae la fecha de nacimiento: es opcional al modificar y, si se carga, el año
-  // de ingreso se valida contra ella.
-  const studentEditBirthDate = useField('', (v) => validateBirthDate(v, 'student', { required: false }), { validateOnChange: true });
-  const studentEditEnrollmentYear = useField('', (v) =>
-    studentEditBirthDate.value
-      ? validateEnrollmentYear(v, studentEditBirthDate.value)
-      : /^\d{4}$/.test(v) && Number(v) <= new Date().getFullYear()
-        ? null
-        : 'Ingrese un año de cuatro cifras, no posterior al actual'
-  );
+  const studentEditBirthDate = useField('', (v) => validateBirthDate(v), { validateOnChange: true });
+  // El año de ingreso se valida contra la fecha de nacimiento.
+  const studentEditEnrollmentYear = useField('', (v) => validateEnrollmentYear(v, studentEditBirthDate.value));
   const [studentEditError, setStudentEditError] = useState<string | null>(null);
   const [isSavingStudentEdit, setIsSavingStudentEdit] = useState(false);
 
@@ -178,6 +172,7 @@ export const Users: React.FC = () => {
     profEditLastName.reset(u.last_name);
     profEditEmail.reset(u.email);
     profEditLegajo.reset(String(u.legajo));
+    profEditBirthDate.reset(u.birth_date || '');
     setProfEditIsSuperAdmin(Boolean(u.is_super_admin));
     setProfEditError(null);
     setOpenMenuId(null);
@@ -189,7 +184,7 @@ export const Users: React.FC = () => {
     if (!editingProf) return;
     setProfEditError(null);
 
-    const checks = [profEditFirstName, profEditLastName, profEditEmail, profEditLegajo].map((f) => f.check());
+    const checks = [profEditFirstName, profEditLastName, profEditEmail, profEditLegajo, profEditBirthDate].map((f) => f.check());
     if (checks.includes(false)) return;
 
     if (
@@ -210,6 +205,7 @@ export const Users: React.FC = () => {
       ...(profEditLastName.value.trim() !== editingProf.last_name && { last_name: profEditLastName.value.trim() }),
       ...(mailLower !== editingProf.email.toLowerCase() && { mail: mailLower }),
       ...(Number(profEditLegajo.value) !== editingProf.legajo && { legajo: Number(profEditLegajo.value) }),
+      ...(profEditBirthDate.value !== (editingProf.birth_date || '') && { birth_date: profEditBirthDate.value }),
       ...(profEditIsSuperAdmin !== Boolean(editingProf.is_super_admin) && { is_super_admin: profEditIsSuperAdmin }),
     };
     if (Object.keys(changes).length === 0) {
@@ -239,7 +235,7 @@ export const Users: React.FC = () => {
     studentEditLastName.reset(u.last_name);
     studentEditLegajo.reset(String(u.legajo));
     studentEditEnrollmentYear.reset(u.enrollment_year ? String(u.enrollment_year) : '');
-    studentEditBirthDate.reset('');
+    studentEditBirthDate.reset(u.birth_date || '');
     setStudentEditError(null);
     setOpenMenuId(null);
     setIsStudentEditModalOpen(true);
@@ -265,7 +261,7 @@ export const Users: React.FC = () => {
       ...(studentEditLastName.value.trim() !== editingStudent.last_name && { last_name: studentEditLastName.value.trim() }),
       ...(Number(studentEditLegajo.value) !== editingStudent.legajo && { legajo: Number(studentEditLegajo.value) }),
       ...(enrollmentYear !== editingStudent.enrollment_year && { enrollment_year: enrollmentYear }),
-      ...(studentEditBirthDate.value && { birth_date: studentEditBirthDate.value }),
+      ...(studentEditBirthDate.value !== (editingStudent.birth_date || '') && { birth_date: studentEditBirthDate.value }),
     };
     if (Object.keys(changes).length === 0) {
       setIsStudentEditModalOpen(false);
@@ -522,7 +518,7 @@ export const Users: React.FC = () => {
               requiredAsterisk
               type="date"
               min={minBirthDate()}
-              max={maxBirthDate('professor')}
+              max={maxBirthDate()}
               {...profCreateBirthDate.inputProps}
               disabled={isSavingProfCreate}
             />
@@ -624,6 +620,18 @@ export const Users: React.FC = () => {
             />
           </div>
 
+          <div>
+            <Input
+              label="Fecha de nacimiento"
+              requiredAsterisk
+              type="date"
+              min={minBirthDate()}
+              max={maxBirthDate()}
+              {...profEditBirthDate.inputProps}
+              disabled={isSavingProfEdit}
+            />
+          </div>
+
           <div className="pt-2">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
@@ -721,12 +729,12 @@ export const Users: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Fecha de nacimiento"
+              requiredAsterisk
               type="date"
               min={minBirthDate()}
-              max={maxBirthDate('student')}
+              max={maxBirthDate()}
               {...studentEditBirthDate.inputProps}
               disabled={isSavingStudentEdit}
-              helperText="Completala solo si querés corregirla"
             />
             <Input
               label="Año de ingreso"
