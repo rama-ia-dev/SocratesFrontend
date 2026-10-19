@@ -7,8 +7,8 @@ export const MIN_AGE = 18;
 const MAX_AGE = 100;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-// Letras (con tildes, diéresis y ñ), espacios, apóstrofo y guion: "María José", "D'Angelo", "Pérez-Gil".
-const NAME_RE = /^[\p{L}]+(?:[ '\-][\p{L}]+)*$/u;
+// Letras (con tildes, diéresis y ñ), espacios y apóstrofo: "María José", "D'Angelo".
+const NAME_RE = /^[\p{L}]+(?:[ '][\p{L}]+)*$/u;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const isoDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -39,7 +39,7 @@ export const validateProfessorEmail = (value: string): string | null =>
 export const validateName = (label: 'nombre' | 'apellido') => (value: string): string | null => {
   const v = value.trim();
   if (!v) return `Ingrese el ${label}`;
-  if (!NAME_RE.test(v)) return `El ${label} solo puede tener letras, espacios, apóstrofos y guiones`;
+  if (!NAME_RE.test(v)) return `El ${label} solo puede tener letras, espacios y apóstrofos`;
   return null;
 };
 

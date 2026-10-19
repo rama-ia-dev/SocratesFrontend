@@ -253,7 +253,6 @@ export const RegisterStudents: React.FC = () => {
             <div>
               <Input
                 label="Legajo"
-                requiredAsterisk
                 inputMode="numeric"
                 placeholder="Ej. 92100"
                 {...legajo.inputProps}
@@ -271,14 +270,12 @@ export const RegisterStudents: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Nombre"
-                requiredAsterisk
                 {...firstName.inputProps}
                 disabled={isSubmittingManual}
                 placeholder="Nombre completo"
               />
               <Input
                 label="Apellido"
-                requiredAsterisk
                 {...lastName.inputProps}
                 disabled={isSubmittingManual}
                 placeholder="Apellido"
@@ -288,7 +285,6 @@ export const RegisterStudents: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Fecha de nacimiento"
-                requiredAsterisk
                 type="date"
                 min={minBirthDate()}
                 max={maxBirthDate()}
@@ -297,7 +293,6 @@ export const RegisterStudents: React.FC = () => {
               />
               <Input
                 label="Año de ingreso"
-                requiredAsterisk
                 inputMode="numeric"
                 maxLength={4}
                 placeholder={enrollmentRange ? `Ej. ${enrollmentRange.max}` : undefined}

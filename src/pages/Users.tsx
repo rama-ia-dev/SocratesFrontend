@@ -453,13 +453,11 @@ export const Users: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Nombre"
-              requiredAsterisk
               {...profCreateFirstName.inputProps}
               disabled={isSavingProfCreate}
             />
             <Input
               label="Apellido"
-              requiredAsterisk
               {...profCreateLastName.inputProps}
               disabled={isSavingProfCreate}
             />
@@ -468,7 +466,6 @@ export const Users: React.FC = () => {
           <div>
             <Input
               label="Correo electrónico"
-              requiredAsterisk
               type="email"
               {...profCreateEmail.inputProps}
               disabled={isSavingProfCreate}
@@ -479,7 +476,6 @@ export const Users: React.FC = () => {
           <div>
             <Input
               label="Legajo"
-              requiredAsterisk
               inputMode="numeric"
               {...profCreateLegajo.inputProps}
               onChange={(e) => profCreateLegajo.setValue(digitsOnly(e.target.value))}
@@ -491,7 +487,6 @@ export const Users: React.FC = () => {
           <div>
             <Input
               label="Fecha de nacimiento"
-              requiredAsterisk
               type="date"
               min={minBirthDate()}
               max={maxBirthDate()}
@@ -563,13 +558,11 @@ export const Users: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Nombre"
-              requiredAsterisk
               {...profEditFirstName.inputProps}
               disabled={isSavingProfEdit}
             />
             <Input
               label="Apellido"
-              requiredAsterisk
               {...profEditLastName.inputProps}
               disabled={isSavingProfEdit}
             />
@@ -578,7 +571,6 @@ export const Users: React.FC = () => {
           <div>
             <Input
               label="Correo electrónico"
-              requiredAsterisk
               type="email"
               {...profEditEmail.inputProps}
               disabled={isSavingProfEdit}
@@ -588,7 +580,6 @@ export const Users: React.FC = () => {
           <div>
             <Input
               label="Legajo"
-              requiredAsterisk
               inputMode="numeric"
               {...profEditLegajo.inputProps}
               onChange={(e) => profEditLegajo.setValue(digitsOnly(e.target.value))}
@@ -599,7 +590,6 @@ export const Users: React.FC = () => {
           <div>
             <Input
               label="Fecha de nacimiento"
-              requiredAsterisk
               type="date"
               min={minBirthDate()}
               max={maxBirthDate()}
@@ -679,7 +669,6 @@ export const Users: React.FC = () => {
           <div>
             <Input
               label="Legajo"
-              requiredAsterisk
               inputMode="numeric"
               {...studentEditLegajo.inputProps}
               onChange={(e) => studentEditLegajo.setValue(digitsOnly(e.target.value))}
@@ -690,13 +679,11 @@ export const Users: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Nombre"
-              requiredAsterisk
               {...studentEditFirstName.inputProps}
               disabled={isSavingStudentEdit}
             />
             <Input
               label="Apellido"
-              requiredAsterisk
               {...studentEditLastName.inputProps}
               disabled={isSavingStudentEdit}
             />
@@ -705,7 +692,6 @@ export const Users: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Fecha de nacimiento"
-              requiredAsterisk
               type="date"
               min={minBirthDate()}
               max={maxBirthDate()}
@@ -714,7 +700,6 @@ export const Users: React.FC = () => {
             />
             <Input
               label="Año de ingreso"
-              requiredAsterisk
               inputMode="numeric"
               maxLength={4}
               {...studentEditEnrollmentYear.inputProps}

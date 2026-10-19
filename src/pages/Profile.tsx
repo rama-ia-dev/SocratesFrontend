@@ -152,14 +152,12 @@ export const Profile: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Nombre"
-              requiredAsterisk
               type="text"
               {...firstName.inputProps}
               disabled={isLoading}
             />
             <Input
               label="Apellido"
-              requiredAsterisk
               type="text"
               {...lastName.inputProps}
               disabled={isLoading}
@@ -169,6 +167,7 @@ export const Profile: React.FC = () => {
           <div>
             <Input
               label="Fecha de nacimiento"
+              optional
               type="date"
               min={minBirthDate()}
               max={maxBirthDate()}
@@ -182,14 +181,12 @@ export const Profile: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Correo electrónico"
-                requiredAsterisk
                 type="email"
                 {...email.inputProps}
                 disabled={isLoading}
               />
               <Input
                 label="Legajo"
-                requiredAsterisk
                 inputMode="numeric"
                 {...legajo.inputProps}
                 onChange={(e) => legajo.setValue(digitsOnly(e.target.value))}

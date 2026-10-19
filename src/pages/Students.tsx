@@ -303,7 +303,6 @@ export const Students: React.FC = () => {
           <div>
             <Input
               label="Legajo"
-              requiredAsterisk
               type="number"
               min={1}
               value={legajo}
@@ -316,7 +315,6 @@ export const Students: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Nombre"
-              requiredAsterisk
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               disabled={isSaving}
@@ -324,7 +322,6 @@ export const Students: React.FC = () => {
             />
             <Input
               label="Apellido"
-              requiredAsterisk
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
               disabled={isSaving}
@@ -335,7 +332,6 @@ export const Students: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Fecha de nacimiento"
-              requiredAsterisk
               type="date"
               value={birthDate}
               onChange={(e) => setBirthDate(e.target.value)}
@@ -344,7 +340,6 @@ export const Students: React.FC = () => {
             />
             <Input
               label="Año de ingreso"
-              requiredAsterisk
               type="number"
               min={1950}
               max={2100}
