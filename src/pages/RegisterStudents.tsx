@@ -299,7 +299,7 @@ export const RegisterStudents: React.FC = () => {
                 {...enrollmentYear.inputProps}
                 onChange={(e) => enrollmentYear.setValue(digitsOnly(e.target.value))}
                 disabled={isSubmittingManual || !enrollmentRange}
-                helperText={enrollmentRange ? undefined : 'Se habilita con una fecha de nacimiento válida'}
+                helperText={enrollmentRange ? undefined : 'Ingrese una fecha de nacimiento para habilitar este campo'}
               />
             </div>
 

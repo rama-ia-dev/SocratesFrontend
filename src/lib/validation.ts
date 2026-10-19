@@ -65,14 +65,13 @@ export const enrollmentYearRange = (birthDate: string): { min: number; max: numb
 
 export const validateEnrollmentYear = (value: string, birthDate: string): string | null => {
   const range = enrollmentYearRange(birthDate);
-  if (!range) return 'Primero ingrese una fecha de nacimiento válida';
+  if (!range) return 'Primero ingrese una fecha de nacimiento';
   if (!value) return 'Ingrese el año de ingreso';
   const year = Number(value);
   if (!/^\d{4}$/.test(value) || year < range.min || year > range.max) {
-    // El mínimo es el año en que cumplió 18; decirlo explica de dónde sale el rango.
     return range.min === range.max
-      ? `Ingrese ${range.max}: cumplió 18 años ese año`
-      : `Ingrese un año entre ${range.min} y ${range.max} (cumplió 18 años en ${range.min})`;
+      ? `Ingrese ${range.max}`
+      : `Ingrese un año entre ${range.min} y ${range.max}`;
   }
   return null;
 };
