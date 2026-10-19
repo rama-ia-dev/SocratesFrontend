@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { StudentCreate } from '../types/api';
+import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Input } from '../components/ui/Input';
 import { DateField } from '../components/ui/DateField';
@@ -13,9 +13,16 @@ import {
   AlertTriangle,
   AlertCircle,
   CheckCircle2,
+  Download,
   X,
-  RefreshCw,
 } from 'lucide-react';
+import {
+  readStudentsExcel,
+  markError,
+  ExcelFileError,
+  TEMPLATE_URL,
+  type ExcelRow,
+} from '../lib/studentsExcel';
 import {
   useField,
   validateName,
@@ -29,24 +36,35 @@ import {
 } from '../lib/validation';
 import { Alert } from '../components/ui/Alert';
 
-interface PreviewRow {
-  row: number;
-  legajo: number;
-  first_name: string;
-  last_name: string;
-  birth_date: string;
-  enrollment_year: number;
-  status: 'valid' | 'error';
-  errorMessage?: string;
-}
+// Traduce los errores por fila que devuelve POST /students/bulk
+const bulkRowError = (detail: string) =>
+  detail.includes('already exists')
+    ? 'Ya hay un alumno registrado con este legajo'
+    : detail.includes('Duplicated')
+    ? 'Legajo repetido en el archivo'
+    : detail;
+
+const RowErrors: React.FC<{ errors: string[]; className?: string }> = ({ errors, className = '' }) => (
+  <ul className={`space-y-1 ${className}`}>
+    {errors.map((msg) => (
+      <li key={msg} className="flex items-start gap-1 text-xs font-semibold text-danger">
+        <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
+        {msg}
+      </li>
+    ))}
+  </ul>
+);
 
 export const RegisterStudents: React.FC = () => {
   const navigate = useNavigate();
   const { success } = useToast();
+  const { user } = useAuth();
+  // El super administrador ve a los alumnos en Usuarios. El listado del docente común muestra solo
+  // alumnos que ya están en un equipo de sus cursos, donde el recién registrado todavía no aparece:
+  // después de registrar sigue en el formulario.
+  const listPath = user?.is_super_admin ? '/usuarios' : '/estudiantes';
 
-  // La carga desde Excel queda oculta hasta que se desarrolle su historia (SCRUM-97): por ahora,
-  // solo carga manual.
-  const [activeTab] = useState<'manual' | 'excel'>('manual');
+  const [activeTab, setActiveTab] = useState<'manual' | 'excel'>('manual');
 
   // ==========================================
   // Formulario Manual
@@ -67,9 +85,10 @@ export const RegisterStudents: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadState, setUploadState] = useState<'empty' | 'loading' | 'loaded' | 'error'>('empty');
   const [excelFile, setExcelFile] = useState<File | null>(null);
-  const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
+  const [previewRows, setPreviewRows] = useState<ExcelRow[]>([]);
   const [excelErrorMsg, setExcelErrorMsg] = useState<string | null>(null);
   const [isSubmittingExcel, setIsSubmittingExcel] = useState(false);
+  const uploadId = useRef(0);
 
   // Correo de ingreso calculado
   const calculatedEmail = legajo.value
@@ -95,7 +114,8 @@ export const RegisterStudents: React.FC = () => {
         enrollment_year: Number(enrollmentYear.value),
       });
       success('Estudiante registrado. Recibirá un correo de bienvenida');
-      navigate('/usuarios');
+      if (user?.is_super_admin) navigate(listPath);
+      else [legajo, firstName, lastName, birthDate, enrollmentYear].forEach((f) => f.reset());
     } catch (err: any) {
       // POST /students responde el legajo repetido como 422 con la lista de filas ({row, legajo, detail})
       const rows = Array.isArray(err.detail) ? err.detail : err.errors;
@@ -109,9 +129,13 @@ export const RegisterStudents: React.FC = () => {
     }
   };
 
-  // Simular lectura y parseo de Excel con filas de ejemplo válidas y un error de prueba
-  const handleProcessFile = (file: File) => {
-    if (!file.name.endsWith('.xlsx')) {
+  const handleProcessFile = async (file: File) => {
+    // Si mientras se lee se cancela o se elige otro archivo, el resultado de esta lectura se descarta
+    const upload = ++uploadId.current;
+    setExcelErrorMsg(null);
+    setPreviewRows([]);
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      setExcelFile(null);
       setUploadState('error');
       setExcelErrorMsg('Solo se admiten archivos Excel (.xlsx)');
       return;
@@ -119,100 +143,112 @@ export const RegisterStudents: React.FC = () => {
 
     setExcelFile(file);
     setUploadState('loading');
-    setExcelErrorMsg(null);
-
-    setTimeout(() => {
-      // Filas de prueba ilustrativas basadas en las especificaciones del brief:
-      // "Las columnas esperadas del archivo son Legajo, Apellido, Nombre, Fecha de nacimiento y Año de ingreso"
-      // "Resumen: 18 filas válidas · 2 con error"
-      const sampleRows: PreviewRow[] = [
-        { row: 1, legajo: 92101, last_name: 'Álvarez', first_name: 'Santiago', birth_date: '2002-04-10', enrollment_year: 2022, status: 'valid' },
-        { row: 2, legajo: 92102, last_name: 'Benítez', first_name: 'Camila', birth_date: '2002-09-18', enrollment_year: 2022, status: 'valid' },
-        { row: 3, legajo: 92103, last_name: 'Castro', first_name: 'Agustín', birth_date: '2001-12-05', enrollment_year: 2021, status: 'valid' },
-        { row: 4, legajo: 92104, last_name: 'Duarte', first_name: 'Lucía', birth_date: '2003-01-22', enrollment_year: 2023, status: 'valid' },
-        { row: 5, legajo: 92105, last_name: 'Espíndola', first_name: 'Joaquín', birth_date: '2002-07-30', enrollment_year: 2022, status: 'valid' },
-        { row: 6, legajo: 92106, last_name: 'Farias', first_name: 'Mariana', birth_date: '2002-11-14', enrollment_year: 2022, status: 'valid' },
-        { row: 7, legajo: 89123, last_name: 'Pérez', first_name: 'Juan Ignacio', birth_date: '2001-04-12', enrollment_year: 2021, status: 'error', errorMessage: 'Legajo ya registrado en el sistema' },
-        { row: 8, legajo: 92108, last_name: 'Giménez', first_name: 'Paula', birth_date: '2003-03-09', enrollment_year: 2023, status: 'valid' },
-        { row: 9, legajo: 92109, last_name: 'Herrera', first_name: 'Facundo', birth_date: '2002-08-16', enrollment_year: 2022, status: 'valid' },
-        { row: 10, legajo: -10, last_name: 'Ibarra', first_name: 'Mateo', birth_date: '2003-06-25', enrollment_year: 2023, status: 'error', errorMessage: 'Legajo inválido (debe ser positivo)' },
-      ];
-
-      setPreviewRows(sampleRows);
+    try {
+      const rows = await readStudentsExcel(file);
+      if (upload !== uploadId.current) return;
+      setPreviewRows(rows);
       setUploadState('loaded');
-    }, 700);
+    } catch (err) {
+      if (upload !== uploadId.current) return;
+      setExcelFile(null);
+      setUploadState('error');
+      setExcelErrorMsg(
+        err instanceof ExcelFileError ? err.message : 'No se pudo leer el archivo'
+      );
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      handleProcessFile(e.target.files[0]);
-    }
+    const file = e.target.files?.[0];
+    // Se limpia para que se pueda volver a elegir el mismo archivo después de corregirlo
+    e.target.value = '';
+    if (file) handleProcessFile(file);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
+    if (isSubmittingExcel) return;
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleProcessFile(e.dataTransfer.files[0]);
     }
   };
 
   const handleRemoveFile = () => {
+    uploadId.current++;
     setExcelFile(null);
     setPreviewRows([]);
     setUploadState('empty');
     setExcelErrorMsg(null);
   };
 
-  const handleFixSampleData = () => {
-    // Corrige los errores en la muestra para permitir probar el envío exitoso
-    setPreviewRows((prev) =>
-      prev.map((r) =>
-        r.status === 'error'
-          ? {
-              ...r,
-              legajo: r.legajo <= 0 ? 92110 : 92111,
-              status: 'valid' as const,
-              errorMessage: undefined,
-            }
-          : r
-      )
-    );
-  };
-
   const handleSubmitExcel = async () => {
-    const errorCount = previewRows.filter((r) => r.status === 'error').length;
-    if (errorCount > 0) return;
-
+    if (previewRows.some((r) => !r.student)) return;
+    setExcelErrorMsg(null);
     setIsSubmittingExcel(true);
     try {
-      const payloadStudents: StudentCreate[] = previewRows.map((r) => ({
-        legajo: r.legajo,
-        first_name: r.first_name,
-        last_name: r.last_name,
-        birth_date: r.birth_date,
-        enrollment_year: r.enrollment_year,
-      }));
-
-      await api.createStudentsBulk({ students: payloadStudents });
-      success(`${payloadStudents.length} estudiantes registrados con éxito`);
-      navigate('/estudiantes');
+      const students = previewRows.map((r) => r.student!);
+      await api.createStudentsBulk({ students });
+      success(
+        students.length === 1
+          ? '1 estudiante registrado. Recibirá un correo de bienvenida'
+          : `${students.length} estudiantes registrados. Recibirán un correo de bienvenida`
+      );
+      if (user?.is_super_admin) navigate(listPath);
+      else handleRemoveFile();
     } catch (err: any) {
-      setExcelErrorMsg(err.message || 'Error al procesar el lote de estudiantes');
+      // Errores por fila (legajo ya registrado): la fila del backend es la posición en el lote
+      const rowErrors = Array.isArray(err.detail) ? err.detail : err.errors;
+      if (err.status === 422 && Array.isArray(rowErrors) && rowErrors[0]?.row) {
+        const rows = previewRows.map((r) => ({ ...r, errors: [...r.errors] }));
+        for (const e of rowErrors) {
+          const target = rows[e.row - 1];
+          if (target) markError(target, bulkRowError(String(e.detail)));
+        }
+        setPreviewRows(rows);
+        setExcelErrorMsg('No se registró ningún alumno. Corrija las filas marcadas y vuelva a subir el archivo');
+      } else {
+        setExcelErrorMsg(err.message || 'Error al registrar los estudiantes');
+      }
     } finally {
       setIsSubmittingExcel(false);
     }
   };
 
-  const validCount = previewRows.filter((r) => r.status === 'valid').length;
-  const errorCount = previewRows.filter((r) => r.status === 'error').length;
+  const errorCount = previewRows.filter((r) => !r.student).length;
+  const validCount = previewRows.length - errorCount;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <PageHeader
         title="Registrar estudiantes"
-        subtitle="Incorpore un nuevo alumno con sus datos personales y académicos"
+        subtitle="Incorpore nuevos alumnos individualmente o mediante plantilla Excel"
       />
+
+      {/* Pestañas: el foco se marca solo al navegar con teclado (estilo global) */}
+      <div role="tablist" aria-label="Forma de registro" className="flex items-center gap-6 border-b border-line mb-6">
+        {(
+          [
+            ['manual', 'Manual'],
+            ['excel', 'Desde Excel'],
+          ] as const
+        ).map(([tab, label]) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            onClick={() => setActiveTab(tab)}
+            className={`-mb-px py-2.5 text-sm border-b-2 transition-colors duration-150 cursor-pointer ${
+              activeTab === tab
+                ? 'border-primary text-ink font-semibold'
+                : 'border-transparent text-ink-muted font-medium hover:text-ink hover:border-line-neutral-strong'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       {/* ========================================================= */}
       {/* Pestaña: Registro Manual                                  */}
@@ -280,7 +316,7 @@ export const RegisterStudents: React.FC = () => {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => navigate('/usuarios')}
+                onClick={() => navigate(listPath)}
                 disabled={isSubmittingManual}
               >
                 Cancelar
@@ -302,6 +338,21 @@ export const RegisterStudents: React.FC = () => {
       {/* ========================================================= */}
       {activeTab === 'excel' && (
         <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-line rounded-xl p-4">
+            <p className="text-sm text-ink-muted">
+              Complete la plantilla con las columnas Legajo, Apellido, Nombre, Fecha de nacimiento y
+              Año de ingreso. Hasta 500 alumnos por archivo.
+            </p>
+            <a
+              href={TEMPLATE_URL}
+              download
+              className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-primary hover:bg-tint"
+            >
+              <Download className="w-4 h-4" />
+              Descargar plantilla
+            </a>
+          </div>
+
           {/* Zona de Carga (Drag & Drop) */}
           <div
             onDragOver={(e) => {
@@ -351,7 +402,7 @@ export const RegisterStudents: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <label className="cursor-pointer">
+                  <label className={isSubmittingExcel ? 'pointer-events-none opacity-50' : 'cursor-pointer'}>
                     <span className="text-xs font-medium text-primary hover:underline px-2 py-1">
                       Reemplazar
                     </span>
@@ -360,12 +411,14 @@ export const RegisterStudents: React.FC = () => {
                       accept=".xlsx"
                       className="hidden"
                       onChange={handleFileChange}
+                      disabled={isSubmittingExcel}
                     />
                   </label>
                   <Button
                     variant="ghostDanger"
                     size="sm"
                     onClick={handleRemoveFile}
+                    disabled={isSubmittingExcel}
                   >
                     <X className="w-4 h-4 mr-1" />
                     Eliminar
@@ -423,24 +476,16 @@ export const RegisterStudents: React.FC = () => {
                   <span className="font-semibold">
                     El registro es de todo o nada:
                   </span>{' '}
-                  si una fila tiene error, no se registra ninguna.
+                  si una fila tiene error, no se registra ninguna. Corrija el archivo y vuelva a
+                  subirlo.
                 </div>
-                {errorCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleFixSampleData}
-                    className="shrink-0 text-xs font-semibold underline text-primary hover:text-primary-hover cursor-pointer ml-2"
-                    title="Simular corrección automática de los errores"
-                  >
-                    Corregir datos de muestra
-                  </button>
-                )}
               </div>
 
               {/* Resumen */}
               <div className="flex items-center justify-between text-sm font-medium px-1">
                 <span className="text-ink">
-                  {validCount} filas válidas · {errorCount} con error
+                  {validCount} {validCount === 1 ? 'fila válida' : 'filas válidas'} · {errorCount}{' '}
+                  con error
                 </span>
                 <span className="text-xs text-ink-muted">
                   Total: {previewRows.length} registros
@@ -457,7 +502,7 @@ export const RegisterStudents: React.FC = () => {
                       <th className="px-4 py-3">Apellido y nombre</th>
                       <th className="px-4 py-3">Fecha nac.</th>
                       <th className="px-4 py-3">Año ing.</th>
-                      <th className="px-4 py-3">Estado</th>
+                      <th className="px-4 py-3 hidden xl:table-cell">Estado</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
@@ -465,35 +510,32 @@ export const RegisterStudents: React.FC = () => {
                       <tr
                         key={row.row}
                         className={
-                          row.status === 'error'
-                            ? 'bg-danger-soft/30'
-                            : 'hover:bg-tint-strong/30'
+                          !row.student ? 'bg-danger-soft/30 align-top' : 'hover:bg-tint-strong/30 align-top'
                         }
                       >
                         <td className="px-4 py-3 font-mono text-xs text-ink-muted">
                           {row.row}
                         </td>
-                        <td className="px-4 py-3 font-mono">{row.legajo}</td>
-                        <td className="px-4 py-3 font-medium">
-                          {row.last_name}, {row.first_name}
+                        <td className="px-4 py-3 font-mono">{row.display.legajo || '—'}</td>
+                        <td className="px-4 py-3 font-medium min-w-[160px]">
+                          {[row.display.last_name, row.display.first_name].filter(Boolean).join(', ') || '—'}
+                          {/* Debajo de xl la columna Estado queda fuera de vista: el error va acá */}
+                          {!row.student && <RowErrors errors={row.errors} className="xl:hidden mt-1.5" />}
+                        </td>
+                        <td className="px-4 py-3 text-ink-muted whitespace-nowrap">
+                          {row.display.birth_date || '—'}
                         </td>
                         <td className="px-4 py-3 text-ink-muted">
-                          {row.birth_date}
+                          {row.display.enrollment_year || '—'}
                         </td>
-                        <td className="px-4 py-3 text-ink-muted">
-                          {row.enrollment_year}
-                        </td>
-                        <td className="px-4 py-3">
-                          {row.status === 'valid' ? (
+                        <td className="px-4 py-3 min-w-[220px] hidden xl:table-cell">
+                          {row.student ? (
                             <span className="inline-flex items-center gap-1 text-xs font-semibold text-success">
                               <CheckCircle2 className="w-3.5 h-3.5" />
                               Válido
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-danger">
-                              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                              Error: {row.errorMessage}
-                            </span>
+                            <RowErrors errors={row.errors} />
                           )}
                         </td>
                       </tr>
@@ -507,7 +549,7 @@ export const RegisterStudents: React.FC = () => {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => navigate('/estudiantes')}
+                  onClick={() => navigate(listPath)}
                   disabled={isSubmittingExcel}
                 >
                   Cancelar
