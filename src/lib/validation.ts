@@ -65,7 +65,8 @@ export const enrollmentYearRange = (birthDate: string): { min: number; max: numb
 
 export const validateEnrollmentYear = (value: string, birthDate: string): string | null => {
   const range = enrollmentYearRange(birthDate);
-  if (!range) return 'Primero ingrese una fecha de nacimiento';
+  // Sin fecha válida el campo queda bloqueado con su leyenda, y el error lo marca la fecha.
+  if (!range) return null;
   if (!value) return 'Ingrese el año de ingreso';
   const year = Number(value);
   if (!/^\d{4}$/.test(value) || year < range.min || year > range.max) {

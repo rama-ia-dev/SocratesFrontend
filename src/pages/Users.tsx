@@ -36,6 +36,7 @@ import {
   validateLegajo,
   validateBirthDate,
   validateEnrollmentYear,
+  enrollmentYearRange,
   maxBirthDate,
   minBirthDate,
   digitsOnly,
@@ -286,6 +287,7 @@ export const Users: React.FC = () => {
     editingProf && profEditEmail.value.trim().toLowerCase() !== editingProf.email.toLowerCase();
   const studentLegajoChanged =
     editingStudent && studentEditLegajo.value !== '' && studentEditLegajo.value !== String(editingStudent.legajo);
+  const studentEnrollmentRange = enrollmentYearRange(studentEditBirthDate.value);
 
   return (
     <div className="space-y-6">
@@ -703,7 +705,8 @@ export const Users: React.FC = () => {
               maxLength={4}
               {...studentEditEnrollmentYear.inputProps}
               onChange={(e) => studentEditEnrollmentYear.setValue(digitsOnly(e.target.value))}
-              disabled={isSavingStudentEdit}
+              disabled={isSavingStudentEdit || !studentEnrollmentRange}
+              helperText={studentEnrollmentRange ? undefined : 'Ingrese una fecha de nacimiento para habilitar este campo'}
             />
           </div>
 
