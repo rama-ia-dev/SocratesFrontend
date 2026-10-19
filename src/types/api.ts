@@ -39,6 +39,7 @@ export interface UserListItem {
   legajo: number;
   email: string;
   role: UserRole;
+  birth_date?: string | null;
   enrollment_year?: number | null;
   is_super_admin?: boolean | null;
 }

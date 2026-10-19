@@ -307,7 +307,6 @@ export const Professors: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Nombre"
-              requiredAsterisk
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               disabled={isSaving}
@@ -315,7 +314,6 @@ export const Professors: React.FC = () => {
             />
             <Input
               label="Apellido"
-              requiredAsterisk
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
               disabled={isSaving}
@@ -326,7 +324,6 @@ export const Professors: React.FC = () => {
           <div>
             <Input
               label="Correo electrónico"
-              requiredAsterisk
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -340,7 +337,6 @@ export const Professors: React.FC = () => {
           <div>
             <Input
               label="Legajo"
-              requiredAsterisk
               type="number"
               min={1}
               value={legajo}
