@@ -42,7 +42,9 @@ export const RegisterStudents: React.FC = () => {
   const navigate = useNavigate();
   const { success } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'manual' | 'excel'>('manual');
+  // La carga desde Excel queda oculta hasta que se desarrolle su historia (SCRUM-97): por ahora,
+  // solo carga manual.
+  const [activeTab] = useState<'manual' | 'excel'>('manual');
 
   // ==========================================
   // Formulario Manual
@@ -91,7 +93,7 @@ export const RegisterStudents: React.FC = () => {
         enrollment_year: Number(enrollmentYear.value),
       });
       success('Estudiante registrado. Recibirá un correo de bienvenida');
-      navigate('/estudiantes');
+      navigate('/usuarios');
     } catch (err: any) {
       if (err.status === 409 || err.message?.includes('existe')) {
         setManualError('Ya existe un alumno con ese legajo');
@@ -205,34 +207,8 @@ export const RegisterStudents: React.FC = () => {
     <div className="max-w-4xl mx-auto space-y-6">
       <PageHeader
         title="Registrar estudiantes"
-        subtitle="Incorpore nuevos alumnos individualmente o mediante plantilla Excel"
+        subtitle="Incorpore un nuevo alumno con sus datos personales y académicos"
       />
-
-      {/* Selector de pestañas */}
-      <div className="flex items-center gap-1 border-b border-[#D6E4F7] mb-6">
-        <button
-          type="button"
-          onClick={() => setActiveTab('manual')}
-          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
-            activeTab === 'manual'
-              ? 'border-[#1D4ED8] text-[#1D4ED8]'
-              : 'border-transparent text-[#51607A] hover:text-[#0F1F3D]'
-          }`}
-        >
-          Manual
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('excel')}
-          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
-            activeTab === 'excel'
-              ? 'border-[#1D4ED8] text-[#1D4ED8]'
-              : 'border-transparent text-[#51607A] hover:text-[#0F1F3D]'
-          }`}
-        >
-          Desde Excel
-        </button>
-      </div>
 
       {/* ========================================================= */}
       {/* Pestaña: Registro Manual                                  */}
@@ -307,7 +283,7 @@ export const RegisterStudents: React.FC = () => {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => navigate('/estudiantes')}
+                onClick={() => navigate('/usuarios')}
                 disabled={isSubmittingManual}
               >
                 Cancelar

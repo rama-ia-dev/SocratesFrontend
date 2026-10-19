@@ -6,7 +6,6 @@ import { SocratesLogo } from '../ui/SocratesLogo';
 import { InitialsAvatar } from '../ui/Table';
 import {
   Layers,
-  GraduationCap,
   Users,
   UserCheck,
   User,
@@ -66,13 +65,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       ];
     }
 
-    if (user.role === 'professor') {
-      return [
-        { label: 'Estudiantes', path: '/estudiantes', icon: GraduationCap },
-      ];
-    }
-
-    // Alumno
+    // Docentes y alumnos: sin módulos por ahora. Estudiantes vuelve para el docente con su
+    // historia (SCRUM-99).
     return [];
   };
 
