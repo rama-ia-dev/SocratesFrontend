@@ -20,6 +20,7 @@ import {
 import { Pagination } from '../components/ui/Pagination';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { useToast } from '../components/ui/Toast';
+import { ActionMenu } from '../components/ui/ActionMenu';
 import {
   Search,
   Plus,
@@ -52,8 +53,6 @@ export const Users: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<'student' | 'professor' | ''>('');
   const [isLoading, setIsLoading] = useState(true);
-
-  // Menú contextual abierto
 
   // ==========================================
   // Diálogo Alta Docente
@@ -405,17 +404,17 @@ export const Users: React.FC = () => {
                     {u.role === 'student' ? u.enrollment_year || '—' : '—'}
                   </TableCell>
                   <TableCell className="text-right sticky right-0 bg-white border-b border-[#D6E4F7]">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        u.role === 'professor' ? handleOpenEditProf(u) : handleOpenEditStudent(u)
-                      }
-                      className="p-1.5 rounded text-[#1D4ED8] hover:bg-[#EFF6FF] cursor-pointer"
-                      aria-label={`Modificar a ${u.first_name} ${u.last_name}`}
-                      title="Modificar"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
+                    <ActionMenu
+                      label={`Acciones de ${u.first_name} ${u.last_name}`}
+                      items={[
+                        {
+                          label: 'Modificar',
+                          icon: <Edit2 className="w-3.5 h-3.5 text-[#1D4ED8]" />,
+                          onClick: () =>
+                            u.role === 'professor' ? handleOpenEditProf(u) : handleOpenEditStudent(u),
+                        },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               ))}
