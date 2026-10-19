@@ -21,6 +21,7 @@ import {
   ProjectCreate,
   ProjectList,
   ProjectPublic,
+  ProjectOverview,
   SectionCreate,
   SectionList,
   SectionPublic,
@@ -1570,6 +1571,24 @@ export const api = {
     }
 
     return request<ProjectPublic>(`/projects/${id_project}`, { method: 'GET' });
+  },
+
+  // El equipo con sus integrantes (activos y finalizados) y su jefe
+  async getProjectOverview(id_project: number): Promise<ProjectOverview> {
+    if (USE_MOCK) {
+      const { members = [], ...p } = await api.getProject(id_project);
+      const active = { id_status: 8, ambito: 'student_project', code: 'active', name: 'Activo' };
+      const list = members.map((m, i) => ({
+        ...m,
+        id_student_project: m.id_student,
+        is_leader: i === 0,
+        enrolled_at: '2025-03-01T09:00:00Z',
+        status: active,
+      }));
+      return { ...p, members: list, responsible: list[0] ?? null };
+    }
+
+    return request<ProjectOverview>(`/projects/${id_project}/overview`, { method: 'GET' });
   },
 
   async createProject(payload: ProjectCreate): Promise<ProjectPublic> {

@@ -278,6 +278,24 @@ export interface ProjectPublic {
   }[];
 }
 
+// Integrante de un equipo, como lo devuelve `GET /projects/{id}/overview`
+export interface ProjectMember {
+  id_student_project: number;
+  id_student: number;
+  first_name: string;
+  last_name: string;
+  legajo: number;
+  is_leader: boolean;
+  enrolled_at: string;
+  status: StatusPublic;
+}
+
+// `GET /projects/{id}/overview`: el equipo con sus integrantes activos y finalizados
+export interface ProjectOverview extends Omit<ProjectPublic, 'members'> {
+  members: ProjectMember[];
+  responsible: ProjectMember | null;
+}
+
 export interface ProjectList {
   items: ProjectPublic[];
   total: number;
