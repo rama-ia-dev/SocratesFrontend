@@ -6,6 +6,14 @@ import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const validateEmail = (value: string): string | null => {
+  if (!value.trim()) return 'Ingrese su correo';
+  if (!EMAIL_RE.test(value.trim())) return 'Ingrese un correo válido, por ejemplo nombre@correo.com';
+  return null;
+};
+
 export const Login: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -14,16 +22,21 @@ export const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!email.trim() || !password) {
-      setErrorMessage('Ingrese su correo y contraseña');
-      return;
-    }
+    // Los dos campos se revisan a la vez y cada error va debajo de su campo. El recuadro de
+    // arriba queda para lo que responde el backend.
+    const emailProblem = validateEmail(email);
+    const passwordProblem = password ? null : 'Ingrese su contraseña';
+    setEmailError(emailProblem);
+    setPasswordError(passwordProblem);
+    if (emailProblem || passwordProblem) return;
 
     setIsLoading(true);
     try {
@@ -87,11 +100,18 @@ export const Login: React.FC = () => {
             <div>
               <Input
                 label="Correo electrónico"
-                requiredAsterisk
                 type="email"
                 placeholder="nombre@correo.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  // Ya marcado el error, se va apenas el correo queda bien escrito.
+                  if (emailError) setEmailError(validateEmail(e.target.value));
+                }}
+                onBlur={() => {
+                  if (email.trim()) setEmailError(validateEmail(email));
+                }}
+                error={emailError ?? undefined}
                 helperText="Alumnos: su legajo seguido de @sistemas.frc.utn.edu.ar"
                 disabled={isLoading}
                 autoComplete="email"
@@ -102,11 +122,14 @@ export const Login: React.FC = () => {
             <div>
               <Input
                 label="Contraseña"
-                requiredAsterisk
                 type={showPassword ? 'text' : 'password'}
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (e.target.value) setPasswordError(null);
+                }}
+                error={passwordError ?? undefined}
                 disabled={isLoading}
                 autoComplete="current-password"
                 required
