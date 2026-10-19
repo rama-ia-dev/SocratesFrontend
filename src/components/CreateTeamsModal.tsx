@@ -18,7 +18,7 @@ const MAX_GROUP_NUMBER = 9999;
 
 const digitsOnly = (v: string) => v.replace(/\D/g, '');
 
-// Crear equipos de trabajo (SCRUM-102). El backend crea equipos vacíos y privados en un curso
+// Crear equipos de trabajo (SCRUM-102). El backend crea equipos vacíos y sin asegurar en un curso
 // lectivo: uno con número elegido (o el siguiente libre) o varios consecutivos. Puede hacerlo un
 // docente del curso lectivo o un super administrador.
 export const CreateTeamsModal: React.FC<{
@@ -161,8 +161,8 @@ export const CreateTeamsModal: React.FC<{
           )}
 
           <p className="text-xs text-[#51607A] bg-[#EFF6FF] border border-[#BAE6FD] rounded-lg p-3">
-            Los equipos se crean vacíos y privados. Los alumnos se suman después y completan el nombre y
-            los datos del proyecto.
+            Los equipos se crean vacíos, sin asegurar y públicos. Los alumnos se suman después y
+            completan el nombre y los datos del proyecto.
           </p>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-[#D6E4F7]">
