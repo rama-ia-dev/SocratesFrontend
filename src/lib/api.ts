@@ -33,6 +33,7 @@ import {
   StudentCreate,
   StudentPublic,
   StudentUpdate,
+  StudentList,
   UserList,
   UserPublic,
   UserUpdate,
@@ -585,6 +586,41 @@ export const api = {
       mockDB.me = { ...u };
       currentAccessToken = 'mock-token-student';
     }
+  },
+
+  // ==========================================
+  // Students: listado para docentes (SCRUM-99)
+  // ==========================================
+  // Un docente común ve los alumnos de sus cursos lectivos; el super administrador, todos.
+  async getStudents(params: {
+    id_section_year?: number | null;
+    q?: string | null;
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<StudentList> {
+    if (USE_MOCK) {
+      const res = await this.getUsers({ role: 'student', q: params.q, limit: params.limit, offset: params.offset });
+      return {
+        ...res,
+        items: res.items.map((u) => ({
+          id_student: u.id_user,
+          first_name: u.first_name,
+          last_name: u.last_name,
+          legajo: u.legajo,
+          email: u.email,
+          enrollment_year: u.enrollment_year ?? 0,
+          groups: [],
+        })),
+      };
+    }
+
+    const query = new URLSearchParams();
+    if (params.id_section_year) query.set('id_section_year', params.id_section_year.toString());
+    if (params.q) query.set('q', params.q);
+    if (params.limit !== undefined) query.set('limit', params.limit.toString());
+    if (params.offset !== undefined) query.set('offset', params.offset.toString());
+
+    return request<StudentList>(`/students?${query.toString()}`);
   },
 
   // ==========================================

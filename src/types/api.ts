@@ -79,6 +79,38 @@ export interface StudentPublic {
   birth_date?: string;
 }
 
+// Listado de alumnos para docentes (GET /students): cada alumno con los equipos a los que pertenece
+export interface StudentGroup {
+  id_project: number;
+  project_name?: string | null;
+  group_number: number;
+  id_section_year: number;
+  year: number;
+  id_section: number;
+  section_name: string;
+  // Si es el jefe del grupo y el estado de su membresía (activo, finalizado, etc.). Opcionales
+  // solo porque los datos simulados no los tienen.
+  is_leader?: boolean;
+  status?: { code: string; name: string };
+}
+
+export interface StudentListItem {
+  id_student: number;
+  first_name: string;
+  last_name: string;
+  legajo: number;
+  email: string;
+  enrollment_year: number;
+  groups: StudentGroup[];
+}
+
+export interface StudentList {
+  items: StudentListItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface StudentUpdate {
   first_name?: string | null;
   last_name?: string | null;

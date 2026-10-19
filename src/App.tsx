@@ -139,11 +139,11 @@ export default function App() {
               }
             />
 
-            {/* P7: Estudiantes. Por ahora solo el super admin; el docente se suma con SCRUM-99 */}
+            {/* P7: Estudiantes (Profesor y super admin) */}
             <Route
               path="/estudiantes"
               element={
-                <ProtectedRoute allowedRoles={['superadmin']}>
+                <ProtectedRoute allowedRoles={['superadmin', 'professor']}>
                   <Students />
                 </ProtectedRoute>
               }

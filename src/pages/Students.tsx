@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import { UserListItem } from '../types/api';
+import type { StudentListItem } from '../types/api';
 import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../components/ui/PageHeader';
+import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Modal } from '../components/ui/Modal';
+import { Select } from '../components/ui/Select';
 import {
   Table,
   TableHeader,
@@ -17,122 +18,79 @@ import {
 } from '../components/ui/Table';
 import { Pagination } from '../components/ui/Pagination';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
-import { useToast } from '../components/ui/Toast';
-import {
-  Search,
-  MoreVertical,
-  Plus,
-  Edit2,
-  AlertCircle,
-  ShieldAlert,
-} from 'lucide-react';
+import { Search, Plus, RefreshCw } from 'lucide-react';
 
+const PAGE_SIZE = 10;
+
+interface CourseOption {
+  id_section_year: number;
+  label: string;
+}
+
+// Consultar estudiantes (SCRUM-99): GET /students. El docente común ve los alumnos de sus cursos
+// lectivos, con el equipo al que pertenece cada uno; el super administrador, todos los alumnos.
 export const Students: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { success, error: toastError } = useToast();
 
-  const [students, setStudents] = useState<UserListItem[]>([]);
+  const [students, setStudents] = useState<StudentListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [course, setCourse] = useState('');
+  const [courses, setCourses] = useState<CourseOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [permissionError, setPermissionError] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState(false);
 
-  // Diálogo Modificar Estudiante
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingStudent, setEditingStudent] = useState<UserListItem | null>(null);
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [legajo, setLegajo] = useState<number | ''>('');
-  const [originalLegajo, setOriginalLegajo] = useState<number | ''>('');
-  const [birthDate, setBirthDate] = useState('2002-01-01');
-  const [enrollmentYear, setEnrollmentYear] = useState<number>(2022);
-  const [modalError, setModalError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  // Filtro por curso lectivo: los del docente o, para el super administrador, todos
+  useEffect(() => {
+    if (!user) return;
+    const load = user.is_super_admin
+      ? api.getSectionYears({ limit: 100 }).then((r) =>
+          r.items.map((sy) => ({ id_section_year: sy.id_section_year, label: `${sy.section_name} (${sy.year})` }))
+        )
+      : api.getProfessorSectionYears({ id_professor: user.id_user, limit: 100 }).then((r) =>
+          r.items.map((a) => ({ id_section_year: a.id_section_year, label: `${a.section_name} (${a.year})` }))
+        );
+    load.then(setCourses).catch(() => setCourses([]));
+  }, [user]);
 
-  // Menú contextual
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  // La búsqueda espera a que se deje de escribir; cada pedido descarta las respuestas anteriores
+  // que lleguen tarde (si no, "Pe" podría pisar los resultados de "Pérez").
+  const [query, setQuery] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+  const requestId = useRef(0);
 
   const fetchStudents = useCallback(async () => {
+    const current = ++requestId.current;
     setIsLoading(true);
-    setPermissionError(false);
-
+    setLoadError(false);
     try {
-      const res = await api.getUsers({
-        role: 'student',
-        q: searchQuery || null,
-        limit: 10,
+      const res = await api.getStudents({
+        id_section_year: course ? Number(course) : null,
+        q: query || null,
+        limit: PAGE_SIZE,
         offset,
       });
+      if (current !== requestId.current) return;
       setStudents(res.items);
       setTotal(res.total);
-    } catch (err: any) {
-      if (err.status === 403) {
-        setPermissionError(true);
-      } else {
-        toastError('Error al cargar la lista de estudiantes');
-      }
+    } catch {
+      if (current !== requestId.current) return;
+      setLoadError(true);
     } finally {
-      setIsLoading(false);
+      if (current === requestId.current) setIsLoading(false);
     }
-  }, [searchQuery, offset, toastError]);
+  }, [query, course, offset]);
 
   useEffect(() => {
     fetchStudents();
   }, [fetchStudents]);
 
-  const handleOpenEdit = (st: UserListItem) => {
-    setEditingStudent(st);
-    setFirstName(st.first_name);
-    setLastName(st.last_name);
-    setLegajo(st.legajo);
-    setOriginalLegajo(st.legajo);
-    setEnrollmentYear(st.enrollment_year || 2022);
-    setBirthDate('2002-05-15');
-    setModalError(null);
-    setOpenMenuId(null);
-    setIsEditModalOpen(true);
-  };
-
-  const handleSaveEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingStudent) return;
-    setModalError(null);
-
-    if (!legajo || legajo <= 0) {
-      setModalError('El legajo debe ser un número positivo');
-      return;
-    }
-    if (!firstName.trim() || !lastName.trim()) {
-      setModalError('Ingrese nombre y apellido');
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      await api.updateStudent(editingStudent.id_user, {
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        legajo: Number(legajo),
-        enrollment_year: enrollmentYear,
-        birth_date: birthDate,
-      });
-      success('Datos del estudiante actualizados');
-      setIsEditModalOpen(false);
-      fetchStudents();
-    } catch (err: any) {
-      if (err.status === 409 || err.message?.includes('existe')) {
-        setModalError('Ya existe un alumno con ese legajo');
-      } else {
-        setModalError(err.message || 'Error al actualizar estudiante');
-      }
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const legajoChanged = legajo !== originalLegajo && legajo !== '';
+  const hasFilters = Boolean(searchQuery.trim() || course);
 
   return (
     <div className="space-y-6">
@@ -140,235 +98,142 @@ export const Students: React.FC = () => {
         title="Estudiantes"
         subtitle={
           user?.is_super_admin
-            ? 'Padrón institucional de alumnos matriculados'
-            : 'Estudiantes matriculados en tus cursos lectivos a cargo'
+            ? 'Todos los alumnos registrados y sus equipos'
+            : 'Alumnos de sus cursos lectivos y el equipo de cada uno'
         }
+        // El docente registra alumnos con su historia (SCRUM-97)
         action={
-          <Button
-            variant="primary"
-            onClick={() => navigate('/estudiantes/nuevo')}
-          >
-            <Plus className="w-4 h-4 mr-1.5" />
-            Registrar estudiantes
-          </Button>
+          user?.is_super_admin ? (
+            <Button variant="primary" onClick={() => navigate('/estudiantes/nuevo')}>
+              <Plus className="w-4 h-4 mr-1.5" />
+              Registrar estudiantes
+            </Button>
+          ) : undefined
         }
       />
 
-      {/* Si el profesor no tiene permisos según el backend actual (403) */}
-      {permissionError ? (
-        <div className="rounded-xl border border-[#D6E4F7] bg-white p-12 text-center fluted-column-pattern">
-          <div className="max-w-md mx-auto flex flex-col items-center">
-            <div className="p-3 bg-[#FEE2E2] text-[#B91C1C] rounded-full mb-3 border border-[#FCA5A5]">
-              <ShieldAlert className="w-6 h-6" />
-            </div>
-            <p className="text-base font-semibold text-[#0F1F3D]">
-              No tiene permisos para ver el listado
-            </p>
-            <p className="text-xs text-[#51607A] mt-1 mb-4">
-              La consulta del padrón de usuarios está reservada exclusivamente a super administradores según el protocolo de seguridad institucional.
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate('/estudiantes/nuevo')}
-            >
-              Ir a registrar estudiantes
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl">
+        <Input
+          type="text"
+          aria-label="Buscar"
+          placeholder="Buscar por nombre, apellido o legajo"
+          maxLength={100}
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setOffset(0);
+          }}
+          leftIcon={<Search className="w-4 h-4" />}
+        />
+        <Select
+          aria-label="Curso lectivo"
+          value={course}
+          onChange={(e) => {
+            setCourse(e.target.value);
+            setOffset(0);
+          }}
+          options={[
+            { value: '', label: user?.is_super_admin ? 'Todos los cursos lectivos' : 'Todos mis cursos lectivos' },
+            ...courses.map((c) => ({ value: c.id_section_year, label: c.label })),
+          ]}
+        />
+      </div>
+
+      {isLoading ? (
+        <TableSkeleton rows={4} cols={5} />
+      ) : loadError ? (
+        <EmptyState
+          message="No se pudo cargar el listado de estudiantes."
+          action={
+            <Button variant="outline" size="sm" onClick={fetchStudents}>
+              <RefreshCw className="w-4 h-4 mr-1.5" />
+              Reintentar
             </Button>
-          </div>
-        </div>
+          }
+        />
+      ) : students.length === 0 ? (
+        <EmptyState
+          message={
+            hasFilters
+              ? 'No hay estudiantes que coincidan con la búsqueda.'
+              : user?.is_super_admin
+                ? 'Todavía no hay estudiantes registrados.'
+                : 'Todavía no hay estudiantes en sus cursos lectivos. Aparecen cuando se suman a un equipo.'
+          }
+          action={
+            hasFilters ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearchQuery('');
+                  setCourse('');
+                  setOffset(0);
+                }}
+              >
+                Limpiar filtros
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         <>
-          {/* Buscador */}
-          <div className="max-w-md">
-            <Input
-              type="text"
-              placeholder="Buscar por nombre o legajo"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setOffset(0);
-              }}
-              leftIcon={<Search className="w-4 h-4" />}
-            />
-          </div>
+          <Table>
+            <TableHeader>
+              <tr>
+                <TableHead>Legajo</TableHead>
+                <TableHead>Apellido y nombre</TableHead>
+                <TableHead>Correo de ingreso</TableHead>
+                <TableHead>Año de ingreso</TableHead>
+                <TableHead>Equipo</TableHead>
+              </tr>
+            </TableHeader>
+            <tbody>
+              {students.map((st) => (
+                <TableRow key={st.id_student}>
+                  <TableCell className="font-mono font-medium text-[#0F1F3D]">{st.legajo}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3 min-w-[160px]">
+                      <InitialsAvatar name={`${st.last_name} ${st.first_name}`} size="sm" />
+                      <span className="font-medium text-[#0F1F3D]">
+                        {st.last_name}, {st.first_name}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-mono text-[#51607A] text-xs">{st.email}</TableCell>
+                  <TableCell className="text-[#51607A]">{st.enrollment_year}</TableCell>
+                  <TableCell className="min-w-[160px]">
+                    {st.groups.length === 0 ? (
+                      <span className="text-xs italic text-[#8A9AB5]">Sin equipo</span>
+                    ) : (
+                      <ul className="space-y-0.5">
+                        {st.groups.map((g) => (
+                          <li key={g.id_project}>
+                            <span className="text-sm text-[#0F1F3D]">Equipo {g.group_number}</span>
+                            <span className="text-xs text-[#51607A]">
+                              {' '}
+                              · {g.section_name} ({g.year})
+                              {g.project_name ? ` · ${g.project_name}` : ''}
+                            </span>
+                            {g.is_leader && (
+                              <Badge variant="superadmin" className="ml-1.5">Jefe</Badge>
+                            )}
+                            {g.status && g.status.code !== 'active' && (
+                              <Badge variant="neutral" className="ml-1.5">{g.status.name}</Badge>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </tbody>
+          </Table>
 
-          {isLoading ? (
-            <TableSkeleton rows={4} cols={5} />
-          ) : students.length === 0 ? (
-            <EmptyState message="No se encontraron estudiantes registrados." />
-          ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <tr>
-                    <TableHead>Legajo</TableHead>
-                    <TableHead>Apellido y nombre</TableHead>
-                    <TableHead>Correo de ingreso</TableHead>
-                    <TableHead>Año de ingreso</TableHead>
-                    <TableHead className="w-20 text-right">Acciones</TableHead>
-                  </tr>
-                </TableHeader>
-                <tbody>
-                  {students.map((st) => (
-                    <TableRow key={st.id_user}>
-                      <TableCell className="font-mono font-medium text-[#0F1F3D]">
-                        {st.legajo}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <InitialsAvatar
-                            name={`${st.last_name} ${st.first_name}`}
-                            size="sm"
-                          />
-                          <span className="font-medium text-[#0F1F3D]">
-                            {st.last_name}, {st.first_name}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-mono text-[#51607A] text-xs">
-                        {`${st.legajo}@sistemas.frc.utn.edu.ar`}
-                      </TableCell>
-                      <TableCell className="text-[#51607A]">
-                        {st.enrollment_year || '—'}
-                      </TableCell>
-                      <TableCell className="text-right relative">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOpenMenuId(
-                              openMenuId === st.id_user ? null : st.id_user
-                            )
-                          }
-                          className="p-1 rounded text-[#51607A] hover:text-[#0F1F3D] hover:bg-[#EFF6FF] cursor-pointer"
-                          aria-label="Abrir menú de opciones"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-
-                        {openMenuId === st.id_user && (
-                          <div className="absolute right-4 top-10 w-36 bg-white border border-[#D6E4F7] rounded-lg shadow-lg py-1 z-20 text-left">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEdit(st)}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#0F1F3D] hover:bg-[#EFF6FF] cursor-pointer"
-                            >
-                              <Edit2 className="w-3.5 h-3.5 text-[#1D4ED8]" />
-                              <span>Modificar</span>
-                            </button>
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </tbody>
-              </Table>
-
-              <Pagination
-                total={total}
-                limit={10}
-                offset={offset}
-                onChangeOffset={setOffset}
-              />
-            </>
-          )}
+          <Pagination total={total} limit={PAGE_SIZE} offset={offset} onChangeOffset={setOffset} />
         </>
       )}
-
-      {/* Diálogo Modificar Estudiante */}
-      <Modal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        title="Modificar estudiante"
-      >
-        {modalError && (
-          <div
-            role="alert"
-            className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
-          >
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{modalError}</span>
-          </div>
-        )}
-
-        {legajoChanged && (
-          <div className="mb-4 p-3 rounded-lg bg-[#EFF6FF] border border-[#BAE6FD] text-[#1D4ED8] text-xs">
-            El correo de ingreso pasará a ser{' '}
-            <span className="font-mono font-semibold">
-              {legajo}@sistemas.frc.utn.edu.ar
-            </span>
-          </div>
-        )}
-
-        <form onSubmit={handleSaveEdit} className="space-y-4">
-          <div>
-            <Input
-              label="Legajo"
-              type="number"
-              min={1}
-              value={legajo}
-              onChange={(e) => setLegajo(Number(e.target.value))}
-              disabled={isSaving}
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="Nombre"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              disabled={isSaving}
-              required
-            />
-            <Input
-              label="Apellido"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              disabled={isSaving}
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="Fecha de nacimiento"
-              type="date"
-              value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
-              disabled={isSaving}
-              required
-            />
-            <Input
-              label="Año de ingreso"
-              type="number"
-              min={1950}
-              max={2100}
-              value={enrollmentYear}
-              onChange={(e) => setEnrollmentYear(Number(e.target.value))}
-              disabled={isSaving}
-              required
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-[#D6E4F7]">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsEditModalOpen(false)}
-              disabled={isSaving}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              isLoading={isSaving}
-            >
-              Guardar
-            </Button>
-          </div>
-        </form>
-      </Modal>
     </div>
   );
 };
