@@ -23,7 +23,6 @@ import { useToast } from '../components/ui/Toast';
 import {
   Search,
   Plus,
-  MoreVertical,
   Edit2,
   AlertCircle,
   UserCheck,
@@ -36,7 +35,6 @@ import {
   validateLegajo,
   validateBirthDate,
   validateEnrollmentYear,
-  enrollmentYearRange,
   maxBirthDate,
   minBirthDate,
   digitsOnly,
@@ -56,7 +54,6 @@ export const Users: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   // Menú contextual abierto
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
   // ==========================================
   // Diálogo Alta Docente
@@ -175,7 +172,6 @@ export const Users: React.FC = () => {
     profEditBirthDate.reset(u.birth_date || '');
     setProfEditIsSuperAdmin(Boolean(u.is_super_admin));
     setProfEditError(null);
-    setOpenMenuId(null);
     setIsProfEditModalOpen(true);
   };
 
@@ -237,7 +233,6 @@ export const Users: React.FC = () => {
     studentEditEnrollmentYear.reset(u.enrollment_year ? String(u.enrollment_year) : '');
     studentEditBirthDate.reset(u.birth_date || '');
     setStudentEditError(null);
-    setOpenMenuId(null);
     setIsStudentEditModalOpen(true);
   };
 
@@ -292,7 +287,6 @@ export const Users: React.FC = () => {
     editingProf && profEditEmail.value.trim().toLowerCase() !== editingProf.email.toLowerCase();
   const studentLegajoChanged =
     editingStudent && studentEditLegajo.value !== '' && studentEditLegajo.value !== String(editingStudent.legajo);
-  const studentEnrollmentRange = enrollmentYearRange(studentEditBirthDate.value);
 
   return (
     <div className="space-y-6">
@@ -414,32 +408,14 @@ export const Users: React.FC = () => {
                     <button
                       type="button"
                       onClick={() =>
-                        setOpenMenuId(openMenuId === u.id_user ? null : u.id_user)
+                        u.role === 'professor' ? handleOpenEditProf(u) : handleOpenEditStudent(u)
                       }
-                      className="p-1 rounded text-[#51607A] hover:text-[#0F1F3D] hover:bg-[#EFF6FF] cursor-pointer"
-                      aria-label="Abrir menú de opciones"
+                      className="p-1.5 rounded text-[#1D4ED8] hover:bg-[#EFF6FF] cursor-pointer"
+                      aria-label={`Modificar a ${u.first_name} ${u.last_name}`}
+                      title="Modificar"
                     >
-                      <MoreVertical className="w-4 h-4" />
+                      <Edit2 className="w-4 h-4" />
                     </button>
-
-                    {openMenuId === u.id_user && (
-                      <div className="absolute right-4 top-10 w-36 bg-white border border-[#D6E4F7] rounded-lg shadow-lg py-1 z-20 text-left">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (u.role === 'professor') {
-                              handleOpenEditProf(u);
-                            } else {
-                              handleOpenEditStudent(u);
-                            }
-                          }}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#0F1F3D] hover:bg-[#EFF6FF] cursor-pointer"
-                        >
-                          <Edit2 className="w-3.5 h-3.5 text-[#1D4ED8]" />
-                          <span>Modificar</span>
-                        </button>
-                      </div>
-                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -744,11 +720,6 @@ export const Users: React.FC = () => {
               {...studentEditEnrollmentYear.inputProps}
               onChange={(e) => studentEditEnrollmentYear.setValue(digitsOnly(e.target.value))}
               disabled={isSavingStudentEdit}
-              helperText={
-                studentEnrollmentRange
-                  ? `Entre ${studentEnrollmentRange.min} y ${studentEnrollmentRange.max}`
-                  : undefined
-              }
             />
           </div>
 

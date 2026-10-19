@@ -304,11 +304,7 @@ export const RegisterStudents: React.FC = () => {
                 {...enrollmentYear.inputProps}
                 onChange={(e) => enrollmentYear.setValue(digitsOnly(e.target.value))}
                 disabled={isSubmittingManual || !enrollmentRange}
-                helperText={
-                  enrollmentRange
-                    ? `Entre ${enrollmentRange.min} y ${enrollmentRange.max}`
-                    : 'Se habilita con una fecha de nacimiento válida'
-                }
+                helperText={enrollmentRange ? undefined : 'Se habilita con una fecha de nacimiento válida'}
               />
             </div>
 
