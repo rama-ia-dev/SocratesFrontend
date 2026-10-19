@@ -643,6 +643,7 @@ export const api = {
           legajo: u.legajo,
           email: u.email,
           role: u.role,
+          birth_date: u.birth_date ?? null,
           enrollment_year: u.enrollment_year ?? null,
           is_super_admin: u.is_super_admin ?? null,
         })),

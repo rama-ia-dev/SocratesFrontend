@@ -5,14 +5,7 @@ import { SocratesLogo } from '../components/ui/SocratesLogo';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const validateEmail = (value: string): string | null => {
-  if (!value.trim()) return 'Ingrese su correo';
-  if (!EMAIL_RE.test(value.trim())) return 'Ingrese un correo válido, por ejemplo nombre@correo.com';
-  return null;
-};
+import { validateEmail } from '../lib/validation';
 
 export const Login: React.FC = () => {
   const { login } = useAuth();

@@ -595,7 +595,6 @@ export const Sections: React.FC = () => {
           <div>
             <Input
               label="Nombre"
-              requiredAsterisk
               placeholder="Ej. 3K1"
               maxLength={20}
               value={sectionNameInput}
@@ -648,7 +647,6 @@ export const Sections: React.FC = () => {
           <div>
             <Select
               label="Comisión"
-              requiredAsterisk
               value={syFormSectionId}
               onChange={(e) => setSyFormSectionId(Number(e.target.value))}
               disabled={savingSY}
@@ -666,7 +664,6 @@ export const Sections: React.FC = () => {
           <div>
             <Input
               label="Año"
-              requiredAsterisk
               type="number"
               min={2000}
               max={2100}
