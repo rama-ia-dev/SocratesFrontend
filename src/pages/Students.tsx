@@ -251,7 +251,7 @@ export const Students: React.FC = () => {
         </>
       )}
 
-      {/* GET /students no trae la fecha de nacimiento: el diálogo la deja opcional */}
+      {/* GET /students no expone la fecha de nacimiento al docente: el diálogo no la muestra */}
       {editingStudent && (
         <EditStudentModal
           key={editingStudent.id_student}

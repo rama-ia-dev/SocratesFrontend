@@ -39,7 +39,7 @@ import {
   maxBirthDate,
   minBirthDate,
   digitsOnly,
-  professorSaveError,
+  showProfessorSaveError,
 } from '../lib/validation';
 
 export const Users: React.FC = () => {
@@ -144,7 +144,12 @@ export const Users: React.FC = () => {
       setIsProfCreateModalOpen(false);
       fetchUsers();
     } catch (err: any) {
-      setProfCreateError(professorSaveError(err, 'Error al guardar docente'));
+      showProfessorSaveError(
+        err,
+        'Error al guardar docente',
+        { legajo: profCreateLegajo, mail: profCreateEmail },
+        setProfCreateError
+      );
     } finally {
       setIsSavingProfCreate(false);
     }
@@ -206,7 +211,12 @@ export const Users: React.FC = () => {
       setIsProfEditModalOpen(false);
       fetchUsers();
     } catch (err: any) {
-      setProfEditError(professorSaveError(err, 'Error al actualizar docente'));
+      showProfessorSaveError(
+        err,
+        'Error al actualizar docente',
+        { legajo: profEditLegajo, mail: profEditEmail },
+        setProfEditError
+      );
     } finally {
       setIsSavingProfEdit(false);
     }

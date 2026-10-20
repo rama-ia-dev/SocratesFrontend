@@ -23,7 +23,7 @@ export interface EditableStudent {
   last_name: string;
   legajo: number;
   enrollment_year?: number | null;
-  /** `undefined` cuando el listado de origen no trae la fecha (el de Estudiantes). */
+  /** `undefined` cuando el listado de origen no la trae (el de Estudiantes, que usa el docente). */
   birth_date?: string | null;
 }
 
@@ -33,9 +33,11 @@ const MIN_ENROLLMENT_YEAR = 1950;
  * Diálogo "Modificar estudiante" (SCRUM-98), compartido por Usuarios y Estudiantes.
  * Se monta con la clave del alumno, así cada apertura arranca con sus datos.
  *
- * Si se conoce la fecha de nacimiento, viene cargada y es obligatoria: el año de ingreso se
- * valida contra ella y se bloquea si se borra. Si el listado no la trae, es opcional y el año
- * se valida entre 1950 y el actual hasta que se cargue una.
+ * Si se conoce la fecha de nacimiento (Usuarios, super administrador), viene cargada y es
+ * obligatoria: el año de ingreso se valida contra ella y se bloquea si se borra. El backend no
+ * le muestra la fecha al docente, así que desde Estudiantes el campo no aparece (no se puede
+ * modificar un dato que no se ve) y el año se valida entre 1950 y el actual. La fecha la cambia
+ * el alumno desde Mi perfil o el super administrador desde Usuarios.
  */
 export const EditStudentModal: React.FC<{
   student: EditableStudent;
@@ -49,11 +51,11 @@ export const EditStudentModal: React.FC<{
   const firstName = useField(student.first_name, validateName('nombre'));
   const lastName = useField(student.last_name, validateName('apellido'));
   const legajo = useField(String(student.legajo), validateLegajo);
-  const birthDate = useField(initialBirthDate, (v) => validateBirthDate(v, { required: birthDateKnown }), {
+  const birthDate = useField(initialBirthDate, (v) => (birthDateKnown ? validateBirthDate(v) : null), {
     validateOnChange: true,
   });
   const enrollmentYear = useField(student.enrollment_year ? String(student.enrollment_year) : '', (v) => {
-    if (birthDate.value || birthDateKnown) return validateEnrollmentYear(v, birthDate.value);
+    if (birthDateKnown) return validateEnrollmentYear(v, birthDate.value);
     const max = new Date().getFullYear();
     if (!v) return 'Ingrese el año de ingreso';
     return /^\d{4}$/.test(v) && Number(v) >= MIN_ENROLLMENT_YEAR && Number(v) <= max
@@ -78,7 +80,7 @@ export const EditStudentModal: React.FC<{
       ...(lastName.value.trim() !== student.last_name && { last_name: lastName.value.trim() }),
       ...(Number(legajo.value) !== student.legajo && { legajo: Number(legajo.value) }),
       ...(year !== student.enrollment_year && { enrollment_year: year }),
-      ...(birthDate.value && birthDate.value !== initialBirthDate && { birth_date: birthDate.value }),
+      ...(birthDateKnown && birthDate.value !== initialBirthDate && { birth_date: birthDate.value }),
     };
     if (Object.keys(changes).length === 0) {
       onClose();
@@ -92,16 +94,15 @@ export const EditStudentModal: React.FC<{
       onSaved();
       onClose();
     } catch (err: any) {
-      setError(
-        err.status === 409 || err.message?.includes('existe')
-          ? 'Ya existe un alumno con ese legajo'
-          : err.message || 'Error al actualizar estudiante'
-      );
+      // El único 409 de esta ruta es el legajo repetido: se marca en el campo
+      if (err.status === 409) legajo.reject('Ya existe un alumno con ese legajo');
+      else setError(err.message || 'Error al actualizar estudiante');
       setIsSaving(false);
     }
   };
 
-  const legajoChanged = legajo.value !== '' && legajo.value !== String(student.legajo);
+  // El aviso del correo nuevo sale solo con un legajo válido
+  const legajoChanged = legajo.value !== String(student.legajo) && !validateLegajo(legajo.value);
   // Con la fecha conocida, el año se bloquea si se borra (como al registrar).
   const yearLocked = birthDateKnown && !enrollmentYearRange(birthDate.value);
 
@@ -139,15 +140,16 @@ export const EditStudentModal: React.FC<{
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input
-            label="Fecha de nacimiento"
-            optional={!birthDateKnown}
-            type="date"
-            min={minBirthDate()}
-            max={maxBirthDate()}
-            {...birthDate.inputProps}
-            disabled={isSaving}
-          />
+          {birthDateKnown && (
+            <Input
+              label="Fecha de nacimiento"
+              type="date"
+              min={minBirthDate()}
+              max={maxBirthDate()}
+              {...birthDate.inputProps}
+              disabled={isSaving}
+            />
+          )}
           <Input
             label="Año de ingreso"
             inputMode="numeric"

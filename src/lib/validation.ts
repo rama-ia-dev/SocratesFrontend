@@ -53,7 +53,8 @@ export const validateBirthDate = (value: string, { required = true } = {}): stri
   if (!value) return required ? 'Ingrese la fecha de nacimiento' : null;
   if (value > isoDate(new Date())) return 'La fecha no puede ser posterior a hoy';
   if (value > maxBirthDate()) return `Debe tener al menos ${MIN_AGE} años`;
-  if (value < minBirthDate()) return 'Revise la fecha: indica más de 100 años';
+  // Más de 100 años es casi siempre un año mal tipeado (0200 en vez de 2000)
+  if (value < minBirthDate()) return 'Ingrese una fecha válida';
   return null;
 };
 
@@ -89,6 +90,23 @@ export const professorSaveError = (err: any, fallback: string): string => {
 };
 
 /**
+ * Muestra el error al guardar un docente: un 409 (legajo o correo repetido) va en su campo, que
+ * lo saca apenas se corrige; el resto, en el aviso de arriba del formulario.
+ */
+export const showProfessorSaveError = (
+  err: any,
+  fallback: string,
+  fields: { legajo: { reject: (message: string) => void }; mail: { reject: (message: string) => void } },
+  setFormError: (message: string) => void
+) => {
+  const message = professorSaveError(err, fallback);
+  const detail = String(err.message || '').toLowerCase();
+  if (err.status === 409 && detail.includes('legajo')) fields.legajo.reject(message);
+  else if (err.status === 409 && detail.includes('mail')) fields.mail.reject(message);
+  else setFormError(message);
+};
+
+/**
  * Estado y error de un campo. El error aparece al salir de un campo con algo escrito o al
  * enviar el formulario; una vez visible, se recalcula con cada tecla para que desaparezca
  * apenas el valor es válido.
@@ -102,7 +120,10 @@ export function useField(
 ) {
   const [value, setRawValue] = useState(initial);
   const [touched, setTouched] = useState(false);
-  const error = touched ? validate(value) : null;
+  // Rechazo del backend (por ejemplo, legajo repetido): vale para el valor que se envió, así
+  // que se va apenas se cambia el campo y vuelve si se escribe el mismo valor.
+  const [rejected, setRejected] = useState<{ value: string; message: string } | null>(null);
+  const error = (touched ? validate(value) : null) ?? (rejected?.value === value ? rejected.message : null);
 
   const setValue = (next: string) => {
     setRawValue(next);
@@ -116,11 +137,14 @@ export function useField(
     reset: (next = initial) => {
       setRawValue(next);
       setTouched(false);
+      setRejected(null);
     },
+    /** Muestra en el campo un error que devolvió el backend para el valor actual. */
+    reject: (message: string) => setRejected({ value, message }),
     /** Marca el campo como revisado y dice si es válido; se usa al enviar. */
     check: () => {
       setTouched(true);
-      return validate(value) === null;
+      return error === null && validate(value) === null;
     },
     inputProps: {
       value,
