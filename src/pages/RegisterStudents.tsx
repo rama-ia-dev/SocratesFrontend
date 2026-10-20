@@ -90,8 +90,8 @@ export const RegisterStudents: React.FC = () => {
   const [isSubmittingExcel, setIsSubmittingExcel] = useState(false);
   const uploadId = useRef(0);
 
-  // Correo de ingreso calculado
-  const calculatedEmail = legajo.value
+  // Correo de ingreso calculado; con un legajo inválido no se muestra uno que no va a existir
+  const calculatedEmail = legajo.value && !validateLegajo(legajo.value)
     ? `${legajo.value}@sistemas.frc.utn.edu.ar`
     : '—';
 
@@ -197,7 +197,9 @@ export const RegisterStudents: React.FC = () => {
       if (user?.is_super_admin) navigate(listPath);
       else handleRemoveFile();
     } catch (err: any) {
-      // Errores por fila (legajo ya registrado): la fila del backend es la posición en el lote
+      // Errores por fila (legajo ya registrado): la fila del backend es la posición en el lote.
+      // Se marcan en la tabla como los demás; el aviso de "todo o nada" ya explica que no se
+      // registró nadie, así que no se suma otro cartel.
       const rowErrors = Array.isArray(err.detail) ? err.detail : err.errors;
       if (err.status === 422 && Array.isArray(rowErrors) && rowErrors[0]?.row) {
         const rows = previewRows.map((r) => ({ ...r, errors: [...r.errors] }));
@@ -206,7 +208,6 @@ export const RegisterStudents: React.FC = () => {
           if (target) markError(target, bulkRowError(String(e.detail)));
         }
         setPreviewRows(rows);
-        setExcelErrorMsg('No se registró ningún alumno. Corrija las filas marcadas y vuelva a subir el archivo');
       } else {
         setExcelErrorMsg(err.message || 'Error al registrar los estudiantes');
       }
