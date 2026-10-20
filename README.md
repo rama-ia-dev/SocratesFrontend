@@ -15,7 +15,19 @@ frontend:
 docker compose up --build -d   # http://localhost:3000
 ```
 
-- Los usuarios de prueba son los de `data/seed.json` del backend.
+- Usuarios de prueba: los carga el backend la primera vez que arranca la base y todos usan la
+  contraseña `Test1234!`. Uno por rol:
+
+  | Rol | Correo |
+  |---|---|
+  | Super administrador | `marta.rodriguez@frc.utn.edu.ar` |
+  | Docente | `carlos.ruiz@frc.utn.edu.ar` |
+  | Estudiante | `100001@sistemas.frc.utn.edu.ar` |
+
+  El resto aparece en la pantalla Usuarios; los estudiantes entran con `{legajo}@sistemas.frc.utn.edu.ar`.
+  Un usuario creado desde la app no tiene contraseña: la crea con "Crear o restablecer
+  contraseña", que manda un código por mail. Para volver a la base inicial: `docker compose down -v`
+  y `docker compose up --build -d`.
 - Sin configurar nada, los mails (por ejemplo, el código para crear o restablecer la contraseña)
   no se envían: se leen con `docker compose logs backend`. Para mandarlos de verdad, guardar el
   `.env` del backend (se pasa por privado) como `.env.backend` en esta carpeta y poner tu correo

@@ -169,7 +169,6 @@ export const ResetPassword: React.FC = () => {
             <div>
               <Input
                 label="Correo electrónico"
-                requiredAsterisk
                 type="email"
                 placeholder="nombre@correo.com"
                 value={email}
@@ -182,7 +181,6 @@ export const ResetPassword: React.FC = () => {
             <div>
               <Input
                 label="Nueva contraseña"
-                requiredAsterisk
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="new-password"
                 placeholder="Mínimo 8 caracteres"
@@ -210,7 +208,6 @@ export const ResetPassword: React.FC = () => {
             <div>
               <Input
                 label="Repetir contraseña"
-                requiredAsterisk
                 type={showRepeatPassword ? 'text' : 'password'}
                 autoComplete="new-password"
                 placeholder="Repita la nueva contraseña"
@@ -265,7 +262,6 @@ export const ResetPassword: React.FC = () => {
             <div>
               <Input
                 label="Código"
-                requiredAsterisk
                 type="text"
                 inputMode="numeric"
                 autoComplete="one-time-code"
