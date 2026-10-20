@@ -385,7 +385,6 @@ export const Professors: React.FC = () => {
             <div>
               <Input
                 label="Fecha de nacimiento"
-                requiredAsterisk
                 type="date"
                 max={latestBirthDate()}
                 value={birthDate}
