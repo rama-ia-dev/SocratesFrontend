@@ -15,6 +15,17 @@ import {
   X,
   RefreshCw,
 } from 'lucide-react';
+import {
+  useField,
+  validateName,
+  validateLegajo,
+  validateBirthDate,
+  validateEnrollmentYear,
+  enrollmentYearRange,
+  maxBirthDate,
+  minBirthDate,
+  digitsOnly,
+} from '../lib/validation';
 
 interface PreviewRow {
   row: number;
@@ -31,16 +42,20 @@ export const RegisterStudents: React.FC = () => {
   const navigate = useNavigate();
   const { success } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'manual' | 'excel'>('manual');
+  // La carga desde Excel queda oculta hasta que se desarrolle su historia (SCRUM-97): por ahora,
+  // solo carga manual.
+  const [activeTab] = useState<'manual' | 'excel'>('manual');
 
   // ==========================================
   // Formulario Manual
   // ==========================================
-  const [legajo, setLegajo] = useState<number | ''>('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [birthDate, setBirthDate] = useState('');
-  const [enrollmentYear, setEnrollmentYear] = useState<number>(new Date().getFullYear());
+  const legajo = useField('', validateLegajo);
+  const firstName = useField('', validateName('nombre'));
+  const lastName = useField('', validateName('apellido'));
+  const birthDate = useField('', (v) => validateBirthDate(v), { validateOnChange: true });
+  const enrollmentYear = useField('', (v) => validateEnrollmentYear(v, birthDate.value));
+  // El año de ingreso se habilita recién con una fecha de nacimiento válida: el rango posible depende de ella
+  const enrollmentRange = enrollmentYearRange(birthDate.value);
   const [manualError, setManualError] = useState<string | null>(null);
   const [isSubmittingManual, setIsSubmittingManual] = useState(false);
 
@@ -55,8 +70,8 @@ export const RegisterStudents: React.FC = () => {
   const [isSubmittingExcel, setIsSubmittingExcel] = useState(false);
 
   // Correo de ingreso calculado
-  const calculatedEmail = legajo
-    ? `${legajo}@sistemas.frc.utn.edu.ar`
+  const calculatedEmail = legajo.value
+    ? `${legajo.value}@sistemas.frc.utn.edu.ar`
     : '—';
 
   // Handler Guardar Manual
@@ -64,39 +79,21 @@ export const RegisterStudents: React.FC = () => {
     e.preventDefault();
     setManualError(null);
 
-    if (!legajo || legajo <= 0) {
-      setManualError('Ingrese un legajo válido (número positivo)');
-      return;
-    }
-    if (!firstName.trim() || !lastName.trim()) {
-      setManualError('Ingrese nombre y apellido');
-      return;
-    }
-    // La fecha es obligatoria en el backend: sin valor precargado, para no registrar una inventada
-    if (!birthDate) {
-      setManualError('Ingrese la fecha de nacimiento');
-      return;
-    }
-    if (birthDate > new Date().toISOString().slice(0, 10)) {
-      setManualError('La fecha no puede ser posterior a hoy');
-      return;
-    }
-    if (!enrollmentYear || enrollmentYear < 1950 || enrollmentYear > 2100) {
-      setManualError('El año de ingreso no es válido');
-      return;
-    }
+    // Se revisan todos (no se corta en el primero) para marcar cada campo con error a la vez
+    const checks = [legajo, firstName, lastName, birthDate, enrollmentYear].map((f) => f.check());
+    if (checks.includes(false)) return;
 
     setIsSubmittingManual(true);
     try {
       await api.createStudent({
-        legajo: Number(legajo),
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        birth_date: birthDate,
-        enrollment_year: enrollmentYear,
+        legajo: Number(legajo.value),
+        first_name: firstName.value.trim(),
+        last_name: lastName.value.trim(),
+        birth_date: birthDate.value,
+        enrollment_year: Number(enrollmentYear.value),
       });
       success('Estudiante registrado. Recibirá un correo de bienvenida');
-      navigate('/estudiantes');
+      navigate('/usuarios');
     } catch (err: any) {
       if (err.status === 409 || err.message?.includes('existe')) {
         setManualError('Ya existe un alumno con ese legajo');
@@ -210,34 +207,8 @@ export const RegisterStudents: React.FC = () => {
     <div className="max-w-4xl mx-auto space-y-6">
       <PageHeader
         title="Registrar estudiantes"
-        subtitle="Incorpore nuevos alumnos individualmente o mediante plantilla Excel"
+        subtitle="Incorpore un nuevo alumno con sus datos personales y académicos"
       />
-
-      {/* Selector de pestañas */}
-      <div className="flex items-center gap-1 border-b border-[#D6E4F7] mb-6">
-        <button
-          type="button"
-          onClick={() => setActiveTab('manual')}
-          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
-            activeTab === 'manual'
-              ? 'border-[#1D4ED8] text-[#1D4ED8]'
-              : 'border-transparent text-[#51607A] hover:text-[#0F1F3D]'
-          }`}
-        >
-          Manual
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('excel')}
-          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
-            activeTab === 'excel'
-              ? 'border-[#1D4ED8] text-[#1D4ED8]'
-              : 'border-transparent text-[#51607A] hover:text-[#0F1F3D]'
-          }`}
-        >
-          Desde Excel
-        </button>
-      </div>
 
       {/* ========================================================= */}
       {/* Pestaña: Registro Manual                                  */}
@@ -258,14 +229,11 @@ export const RegisterStudents: React.FC = () => {
             <div>
               <Input
                 label="Legajo"
-                requiredAsterisk
-                type="number"
-                min={1}
+                inputMode="numeric"
                 placeholder="Ej. 92100"
-                value={legajo}
-                onChange={(e) => setLegajo(e.target.value ? Number(e.target.value) : '')}
+                {...legajo.inputProps}
+                onChange={(e) => legajo.setValue(digitsOnly(e.target.value))}
                 disabled={isSubmittingManual}
-                required
               />
               <div className="mt-2 text-xs text-[#51607A] flex items-center gap-1.5">
                 <span className="font-medium text-[#0F1F3D]">Correo de ingreso:</span>
@@ -278,44 +246,36 @@ export const RegisterStudents: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Nombre"
-                requiredAsterisk
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
+                {...firstName.inputProps}
                 disabled={isSubmittingManual}
                 placeholder="Nombre completo"
-                required
               />
               <Input
                 label="Apellido"
-                requiredAsterisk
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
+                {...lastName.inputProps}
                 disabled={isSubmittingManual}
                 placeholder="Apellido"
-                required
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Fecha de nacimiento"
-                requiredAsterisk
                 type="date"
-                value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
+                min={minBirthDate()}
+                max={maxBirthDate()}
+                {...birthDate.inputProps}
                 disabled={isSubmittingManual}
-                required
               />
               <Input
                 label="Año de ingreso"
-                requiredAsterisk
-                type="number"
-                min={1950}
-                max={2100}
-                value={enrollmentYear}
-                onChange={(e) => setEnrollmentYear(Number(e.target.value))}
-                disabled={isSubmittingManual}
-                required
+                inputMode="numeric"
+                maxLength={4}
+                placeholder={enrollmentRange ? `Ej. ${enrollmentRange.max}` : undefined}
+                {...enrollmentYear.inputProps}
+                onChange={(e) => enrollmentYear.setValue(digitsOnly(e.target.value))}
+                disabled={isSubmittingManual || !enrollmentRange}
+                helperText={enrollmentRange ? undefined : 'Ingrese una fecha de nacimiento para habilitar este campo'}
               />
             </div>
 
@@ -323,7 +283,7 @@ export const RegisterStudents: React.FC = () => {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => navigate('/estudiantes')}
+                onClick={() => navigate('/usuarios')}
                 disabled={isSubmittingManual}
               >
                 Cancelar

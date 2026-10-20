@@ -25,6 +25,17 @@ import {
   Edit2,
 } from 'lucide-react';
 
+// Fila de la pestaña Cursos lectivos: el backend devuelve el curso lectivo solo; los docentes
+// asignados y la cantidad de grupos se consultan aparte.
+type SectionYearRow = SectionYearPublic & {
+  professors: { id_professor: number; first_name: string; last_name: string }[];
+  project_count: number;
+};
+
+// Opciones del filtro de año: del año que viene hacia atrás.
+const currentYear = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: 7 }, (_, i) => currentYear + 1 - i);
+
 export const Sections: React.FC = () => {
   const { success, error: toastError } = useToast();
 
@@ -49,7 +60,7 @@ export const Sections: React.FC = () => {
   // ==========================================
   // Pestaña Cursos Lectivos
   // ==========================================
-  const [sectionYears, setSectionYears] = useState<SectionYearPublic[]>([]);
+  const [sectionYears, setSectionYears] = useState<SectionYearRow[]>([]);
   const [totalSY, setTotalSY] = useState(0);
   const [syOffset, setSyOffset] = useState(0);
   const [syYearFilter, setSyYearFilter] = useState<string>('');
@@ -66,7 +77,7 @@ export const Sections: React.FC = () => {
 
   // Diálogo Asignar Docentes
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [targetSYForAssign, setTargetSYForAssign] = useState<SectionYearPublic | null>(null);
+  const [targetSYForAssign, setTargetSYForAssign] = useState<SectionYearRow | null>(null);
   const [allProfessors, setAllProfessors] = useState<UserListItem[]>([]);
   // Docentes que ya están asignados al curso lectivo (se muestran marcados y no se pueden elegir)
   const [assignedProfIds, setAssignedProfIds] = useState<number[]>([]);
@@ -75,6 +86,9 @@ export const Sections: React.FC = () => {
   const [selectedProfIds, setSelectedProfIds] = useState<number[]>([]);
   const [assignModalError, setAssignModalError] = useState<string | null>(null);
   const [savingAssign, setSavingAssign] = useState(false);
+
+  // Todas las comisiones, para los selectores (la tabla de comisiones está paginada y filtrada)
+  const [allSections, setAllSections] = useState<SectionPublic[]>([]);
 
   // Menú contextual abierto
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -107,7 +121,24 @@ export const Sections: React.FC = () => {
         limit: 10,
         offset: syOffset,
       });
-      setSectionYears(res.items);
+      const rows = await Promise.all(
+        res.items.map(async (sy): Promise<SectionYearRow> => {
+          const [assignments, projects] = await Promise.all([
+            api.getProfessorSectionYears({ id_section_year: sy.id_section_year, limit: 100 }),
+            api.getProjects({ id_section_year: sy.id_section_year, limit: 1 }),
+          ]);
+          return {
+            ...sy,
+            professors: assignments.items.map((a) => ({
+              id_professor: a.id_professor,
+              first_name: a.professor_first_name,
+              last_name: a.professor_last_name,
+            })),
+            project_count: projects.total,
+          };
+        })
+      );
+      setSectionYears(rows);
       setTotalSY(res.total);
     } catch {
       toastError('Error al cargar cursos lectivos');
@@ -126,9 +157,22 @@ export const Sections: React.FC = () => {
     }
   }, []);
 
+  const fetchAllSections = useCallback(async () => {
+    try {
+      const res = await api.getSections({ limit: 100 });
+      setAllSections(res.items);
+    } catch {
+      toastError('Error al cargar comisiones');
+    }
+  }, [toastError]);
+
   useEffect(() => {
     fetchSections();
   }, [fetchSections]);
+
+  useEffect(() => {
+    fetchAllSections();
+  }, [fetchAllSections]);
 
   useEffect(() => {
     fetchSectionYears();
@@ -177,12 +221,16 @@ export const Sections: React.FC = () => {
       }
       setIsSectionModalOpen(false);
       fetchSections();
+      fetchAllSections();
       fetchSectionYears();
     } catch (err: any) {
       if (err.status === 409 || err.message?.includes('existe')) {
         setSectionModalError('Ya existe una comisión con ese nombre');
+      } else if (err.status === 422) {
+        // El backend detalla la validación en una lista, en inglés: se muestra la regla en español
+        setSectionModalError('El nombre debe tener entre 1 y 20 caracteres');
       } else {
-        setSectionModalError(err.message || 'Error al guardar la comisión');
+        setSectionModalError('Error al guardar la comisión');
       }
     } finally {
       setSavingSection(false);
@@ -194,7 +242,7 @@ export const Sections: React.FC = () => {
   // ==========================================
   const handleOpenCreateSY = () => {
     setEditingSY(null);
-    setSyFormSectionId(sections[0]?.id_section || '');
+    setSyFormSectionId(allSections[0]?.id_section || '');
     setSyFormYear(new Date().getFullYear());
     setSyModalError(null);
     setIsSYModalOpen(true);
@@ -253,7 +301,7 @@ export const Sections: React.FC = () => {
   // ==========================================
   // Handlers Asignar Docentes
   // ==========================================
-  const handleOpenAssignModal = async (sy: SectionYearPublic) => {
+  const handleOpenAssignModal = async (sy: SectionYearRow) => {
     setTargetSYForAssign(sy);
     setAssignedProfIds([]);
     setSelectedProfIds([]);
@@ -261,7 +309,7 @@ export const Sections: React.FC = () => {
     setOpenMenuId(null);
     setIsAssignModalOpen(true);
 
-    // El curso lectivo no trae sus docentes: se consultan las asignaciones
+    // Se consultan las asignaciones al abrir, para no depender de la tabla ya cargada
     setLoadingAssigned(true);
     try {
       const res = await api.getProfessorSectionYears({
@@ -476,10 +524,11 @@ export const Sections: React.FC = () => {
                 }}
               >
                 <option value="">Todos los años</option>
-                <option value="2025">2025</option>
-                <option value="2024">2024</option>
-                <option value="2023">2023</option>
-                <option value="2022">2022</option>
+                {YEAR_OPTIONS.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
               </Select>
             </div>
             <div>
@@ -491,7 +540,7 @@ export const Sections: React.FC = () => {
                 }}
               >
                 <option value="">Todas las comisiones</option>
-                {sections.map((s) => (
+                {allSections.map((s) => (
                   <option key={s.id_section} value={s.id_section}>
                     {s.name}
                   </option>
@@ -501,7 +550,7 @@ export const Sections: React.FC = () => {
           </div>
 
           {loadingSY ? (
-            <TableSkeleton rows={4} cols={4} />
+            <TableSkeleton rows={4} cols={5} />
           ) : sectionYears.length === 0 ? (
             <EmptyState message="No se encontraron cursos lectivos para los filtros seleccionados." />
           ) : (
@@ -512,6 +561,7 @@ export const Sections: React.FC = () => {
                     <TableHead>Comisión</TableHead>
                     <TableHead>Año</TableHead>
                     <TableHead>Docentes asignados</TableHead>
+                    <TableHead className="w-24 text-center">Grupos</TableHead>
                     <TableHead className="w-20 text-right">Acciones</TableHead>
                   </tr>
                 </TableHeader>
@@ -526,8 +576,8 @@ export const Sections: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1.5">
-                          {sy.assigned_professors && sy.assigned_professors.length > 0 ? (
-                            sy.assigned_professors.map((p) => (
+                          {sy.professors.length > 0 ? (
+                            sy.professors.map((p) => (
                               <span
                                 key={p.id_professor}
                                 className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-[#EFF6FF] text-[#1D4ED8] border border-[#BAE6FD]"
@@ -541,6 +591,9 @@ export const Sections: React.FC = () => {
                             </span>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell className="text-center font-mono text-sm">
+                        {sy.project_count}
                       </TableCell>
                       <TableCell className="text-right relative">
                         <button
@@ -617,7 +670,6 @@ export const Sections: React.FC = () => {
           <div>
             <Input
               label="Nombre"
-              requiredAsterisk
               placeholder="Ej. 3K1"
               maxLength={20}
               value={sectionNameInput}
@@ -670,14 +722,13 @@ export const Sections: React.FC = () => {
           <div>
             <Select
               label="Comisión"
-              requiredAsterisk
               value={syFormSectionId}
               onChange={(e) => setSyFormSectionId(Number(e.target.value))}
               disabled={savingSY}
               required
             >
               <option value="" disabled>Seleccione una comisión</option>
-              {sections.map((s) => (
+              {allSections.map((s) => (
                 <option key={s.id_section} value={s.id_section}>
                   {s.name}
                 </option>
@@ -688,7 +739,6 @@ export const Sections: React.FC = () => {
           <div>
             <Input
               label="Año"
-              requiredAsterisk
               type="number"
               min={2000}
               max={2100}

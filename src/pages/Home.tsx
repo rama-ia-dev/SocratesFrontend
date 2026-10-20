@@ -5,7 +5,6 @@ import { PageHeader } from '../components/ui/PageHeader';
 import {
   Layers,
   UserCheck,
-  GraduationCap,
   Users,
   ArrowRight,
 } from 'lucide-react';
@@ -34,18 +33,8 @@ export const Home: React.FC = () => {
       ];
     }
 
-    if (user.role === 'professor') {
-      return [
-        {
-          title: 'Estudiantes',
-          desc: 'Alta de alumnos de forma manual o mediante importación por lotes Excel.',
-          path: '/estudiantes',
-          icon: GraduationCap,
-        },
-      ];
-    }
-
-    // Alumno
+    // Docentes y alumnos: sin módulos por ahora. Estudiantes vuelve para el docente con su
+    // historia (SCRUM-99).
     return [];
   };
 
