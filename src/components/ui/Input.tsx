@@ -4,7 +4,8 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   label?: string;
   error?: string;
   helperText?: string;
-  requiredAsterisk?: boolean;
+  /** Marca el campo como opcional; los demás se entienden obligatorios. */
+  optional?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
 }
@@ -15,7 +16,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       label,
       error,
       helperText,
-      requiredAsterisk,
+      optional,
       leftIcon,
       rightIcon,
       className = '',
@@ -34,7 +35,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             className="block text-sm font-medium text-[#0F1F3D] mb-1.5"
           >
             {label}
-            {requiredAsterisk && <span className="text-[#B91C1C] ml-0.5">*</span>}
+            {optional && <span className="font-normal text-[#51607A]"> (opcional)</span>}
           </label>
         )}
         <div className="relative">

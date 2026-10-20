@@ -9,6 +9,9 @@ services:
       POSTGRES_USER: socrates
       POSTGRES_PASSWORD: socrates
       POSTGRES_DB: socrates
+      # Orden alfabético en español (Cáceres antes que Coronel). La imagen alpine no lo trae por
+      # defecto; se aplica al crear la base, así que una base ya creada necesita `down -v`.
+      POSTGRES_INITDB_ARGS: --locale-provider=icu --icu-locale=es-AR
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -16,6 +19,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+      # La primera vez, crear la base tarda más que los 5 intentos: los fallos de ese rato no cuentan.
+      start_period: 60s
 
   backend:
     build: https://github.com/JoaquinMorais/SocratesBackend.git#main
