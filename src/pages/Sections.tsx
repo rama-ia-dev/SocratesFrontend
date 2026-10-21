@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../lib/api';
-import { SectionPublic, SectionYearPublic, UserListItem } from '../types/api';
+import {
+  ProfessorSectionYearPublic,
+  SectionPublic,
+  SectionYearPublic,
+  UserListItem,
+} from '../types/api';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -75,14 +80,14 @@ export const Sections: React.FC = () => {
   const [syModalError, setSyModalError] = useState<string | null>(null);
   const [savingSY, setSavingSY] = useState(false);
 
-  // Diálogo Asignar Docentes
+  // Diálogo Docentes asignados
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [targetSYForAssign, setTargetSYForAssign] = useState<SectionYearRow | null>(null);
   const [allProfessors, setAllProfessors] = useState<UserListItem[]>([]);
-  // Docentes que ya están asignados al curso lectivo (se muestran marcados y no se pueden elegir)
-  const [assignedProfIds, setAssignedProfIds] = useState<number[]>([]);
+  // Asignaciones actuales del curso lectivo (el id de la asignación hace falta para quitarla)
+  const [currentAssignments, setCurrentAssignments] = useState<ProfessorSectionYearPublic[]>([]);
   const [loadingAssigned, setLoadingAssigned] = useState(false);
-  // Docentes nuevos elegidos para asignar
+  // Docentes que quedan asignados al guardar: los actuales que siguen tildados y los nuevos
   const [selectedProfIds, setSelectedProfIds] = useState<number[]>([]);
   const [assignModalError, setAssignModalError] = useState<string | null>(null);
   const [savingAssign, setSavingAssign] = useState(false);
@@ -299,11 +304,11 @@ export const Sections: React.FC = () => {
   };
 
   // ==========================================
-  // Handlers Asignar Docentes
+  // Handlers Docentes asignados
   // ==========================================
   const handleOpenAssignModal = async (sy: SectionYearRow) => {
     setTargetSYForAssign(sy);
-    setAssignedProfIds([]);
+    setCurrentAssignments([]);
     setSelectedProfIds([]);
     setAssignModalError(null);
     setOpenMenuId(null);
@@ -316,7 +321,8 @@ export const Sections: React.FC = () => {
         id_section_year: sy.id_section_year,
         limit: 100,
       });
-      setAssignedProfIds(res.items.map((a) => a.id_professor));
+      setCurrentAssignments(res.items);
+      setSelectedProfIds(res.items.map((a) => a.id_professor));
     } catch {
       setAssignModalError('No se pudieron cargar los docentes asignados');
     } finally {
@@ -329,14 +335,24 @@ export const Sections: React.FC = () => {
     if (!targetSYForAssign) return;
     setAssignModalError(null);
 
-    if (selectedProfIds.length === 0) {
-      setAssignModalError('Seleccione al menos un docente para asignar');
+    if (profIdsToAdd.length === 0 && assignmentsToRemove.length === 0) {
+      setAssignModalError('No hay cambios para guardar');
       return;
     }
 
     setSavingAssign(true);
     try {
-      for (const profId of selectedProfIds) {
+      for (const assignment of assignmentsToRemove) {
+        try {
+          await api.deleteProfessorSectionYear(assignment.id_professor_section_year);
+        } catch (err: any) {
+          // Si otro usuario lo quitó mientras tanto, el resultado buscado ya se cumple
+          if (err.status !== 404) {
+            throw err;
+          }
+        }
+      }
+      for (const profId of profIdsToAdd) {
         try {
           await api.createProfessorSectionYear({
             id_professor: profId,
@@ -349,26 +365,29 @@ export const Sections: React.FC = () => {
           }
         }
       }
-      success(
-        selectedProfIds.length === 1
-          ? 'Docente asignado al curso lectivo'
-          : 'Docentes asignados al curso lectivo'
-      );
+      success('Docentes del curso lectivo actualizados');
       setIsAssignModalOpen(false);
       fetchSectionYears();
     } catch (err: any) {
       if (err.status === 404) {
         setAssignModalError('El docente o el curso lectivo ya no existe');
       } else {
-        setAssignModalError('Error al asignar docentes');
+        setAssignModalError('Error al guardar los docentes');
       }
+      // Los cambios que llegaron a aplicarse antes del error se reflejan en la tabla
+      fetchSectionYears();
     } finally {
       setSavingAssign(false);
     }
   };
 
+  const assignedProfIds = currentAssignments.map((a) => a.id_professor);
+  const profIdsToAdd = selectedProfIds.filter((id) => !assignedProfIds.includes(id));
+  const assignmentsToRemove = currentAssignments.filter(
+    (a) => !selectedProfIds.includes(a.id_professor)
+  );
+
   const toggleSelectProfessor = (profId: number) => {
-    if (assignedProfIds.includes(profId)) return;
     setSelectedProfIds((prev) =>
       prev.includes(profId) ? prev.filter((id) => id !== profId) : [...prev, profId]
     );
@@ -627,7 +646,7 @@ export const Sections: React.FC = () => {
                               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#0F1F3D] hover:bg-[#EFF6FF] cursor-pointer"
                             >
                               <UserPlus className="w-3.5 h-3.5 text-[#1D4ED8]" />
-                              <span>Asignar docentes</span>
+                              <span>Docentes asignados</span>
                             </button>
                           </div>
                         )}
@@ -770,12 +789,12 @@ export const Sections: React.FC = () => {
       </Modal>
 
       {/* ========================================================= */}
-      {/* Diálogo Asignar Docentes                                 */}
+      {/* Diálogo Docentes asignados                               */}
       {/* ========================================================= */}
       <Modal
         isOpen={isAssignModalOpen}
         onClose={() => setIsAssignModalOpen(false)}
-        title="Asignar docentes"
+        title="Docentes asignados"
         maxWidth="lg"
       >
         {targetSYForAssign && (
@@ -804,7 +823,7 @@ export const Sections: React.FC = () => {
         <form onSubmit={handleSaveAssign} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-[#0F1F3D] mb-2">
-              Docentes <span className="text-[#B91C1C]">*</span>
+              Docentes
             </label>
             {loadingAssigned ? (
               <p className="text-sm text-[#51607A] py-4 text-center">Cargando docentes...</p>
@@ -812,17 +831,13 @@ export const Sections: React.FC = () => {
               <div className="max-h-56 overflow-y-auto border border-[#D6E4F7] rounded-lg divide-y divide-[#D6E4F7] bg-white">
                 {allProfessors.map((prof) => {
                   const isAssigned = assignedProfIds.includes(prof.id_user);
-                  const isSelected = isAssigned || selectedProfIds.includes(prof.id_user);
+                  const isSelected = selectedProfIds.includes(prof.id_user);
                   return (
                     <div
                       key={prof.id_user}
                       onClick={() => toggleSelectProfessor(prof.id_user)}
-                      className={`flex items-center justify-between px-3.5 py-2.5 text-sm transition-colors ${
-                        isAssigned
-                          ? 'bg-[#F8FAFC] cursor-default'
-                          : isSelected
-                            ? 'bg-[#EFF6FF] cursor-pointer'
-                            : 'hover:bg-[#F5F9FF] cursor-pointer'
+                      className={`flex items-center justify-between px-3.5 py-2.5 text-sm cursor-pointer transition-colors ${
+                        isSelected ? 'bg-[#EFF6FF]' : 'hover:bg-[#F5F9FF]'
                       }`}
                     >
                       <div>
@@ -832,16 +847,18 @@ export const Sections: React.FC = () => {
                         <span className="text-xs text-[#51607A] ml-2">
                           Leg. {prof.legajo}
                         </span>
-                        {isAssigned && (
-                          <span className="text-xs text-[#51607A] italic ml-2">Ya asignado</span>
+                        {isAssigned && !isSelected && (
+                          <span className="text-xs text-[#B91C1C] italic ml-2">Se quita</span>
+                        )}
+                        {!isAssigned && isSelected && (
+                          <span className="text-xs text-[#1D4ED8] italic ml-2">Nuevo</span>
                         )}
                       </div>
                       <input
                         type="checkbox"
                         checked={isSelected}
-                        disabled={isAssigned}
                         onChange={() => {}} // controlado por el div onClick
-                        className="rounded border-[#D6E4F7] text-[#1D4ED8] focus:ring-[#BAE6FD] pointer-events-none disabled:opacity-50"
+                        className="rounded border-[#D6E4F7] text-[#1D4ED8] focus:ring-[#BAE6FD] pointer-events-none"
                       />
                     </div>
                   );
@@ -849,6 +866,15 @@ export const Sections: React.FC = () => {
               </div>
             )}
           </div>
+
+          {assignmentsToRemove.length > 0 && (
+            <p className="text-sm text-[#B91C1C]">
+              Se quitará a:{' '}
+              {assignmentsToRemove
+                .map((a) => `${a.professor_last_name}, ${a.professor_first_name}`)
+                .join('; ')}
+            </p>
+          )}
 
           <div className="flex justify-end gap-3 pt-3 border-t border-[#D6E4F7]">
             <Button
@@ -865,7 +891,7 @@ export const Sections: React.FC = () => {
               isLoading={savingAssign}
               disabled={loadingAssigned}
             >
-              Asignar
+              Guardar
             </Button>
           </div>
         </form>
