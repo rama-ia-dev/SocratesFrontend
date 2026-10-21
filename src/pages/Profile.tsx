@@ -17,7 +17,7 @@ import {
   maxBirthDate,
   minBirthDate,
   digitsOnly,
-  professorSaveError,
+  showProfessorSaveError,
 } from '../lib/validation';
 
 const ReadOnlyField: React.FC<{ label: string; children: React.ReactNode; mono?: boolean }> = ({
@@ -117,7 +117,7 @@ export const Profile: React.FC = () => {
       await refreshUser();
       success('Datos actualizados');
     } catch (err: any) {
-      setErrorMessage(professorSaveError(err, 'Error al actualizar los datos'));
+      showProfessorSaveError(err, 'Error al actualizar los datos', { legajo, mail: email }, setErrorMessage);
     } finally {
       setIsLoading(false);
     }

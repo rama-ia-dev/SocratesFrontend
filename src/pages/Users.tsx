@@ -21,6 +21,7 @@ import { Pagination } from '../components/ui/Pagination';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { useToast } from '../components/ui/Toast';
 import { ActionMenu } from '../components/ui/ActionMenu';
+import { EditStudentModal } from '../components/EditStudentModal';
 import {
   Search,
   Plus,
@@ -35,12 +36,10 @@ import {
   validateProfessorEmail,
   validateLegajo,
   validateBirthDate,
-  validateEnrollmentYear,
-  enrollmentYearRange,
   maxBirthDate,
   minBirthDate,
   digitsOnly,
-  professorSaveError,
+  showProfessorSaveError,
 } from '../lib/validation';
 
 export const Users: React.FC = () => {
@@ -85,16 +84,7 @@ export const Users: React.FC = () => {
   // ==========================================
   // Diálogo Modificar Alumno
   // ==========================================
-  const [isStudentEditModalOpen, setIsStudentEditModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<UserListItem | null>(null);
-  const studentEditFirstName = useField('', validateName('nombre'));
-  const studentEditLastName = useField('', validateName('apellido'));
-  const studentEditLegajo = useField('', validateLegajo);
-  const studentEditBirthDate = useField('', (v) => validateBirthDate(v), { validateOnChange: true });
-  // El año de ingreso se valida contra la fecha de nacimiento.
-  const studentEditEnrollmentYear = useField('', (v) => validateEnrollmentYear(v, studentEditBirthDate.value));
-  const [studentEditError, setStudentEditError] = useState<string | null>(null);
-  const [isSavingStudentEdit, setIsSavingStudentEdit] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
@@ -154,7 +144,12 @@ export const Users: React.FC = () => {
       setIsProfCreateModalOpen(false);
       fetchUsers();
     } catch (err: any) {
-      setProfCreateError(professorSaveError(err, 'Error al guardar docente'));
+      showProfessorSaveError(
+        err,
+        'Error al guardar docente',
+        { legajo: profCreateLegajo, mail: profCreateEmail },
+        setProfCreateError
+      );
     } finally {
       setIsSavingProfCreate(false);
     }
@@ -216,7 +211,12 @@ export const Users: React.FC = () => {
       setIsProfEditModalOpen(false);
       fetchUsers();
     } catch (err: any) {
-      setProfEditError(professorSaveError(err, 'Error al actualizar docente'));
+      showProfessorSaveError(
+        err,
+        'Error al actualizar docente',
+        { legajo: profEditLegajo, mail: profEditEmail },
+        setProfEditError
+      );
     } finally {
       setIsSavingProfEdit(false);
     }
@@ -225,69 +225,13 @@ export const Users: React.FC = () => {
   // ==========================================
   // Handlers Modificar Alumno
   // ==========================================
-  const handleOpenEditStudent = (u: UserListItem) => {
-    setEditingStudent(u);
-    studentEditFirstName.reset(u.first_name);
-    studentEditLastName.reset(u.last_name);
-    studentEditLegajo.reset(String(u.legajo));
-    studentEditEnrollmentYear.reset(u.enrollment_year ? String(u.enrollment_year) : '');
-    studentEditBirthDate.reset(u.birth_date || '');
-    setStudentEditError(null);
-    setIsStudentEditModalOpen(true);
-  };
-
-  const handleSaveStudentEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingStudent) return;
-    setStudentEditError(null);
-
-    const checks = [
-      studentEditLegajo,
-      studentEditFirstName,
-      studentEditLastName,
-      studentEditBirthDate,
-      studentEditEnrollmentYear,
-    ].map((f) => f.check());
-    if (checks.includes(false)) return;
-
-    const enrollmentYear = Number(studentEditEnrollmentYear.value);
-    const changes = {
-      ...(studentEditFirstName.value.trim() !== editingStudent.first_name && { first_name: studentEditFirstName.value.trim() }),
-      ...(studentEditLastName.value.trim() !== editingStudent.last_name && { last_name: studentEditLastName.value.trim() }),
-      ...(Number(studentEditLegajo.value) !== editingStudent.legajo && { legajo: Number(studentEditLegajo.value) }),
-      ...(enrollmentYear !== editingStudent.enrollment_year && { enrollment_year: enrollmentYear }),
-      ...(studentEditBirthDate.value !== (editingStudent.birth_date || '') && { birth_date: studentEditBirthDate.value }),
-    };
-    if (Object.keys(changes).length === 0) {
-      setIsStudentEditModalOpen(false);
-      return;
-    }
-
-    setIsSavingStudentEdit(true);
-    try {
-      await api.updateStudent(editingStudent.id_user, changes);
-      success('Datos del estudiante actualizados');
-      setIsStudentEditModalOpen(false);
-      fetchUsers();
-    } catch (err: any) {
-      if (err.status === 409 || err.message?.includes('existe')) {
-        setStudentEditError('Ya existe un alumno con ese legajo');
-      } else {
-        setStudentEditError(err.message || 'Error al actualizar estudiante');
-      }
-    } finally {
-      setIsSavingStudentEdit(false);
-    }
-  };
+  const handleOpenEditStudent = (u: UserListItem) => setEditingStudent(u);
 
   const isEditingSelf = Boolean(
     editingProf && currentUser && editingProf.id_user === currentUser.id_user
   );
   const profEmailChanged =
     editingProf && profEditEmail.value.trim().toLowerCase() !== editingProf.email.toLowerCase();
-  const studentLegajoChanged =
-    editingStudent && studentEditLegajo.value !== '' && studentEditLegajo.value !== String(editingStudent.legajo);
-  const studentEnrollmentRange = enrollmentYearRange(studentEditBirthDate.value);
 
   return (
     <div className="space-y-6">
@@ -639,96 +583,21 @@ export const Users: React.FC = () => {
         </form>
       </Modal>
 
-      {/* ========================================================= */}
-      {/* Diálogo Modificar Alumno                                 */}
-      {/* ========================================================= */}
-      <Modal
-        isOpen={isStudentEditModalOpen}
-        onClose={() => setIsStudentEditModalOpen(false)}
-        title="Modificar estudiante"
-      >
-        {studentEditError && (
-          <div
-            role="alert"
-            className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
-          >
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{studentEditError}</span>
-          </div>
-        )}
-
-        {studentLegajoChanged && (
-          <div className="mb-4 p-3 rounded-lg bg-[#EFF6FF] border border-[#BAE6FD] text-[#1D4ED8] text-xs">
-            El correo de ingreso pasará a ser{' '}
-            <span className="font-mono font-semibold">
-              {studentEditLegajo.value}@sistemas.frc.utn.edu.ar
-            </span>
-          </div>
-        )}
-
-        <form onSubmit={handleSaveStudentEdit} className="space-y-4" noValidate>
-          <div>
-            <Input
-              label="Legajo"
-              inputMode="numeric"
-              {...studentEditLegajo.inputProps}
-              onChange={(e) => studentEditLegajo.setValue(digitsOnly(e.target.value))}
-              disabled={isSavingStudentEdit}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="Nombre"
-              {...studentEditFirstName.inputProps}
-              disabled={isSavingStudentEdit}
-            />
-            <Input
-              label="Apellido"
-              {...studentEditLastName.inputProps}
-              disabled={isSavingStudentEdit}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="Fecha de nacimiento"
-              type="date"
-              min={minBirthDate()}
-              max={maxBirthDate()}
-              {...studentEditBirthDate.inputProps}
-              disabled={isSavingStudentEdit}
-            />
-            <Input
-              label="Año de ingreso"
-              inputMode="numeric"
-              maxLength={4}
-              {...studentEditEnrollmentYear.inputProps}
-              onChange={(e) => studentEditEnrollmentYear.setValue(digitsOnly(e.target.value))}
-              disabled={isSavingStudentEdit || !studentEnrollmentRange}
-              helperText={studentEnrollmentRange ? undefined : 'Ingrese una fecha de nacimiento para habilitar este campo'}
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-[#D6E4F7]">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsStudentEditModalOpen(false)}
-              disabled={isSavingStudentEdit}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              isLoading={isSavingStudentEdit}
-            >
-              Guardar
-            </Button>
-          </div>
-        </form>
-      </Modal>
+      {editingStudent && (
+        <EditStudentModal
+          key={editingStudent.id_user}
+          student={{
+            id: editingStudent.id_user,
+            first_name: editingStudent.first_name,
+            last_name: editingStudent.last_name,
+            legajo: editingStudent.legajo,
+            enrollment_year: editingStudent.enrollment_year,
+            birth_date: editingStudent.birth_date ?? null,
+          }}
+          onClose={() => setEditingStudent(null)}
+          onSaved={fetchUsers}
+        />
+      )}
     </div>
   );
 };

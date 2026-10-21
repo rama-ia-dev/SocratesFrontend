@@ -18,7 +18,9 @@ import {
 } from '../components/ui/Table';
 import { Pagination } from '../components/ui/Pagination';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
-import { Search, Plus, RefreshCw } from 'lucide-react';
+import { ActionMenu } from '../components/ui/ActionMenu';
+import { EditStudentModal } from '../components/EditStudentModal';
+import { Search, Plus, RefreshCw, Edit2 } from 'lucide-react';
 
 const PAGE_SIZE = 10;
 
@@ -41,6 +43,7 @@ export const Students: React.FC = () => {
   const [courses, setCourses] = useState<CourseOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<StudentListItem | null>(null);
 
   // Filtro por curso lectivo: los del docente o, para el super administrador, todos
   useEffect(() => {
@@ -186,6 +189,7 @@ export const Students: React.FC = () => {
                 <TableHead>Correo de ingreso</TableHead>
                 <TableHead>Año de ingreso</TableHead>
                 <TableHead>Equipo</TableHead>
+                <TableHead className="w-20 text-right sticky right-0 bg-[#EFF6FF]">Acciones</TableHead>
               </tr>
             </TableHeader>
             <tbody>
@@ -226,6 +230,18 @@ export const Students: React.FC = () => {
                       </ul>
                     )}
                   </TableCell>
+                  <TableCell className="text-right sticky right-0 bg-white border-b border-[#D6E4F7]">
+                    <ActionMenu
+                      label={`Acciones de ${st.first_name} ${st.last_name}`}
+                      items={[
+                        {
+                          label: 'Modificar',
+                          icon: <Edit2 className="w-3.5 h-3.5 text-[#1D4ED8]" />,
+                          onClick: () => setEditingStudent(st),
+                        },
+                      ]}
+                    />
+                  </TableCell>
                 </TableRow>
               ))}
             </tbody>
@@ -233,6 +249,22 @@ export const Students: React.FC = () => {
 
           <Pagination total={total} limit={PAGE_SIZE} offset={offset} onChangeOffset={setOffset} />
         </>
+      )}
+
+      {/* GET /students no expone la fecha de nacimiento al docente: el diálogo no la muestra */}
+      {editingStudent && (
+        <EditStudentModal
+          key={editingStudent.id_student}
+          student={{
+            id: editingStudent.id_student,
+            first_name: editingStudent.first_name,
+            last_name: editingStudent.last_name,
+            legajo: editingStudent.legajo,
+            enrollment_year: editingStudent.enrollment_year,
+          }}
+          onClose={() => setEditingStudent(null)}
+          onSaved={fetchStudents}
+        />
       )}
     </div>
   );
