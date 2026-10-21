@@ -5,6 +5,8 @@ import React, { useState } from 'react';
 export const STUDENT_DOMAIN = 'sistemas.frc.utn.edu.ar';
 export const MIN_AGE = 18;
 const MAX_AGE = 100;
+// Límite del backend para nombre y apellido
+const NAME_MAX_LENGTH = 100;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Letras (con tildes, diéresis y ñ), espacios y apóstrofo: "María José", "D'Angelo".
@@ -39,6 +41,7 @@ export const validateProfessorEmail = (value: string): string | null =>
 export const validateName = (label: 'nombre' | 'apellido') => (value: string): string | null => {
   const v = value.trim();
   if (!v) return `Ingrese el ${label}`;
+  if (v.length > NAME_MAX_LENGTH) return `El ${label} puede tener hasta ${NAME_MAX_LENGTH} caracteres`;
   if (!NAME_RE.test(v)) return `El ${label} solo puede tener letras, espacios y apóstrofos`;
   return null;
 };
@@ -86,6 +89,8 @@ export const professorSaveError = (err: any, fallback: string): string => {
   if (err.status === 409 && detail.includes('legajo')) return 'Ya existe un docente con ese legajo';
   if (err.status === 409 && detail.includes('mail')) return 'Ya existe un docente con ese correo';
   if (err.status === 422 && detail.includes('reserved for students')) return 'Los correos de alumnos no se pueden usar para un docente';
+  // Un rechazo de validación llega como lista de campos: no se muestra crudo
+  if (Array.isArray(err.detail)) return `${fallback}. Revise los datos e intente de nuevo`;
   return err.message || fallback;
 };
 

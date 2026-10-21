@@ -96,6 +96,8 @@ export const EditStudentModal: React.FC<{
     } catch (err: any) {
       // El único 409 de esta ruta es el legajo repetido: se marca en el campo
       if (err.status === 409) legajo.reject('Ya existe un alumno con ese legajo');
+      // Un rechazo de validación llega como lista de campos: no se muestra crudo
+      else if (Array.isArray(err.detail)) setError('Error al actualizar estudiante. Revise los datos e intente de nuevo');
       else setError(err.message || 'Error al actualizar estudiante');
       setIsSaving(false);
     }
