@@ -8,6 +8,7 @@ import {
   GraduationCap,
   Users,
   ArrowRight,
+  BarChart3,
 } from 'lucide-react';
 
 export const Home: React.FC = () => {
@@ -24,6 +25,12 @@ export const Home: React.FC = () => {
           desc: 'Gestión de comisiones y cursos lectivos anuales con asignación docente.',
           path: '/comisiones',
           icon: Layers,
+        },
+        {
+          title: 'Estado de la cátedra',
+          desc: 'Panorama de los cursos lectivos: docentes, grupos por etapa y aprobados.',
+          path: '/catedra',
+          icon: BarChart3,
         },
         {
           title: 'Usuarios',

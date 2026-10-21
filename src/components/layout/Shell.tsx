@@ -16,6 +16,7 @@ import {
   ChevronDown,
   Shield,
   BookOpen,
+  BarChart3,
 } from 'lucide-react';
 
 interface NavItem {
@@ -62,6 +63,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     if (user.is_super_admin) {
       return [
         { label: 'Comisiones', path: '/comisiones', icon: Layers },
+        { label: 'Estado de la cátedra', path: '/catedra', icon: BarChart3 },
         { label: 'Usuarios', path: '/usuarios', icon: Users },
       ];
     }
