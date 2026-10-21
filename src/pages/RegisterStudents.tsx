@@ -95,10 +95,12 @@ export const RegisterStudents: React.FC = () => {
       success('Estudiante registrado. Recibirá un correo de bienvenida');
       navigate('/usuarios');
     } catch (err: any) {
-      if (err.status === 409 || err.message?.includes('existe')) {
-        setManualError('Ya existe un alumno con ese legajo');
+      // POST /students responde el legajo repetido como 422 con la lista de filas ({row, legajo, detail})
+      const rows = Array.isArray(err.detail) ? err.detail : err.errors;
+      if (Array.isArray(rows) && String(rows[0]?.detail).includes('already exists')) {
+        legajo.reject('Ya existe un alumno con ese legajo');
       } else {
-        setManualError(err.message || 'Error al registrar estudiante');
+        setManualError(Array.isArray(err.detail) ? 'No se pudo registrar el estudiante' : err.message || 'No se pudo registrar el estudiante');
       }
     } finally {
       setIsSubmittingManual(false);
