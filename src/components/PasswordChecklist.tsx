@@ -10,9 +10,17 @@ export const PasswordChecklist: React.FC<{ password: string }> = ({ password }) 
       return (
         <li
           key={rule.label}
-          className={`flex items-center gap-1.5 ${ok ? 'text-[#15803D]' : 'text-[#51607A]'}`}
+          className={`flex items-center gap-1.5 ${ok ? 'text-[#15803D] font-semibold' : 'text-[#51607A]'}`}
         >
-          {ok ? <Check className="w-3.5 h-3.5 shrink-0" /> : <X className="w-3.5 h-3.5 shrink-0" />}
+          {ok ? (
+            <span className="w-4 h-4 rounded-full bg-[#16A34A] text-white flex items-center justify-center shrink-0">
+              <Check className="w-3 h-3" strokeWidth={3} />
+            </span>
+          ) : (
+            <span className="w-4 h-4 rounded-full bg-[#E2E8F0] text-[#51607A] flex items-center justify-center shrink-0">
+              <X className="w-3 h-3" />
+            </span>
+          )}
           <span>{rule.label}</span>
           <span className="sr-only">{ok ? '(cumplido)' : '(falta)'}</span>
         </li>
