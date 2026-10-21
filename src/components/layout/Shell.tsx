@@ -83,7 +83,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const roleLabel = user?.is_super_admin
     ? 'Super administrador'
     : user?.role === 'professor'
-    ? 'Profesor'
+    ? 'Docente'
     : 'Alumno';
 
   const fullName = user ? `${user.first_name} ${user.last_name}` : '';
@@ -152,9 +152,9 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                   ? 'bg-[#1D4ED8] text-white shadow-xs font-semibold'
                   : 'bg-white/10 text-white/80 border border-transparent hover:bg-white/20 hover:text-white'
               }`}
-              title="Profesor regular"
+              title="Docente"
             >
-              Profesor
+              Docente
             </button>
             <button
               type="button"

@@ -237,7 +237,7 @@ export const Users: React.FC = () => {
     <div className="space-y-6">
       <PageHeader
         title="Usuarios"
-        subtitle="Gestión unificada de docentes y estudiantes"
+        subtitle="Docentes, super administradores y estudiantes de la cátedra"
         action={
           <div className="flex items-center gap-2">
             {roleFilter === 'professor' ? (
@@ -322,13 +322,14 @@ export const Users: React.FC = () => {
             <tbody>
               {users.map((u) => (
                 <TableRow key={u.id_user}>
-                  <TableCell>
+                  {/* Un nombre largo baja de línea en vez de ensanchar la tabla */}
+                  <TableCell className="min-w-48 max-w-72">
                     <div className="flex items-center gap-3">
                       <InitialsAvatar
                         name={`${u.last_name} ${u.first_name}`}
                         size="sm"
                       />
-                      <span className="font-medium text-[#0F1F3D]">
+                      <span className="min-w-0 font-medium text-[#0F1F3D] [overflow-wrap:anywhere]">
                         {u.last_name}, {u.first_name}
                       </span>
                     </div>
@@ -341,7 +342,7 @@ export const Users: React.FC = () => {
                     {u.is_super_admin ? (
                       <Badge variant="superadmin">Super administrador</Badge>
                     ) : u.role === 'professor' ? (
-                      <Badge variant="professor">Profesor</Badge>
+                      <Badge variant="professor">Docente</Badge>
                     ) : (
                       <Badge variant="student">Alumno</Badge>
                     )}
