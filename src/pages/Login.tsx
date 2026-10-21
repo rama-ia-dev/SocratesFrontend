@@ -5,7 +5,7 @@ import { SocratesLogo } from '../components/ui/SocratesLogo';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
-import { validateEmail } from '../lib/validation';
+import { validateEmail, STUDENT_EMAIL_HELP, STUDENT_EMAIL_PLACEHOLDER } from '../lib/validation';
 
 export const Login: React.FC = () => {
   const { login } = useAuth();
@@ -94,7 +94,7 @@ export const Login: React.FC = () => {
               <Input
                 label="Correo electrónico"
                 type="email"
-                placeholder="nombre@correo.com"
+                placeholder={STUDENT_EMAIL_PLACEHOLDER}
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
@@ -105,7 +105,7 @@ export const Login: React.FC = () => {
                   if (email.trim()) setEmailError(validateEmail(email));
                 }}
                 error={emailError ?? undefined}
-                helperText="Alumnos: su legajo seguido de @sistemas.frc.utn.edu.ar"
+                helperText={STUDENT_EMAIL_HELP}
                 disabled={isLoading}
                 autoComplete="email"
                 required

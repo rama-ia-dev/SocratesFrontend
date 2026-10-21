@@ -26,9 +26,25 @@ export const minBirthDate = () => yearsAgo(MAX_AGE);
 export const validateEmail = (value: string): string | null => {
   const v = value.trim();
   if (!v) return 'Ingrese el correo';
-  if (!EMAIL_RE.test(v)) return 'Ingrese un correo válido, por ejemplo nombre@correo.com';
+  if (!EMAIL_RE.test(v)) return 'Ingrese un correo válido, con @ y dominio';
   return null;
 };
+
+// Contraseña de alta seguridad. El backend solo exige 8 caracteres; el resto lo pide el frontend
+// al crearla o cambiarla, así que no afecta a las contraseñas que ya existen.
+export const PASSWORD_MAX_LENGTH = 128;
+export const PASSWORD_RULES: { label: string; test: (v: string) => boolean }[] = [
+  { label: 'Al menos 8 caracteres', test: (v) => v.length >= 8 },
+  { label: 'Una letra mayúscula', test: (v) => /\p{Lu}/u.test(v) },
+  { label: 'Una letra minúscula', test: (v) => /\p{Ll}/u.test(v) },
+  { label: 'Un número', test: (v) => /\d/.test(v) },
+  { label: 'Un símbolo, por ejemplo ! ? # $ . -', test: (v) => /[^\p{L}\d\s]/u.test(v) },
+];
+export const isStrongPassword = (value: string) => PASSWORD_RULES.every((rule) => rule.test(value));
+
+// Ayuda del correo de los alumnos, en todas las pantallas donde se escribe el propio correo.
+export const STUDENT_EMAIL_PLACEHOLDER = `123456@${STUDENT_DOMAIN}`;
+export const STUDENT_EMAIL_HELP = `Alumnos: su legajo seguido de @${STUDENT_DOMAIN}`;
 
 export const validateProfessorEmail = (value: string): string | null =>
   validateEmail(value) ??
