@@ -77,8 +77,20 @@ export const Sections: React.FC = () => {
   const [editingSY, setEditingSY] = useState<SectionYearPublic | null>(null);
   const [syFormSectionId, setSyFormSectionId] = useState<number | ''>('');
   const [syFormYear, setSyFormYear] = useState<number>(new Date().getFullYear());
+  // Cupo de integrantes de cada equipo del curso lectivo (el backend lo exige al registrarlo)
+  const [syFormMin, setSyFormMin] = useState('');
+  const [syFormMax, setSyFormMax] = useState('');
+  const [syCupoTouched, setSyCupoTouched] = useState(false);
   const [syModalError, setSyModalError] = useState<string | null>(null);
   const [savingSY, setSavingSY] = useState(false);
+
+  const inCupoRange = (v: string) => /^\d+$/.test(v) && Number(v) >= 1 && Number(v) <= 100;
+  const syMinError = !inCupoRange(syFormMin) ? 'Ingrese un número de 1 a 100' : null;
+  const syMaxError = !inCupoRange(syFormMax)
+    ? 'Ingrese un número de 1 a 100'
+    : !syMinError && Number(syFormMax) < Number(syFormMin)
+      ? 'No puede ser menor que el mínimo'
+      : null;
 
   // Diálogo Docentes asignados
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
@@ -249,6 +261,9 @@ export const Sections: React.FC = () => {
     setEditingSY(null);
     setSyFormSectionId(allSections[0]?.id_section || '');
     setSyFormYear(new Date().getFullYear());
+    setSyFormMin('');
+    setSyFormMax('');
+    setSyCupoTouched(false);
     setSyModalError(null);
     setIsSYModalOpen(true);
   };
@@ -257,6 +272,9 @@ export const Sections: React.FC = () => {
     setEditingSY(sy);
     setSyFormSectionId(sy.id_section);
     setSyFormYear(sy.year);
+    setSyFormMin(sy.min_students !== undefined ? String(sy.min_students) : '');
+    setSyFormMax(sy.max_students !== undefined ? String(sy.max_students) : '');
+    setSyCupoTouched(false);
     setSyModalError(null);
     setOpenMenuId(null);
     setIsSYModalOpen(true);
@@ -274,6 +292,8 @@ export const Sections: React.FC = () => {
       setSyModalError('El año debe estar entre 2000 y 2100');
       return;
     }
+    setSyCupoTouched(true);
+    if (syMinError || syMaxError) return;
 
     setSavingSY(true);
     try {
@@ -281,22 +301,27 @@ export const Sections: React.FC = () => {
         await api.updateSectionYear(editingSY.id_section_year, {
           id_section: Number(syFormSectionId),
           year: syFormYear,
+          min_students: Number(syFormMin),
+          max_students: Number(syFormMax),
         });
         success('Curso lectivo actualizado');
       } else {
         await api.createSectionYear({
           id_section: Number(syFormSectionId),
           year: syFormYear,
+          min_students: Number(syFormMin),
+          max_students: Number(syFormMax),
         });
         success('Curso lectivo registrado');
       }
       setIsSYModalOpen(false);
       fetchSectionYears();
     } catch (err: any) {
-      if (err.status === 409 || err.message?.includes('existe')) {
+      // El 422 del backend trae una lista de errores, no un texto: no se muestra tal cual
+      if (err.status === 409) {
         setSyModalError('Ya existe ese curso lectivo');
       } else {
-        setSyModalError(err.message || 'Error al guardar el curso lectivo');
+        setSyModalError('No se pudo guardar el curso lectivo. Revise los datos e intente de nuevo');
       }
     } finally {
       setSavingSY(false);
@@ -767,6 +792,32 @@ export const Sections: React.FC = () => {
               required
             />
           </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Mínimo de integrantes"
+              inputMode="numeric"
+              maxLength={3}
+              value={syFormMin}
+              onChange={(e) => setSyFormMin(e.target.value.replace(/\D/g, ''))}
+              onBlur={() => setSyCupoTouched(true)}
+              error={syCupoTouched ? syMinError ?? undefined : undefined}
+              disabled={savingSY}
+            />
+            <Input
+              label="Máximo de integrantes"
+              inputMode="numeric"
+              maxLength={3}
+              value={syFormMax}
+              onChange={(e) => setSyFormMax(e.target.value.replace(/\D/g, ''))}
+              onBlur={() => setSyCupoTouched(true)}
+              error={syCupoTouched ? syMaxError ?? undefined : undefined}
+              disabled={savingSY}
+            />
+          </div>
+          <p className="text-xs text-[#51607A] -mt-2">
+            Vale para todos los equipos de este curso lectivo.
+          </p>
 
           <div className="flex justify-end gap-3 pt-3 border-t border-[#D6E4F7]">
             <Button
