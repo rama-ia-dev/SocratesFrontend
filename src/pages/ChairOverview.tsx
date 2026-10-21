@@ -76,7 +76,6 @@ const PAGE_SIZE = 10;
 
 // Opciones del filtro de año: del año que viene hacia atrás.
 const currentYear = new Date().getFullYear();
-const YEAR_OPTIONS = Array.from({ length: 7 }, (_, i) => currentYear + 1 - i);
 
 // Trae todas las páginas de un listado (el backend devuelve hasta 100 por consulta)
 async function fetchAll<T>(
@@ -96,6 +95,8 @@ export const ChairOverview: React.FC = () => {
   const [yearFilter, setYearFilter] = useState<string>(String(currentYear));
   const [sectionFilter, setSectionFilter] = useState<string>('');
   const [allSections, setAllSections] = useState<SectionPublic[]>([]);
+  // Opciones del filtro de año: los años que tienen cursos lectivos, del más reciente al más viejo
+  const [yearOptions, setYearOptions] = useState<number[]>([]);
 
   const [rows, setRows] = useState<ChairRow[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -111,6 +112,17 @@ export const ChairOverview: React.FC = () => {
       .then((res) => setAllSections(res.items))
       .catch(() => toastError('Error al cargar comisiones'));
   }, [toastError]);
+
+  useEffect(() => {
+    fetchAll<SectionYearPublic>((o) => api.getSectionYears({ limit: 100, offset: o }))
+      .then((items) => {
+        const years = [...new Set(items.map((sy) => sy.year))].sort((a, b) => b - a);
+        setYearOptions(years);
+        // Si el año actual todavía no tiene cursos lectivos, se muestran todos los años
+        if (!years.includes(currentYear)) setYearFilter('');
+      })
+      .catch(() => setYearOptions([]));
+  }, []);
 
   // Se traen todos los cursos lectivos, asignaciones y proyectos del filtro y se agrupan acá:
   // son tres listados en total, sin importar cuántos cursos lectivos haya.
@@ -215,13 +227,14 @@ export const ChairOverview: React.FC = () => {
     setStudentCounts({});
   }, [yearFilter, sectionFilter]);
 
-  // Avance: grupos aprobados sobre los grupos que siguen vigentes (sin contar cancelados)
+  // Grupos aprobados sobre los grupos que siguen vigentes (sin contar cancelados). Un grupo
+  // rechazado sigue vigente: rehace la propuesta hasta aprobar.
   const progressOf = (row: ChairRow): number | null => {
     const active = row.project_count - row.stages.cancelled;
     return active > 0 ? Math.round((row.stages.approved / active) * 100) : null;
   };
 
-  // Color de la barra de avance: rojo hasta 33 %, amarillo hasta 66 % y verde desde 67 %
+  // Color de la barra de grupos aprobados: rojo hasta 33 %, amarillo hasta 66 % y verde desde 67 %
   const progressColor = (progress: number): string => {
     if (progress < 34) return 'bg-[#DC2626]';
     if (progress < 67) return 'bg-[#F59E0B]';
@@ -236,7 +249,7 @@ export const ChairOverview: React.FC = () => {
     <div>
       <PageHeader
         title="Estado de la cátedra"
-        subtitle="Panorama de los cursos lectivos: docentes, grupos y avance"
+        subtitle="Panorama de los cursos lectivos: docentes, grupos y aprobados"
       />
 
       <div className="space-y-4">
@@ -252,7 +265,7 @@ export const ChairOverview: React.FC = () => {
               aria-label="Filtrar por año"
             >
               <option value="">Todos los años</option>
-              {YEAR_OPTIONS.map((y) => (
+              {yearOptions.map((y) => (
                 <option key={y} value={y}>
                   {y}
                 </option>
@@ -319,6 +332,7 @@ export const ChairOverview: React.FC = () => {
                 <tr>
                   <TableHead>Comisión</TableHead>
                   <TableHead>Año</TableHead>
+                  <TableHead>Grupos aprobados (%)</TableHead>
                   <TableHead>Docentes</TableHead>
                   <TableHead className="text-center">Grupos</TableHead>
                   {(Object.keys(STAGE_LABELS) as Stage[]).map((stage) => (
@@ -327,8 +341,7 @@ export const ChairOverview: React.FC = () => {
                     </TableHead>
                   ))}
                   <TableHead className="text-center">Alumnos en grupos</TableHead>
-                  <TableHead className="text-center">Integrantes por grupo</TableHead>
-                  <TableHead>Avance</TableHead>
+                  <TableHead className="text-center">Cupo de integrantes por grupo</TableHead>
                 </tr>
               </TableHeader>
               <tbody>
@@ -341,6 +354,30 @@ export const ChairOverview: React.FC = () => {
                         {row.section_name}
                       </TableCell>
                       <TableCell className="font-mono text-sm">{row.year}</TableCell>
+                      <TableCell>
+                        {progress === null ? (
+                          <span className="text-xs text-[#94A3B8]">Sin grupos</span>
+                        ) : (
+                          <div className="flex items-center gap-2 min-w-28">
+                            <div
+                              className="h-2 flex-1 rounded-full bg-[#E2E8F0] overflow-hidden"
+                              role="progressbar"
+                              aria-valuenow={progress}
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                              aria-label={`Grupos aprobados de ${row.section_name} ${row.year}`}
+                            >
+                              <div
+                                className={`h-full ${progressColor(progress)}`}
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+                            <span className="font-mono text-xs text-[#51607A] w-9 text-right">
+                              {progress}%
+                            </span>
+                          </div>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1.5">
                           {row.professors.length > 0 ? (
@@ -401,30 +438,6 @@ export const ChairOverview: React.FC = () => {
                         {row.min_students !== undefined && row.max_students !== undefined
                           ? `${row.min_students} – ${row.max_students}`
                           : '—'}
-                      </TableCell>
-                      <TableCell>
-                        {progress === null ? (
-                          <span className="text-xs text-[#94A3B8]">Sin grupos</span>
-                        ) : (
-                          <div className="flex items-center gap-2 min-w-28">
-                            <div
-                              className="h-2 flex-1 rounded-full bg-[#E2E8F0] overflow-hidden"
-                              role="progressbar"
-                              aria-valuenow={progress}
-                              aria-valuemin={0}
-                              aria-valuemax={100}
-                              aria-label={`Avance de ${row.section_name} ${row.year}`}
-                            >
-                              <div
-                                className={`h-full ${progressColor(progress)}`}
-                                style={{ width: `${progress}%` }}
-                              />
-                            </div>
-                            <span className="font-mono text-xs text-[#51607A] w-9 text-right">
-                              {progress}%
-                            </span>
-                          </div>
-                        )}
                       </TableCell>
                     </TableRow>
                   );

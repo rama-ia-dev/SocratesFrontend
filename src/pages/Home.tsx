@@ -28,7 +28,7 @@ export const Home: React.FC = () => {
         },
         {
           title: 'Estado de la cátedra',
-          desc: 'Panorama de los cursos lectivos: docentes, grupos por etapa y avance.',
+          desc: 'Panorama de los cursos lectivos: docentes, grupos por etapa y aprobados.',
           path: '/catedra',
           icon: BarChart3,
         },
