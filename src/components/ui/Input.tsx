@@ -60,11 +60,9 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             </div>
           )}
         </div>
-        {error ? (
-          <p className="mt-1 text-xs text-[#B91C1C] font-medium">{error}</p>
-        ) : helperText ? (
-          <p className="mt-1 text-xs text-[#51607A]">{helperText}</p>
-        ) : null}
+        {/* La ayuda queda siempre a la vista (por ejemplo, el dominio para copiar) y el error va debajo */}
+        {helperText && <p className="mt-1 text-xs text-[#51607A]">{helperText}</p>}
+        {error && <p className="mt-1 text-xs text-[#B91C1C] font-medium">{error}</p>}
       </div>
     );
   }
