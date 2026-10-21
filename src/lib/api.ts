@@ -1198,6 +1198,8 @@ export const api = {
         year: payload.year,
         id_section: payload.id_section,
         section_name: sec.name,
+        min_students: payload.min_students,
+        max_students: payload.max_students,
         assignedProfessorIds: [],
         assigned_professors: [],
       };
@@ -1246,12 +1248,16 @@ export const api = {
       if (payload.year) {
         sy.year = payload.year;
       }
+      if (payload.min_students) sy.min_students = payload.min_students;
+      if (payload.max_students) sy.max_students = payload.max_students;
 
       return {
         id_section_year: sy.id_section_year,
         year: sy.year,
         id_section: sy.id_section,
         section_name: sy.section_name,
+        min_students: sy.min_students,
+        max_students: sy.max_students,
       };
     }
 

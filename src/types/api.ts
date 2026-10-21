@@ -170,6 +170,8 @@ export interface SectionList {
 export interface SectionYearCreate {
   year: number;
   id_section: number;
+  min_students: number;
+  max_students: number;
 }
 
 export interface SectionYearPublic {
@@ -177,6 +179,9 @@ export interface SectionYearPublic {
   year: number;
   id_section: number;
   section_name: string;
+  // Cupo de integrantes de cada equipo del curso lectivo
+  min_students?: number;
+  max_students?: number;
   assigned_professors?: {
     id_professor: number;
     first_name: string;
@@ -187,6 +192,8 @@ export interface SectionYearPublic {
 export interface SectionYearUpdate {
   year?: number | null;
   id_section?: number | null;
+  min_students?: number;
+  max_students?: number;
 }
 
 export interface SectionYearList {
