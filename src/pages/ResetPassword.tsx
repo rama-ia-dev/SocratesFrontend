@@ -6,6 +6,13 @@ import { SocratesLogo } from '../components/ui/SocratesLogo';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Eye, EyeOff, AlertCircle, ArrowLeft } from 'lucide-react';
+import { PasswordChecklist } from '../components/PasswordChecklist';
+import {
+  isStrongPassword,
+  PASSWORD_MAX_LENGTH,
+  STUDENT_EMAIL_HELP,
+  STUDENT_EMAIL_PLACEHOLDER,
+} from '../lib/validation';
 
 const RESEND_WAIT_SECONDS = 60;
 
@@ -43,8 +50,8 @@ export const ResetPassword: React.FC = () => {
       return;
     }
 
-    if (newPassword.length < 8) {
-      setErrorMessage('La contraseña debe tener al menos 8 caracteres');
+    if (!isStrongPassword(newPassword)) {
+      setErrorMessage('La contraseña no cumple todos los requisitos');
       return;
     }
 
@@ -170,7 +177,8 @@ export const ResetPassword: React.FC = () => {
               <Input
                 label="Correo electrónico"
                 type="email"
-                placeholder="nombre@correo.com"
+                placeholder={STUDENT_EMAIL_PLACEHOLDER}
+                helperText={STUDENT_EMAIL_HELP}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoading}
@@ -183,7 +191,7 @@ export const ResetPassword: React.FC = () => {
                 label="Nueva contraseña"
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="new-password"
-                placeholder="Mínimo 8 caracteres"
+                maxLength={PASSWORD_MAX_LENGTH}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 disabled={isLoading}
@@ -203,6 +211,7 @@ export const ResetPassword: React.FC = () => {
                   </button>
                 }
               />
+              <PasswordChecklist password={newPassword} />
             </div>
 
             <div>
@@ -211,6 +220,7 @@ export const ResetPassword: React.FC = () => {
                 type={showRepeatPassword ? 'text' : 'password'}
                 autoComplete="new-password"
                 placeholder="Repita la nueva contraseña"
+                maxLength={PASSWORD_MAX_LENGTH}
                 value={repeatPassword}
                 onChange={(e) => setRepeatPassword(e.target.value)}
                 disabled={isLoading}
