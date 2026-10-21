@@ -167,7 +167,7 @@ export const Projects: React.FC = () => {
                 <TableHead>Nombre del proyecto</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Privacidad</TableHead>
-                <TableHead className="w-16 text-right">Acciones</TableHead>
+                <TableHead className="w-16 text-right sticky right-0 bg-[#EFF6FF]">Acciones</TableHead>
               </tr>
             </TableHeader>
             <tbody>
@@ -195,7 +195,7 @@ export const Projects: React.FC = () => {
                   <TableCell>
                     <Badge variant={p.privacy}>{PRIVACY_LABEL[p.privacy]}</Badge>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right sticky right-0 bg-white border-b border-[#D6E4F7]">
                     <button
                       type="button"
                       onClick={(e) => {
