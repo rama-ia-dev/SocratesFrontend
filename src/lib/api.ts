@@ -417,14 +417,20 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   if (!response.ok) {
     let errorDetail = '';
+    let rawDetail: unknown;
     try {
       const errorJson = await response.json();
-      errorDetail = errorJson.detail || JSON.stringify(errorJson);
+      rawDetail = errorJson.detail;
+      // Un detail que no es texto (por ejemplo, la lista de filas de POST /students) queda en
+      // err.detail para que cada pantalla lo interprete
+      errorDetail =
+        typeof errorJson.detail === 'string' ? errorJson.detail : JSON.stringify(errorJson);
     } catch {
       errorDetail = response.statusText;
     }
     const err: any = new Error(errorDetail || `Error ${response.status}`);
     err.status = response.status;
+    err.detail = rawDetail;
     throw err;
   }
 
