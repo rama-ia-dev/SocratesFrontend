@@ -5,6 +5,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import {
   Layers,
   UserCheck,
+  GraduationCap,
   Users,
   ArrowRight,
 } from 'lucide-react';
@@ -33,8 +34,18 @@ export const Home: React.FC = () => {
       ];
     }
 
-    // Docentes y alumnos: sin módulos por ahora. Estudiantes vuelve para el docente con su
-    // historia (SCRUM-99).
+    if (user.role === 'professor') {
+      return [
+        {
+          title: 'Estudiantes',
+          desc: 'Alumnos de sus cursos lectivos y el equipo de cada uno.',
+          path: '/estudiantes',
+          icon: GraduationCap,
+        },
+      ];
+    }
+
+    // Alumno
     return [];
   };
 

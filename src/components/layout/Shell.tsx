@@ -7,6 +7,7 @@ import { InitialsAvatar } from '../ui/Table';
 import {
   Layers,
   Users,
+  GraduationCap,
   UserCheck,
   User,
   LogOut,
@@ -65,8 +66,13 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       ];
     }
 
-    // Docentes y alumnos: sin módulos por ahora. Estudiantes vuelve para el docente con su
-    // historia (SCRUM-99).
+    if (user.role === 'professor') {
+      return [
+        { label: 'Estudiantes', path: '/estudiantes', icon: GraduationCap },
+      ];
+    }
+
+    // Alumno
     return [];
   };
 
