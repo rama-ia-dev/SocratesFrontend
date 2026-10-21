@@ -237,7 +237,7 @@ export const Professors: React.FC = () => {
                     {prof.is_super_admin ? (
                       <Badge variant="superadmin">Super administrador</Badge>
                     ) : (
-                      <Badge variant="professor">Profesor</Badge>
+                      <Badge variant="professor">Docente</Badge>
                     )}
                   </TableCell>
                   <TableCell className="text-right relative">

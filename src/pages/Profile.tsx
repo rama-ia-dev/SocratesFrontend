@@ -123,7 +123,7 @@ export const Profile: React.FC = () => {
     }
   };
 
-  const roleText = user.role === 'professor' ? 'Profesor' : 'Alumno';
+  const roleText = user.role === 'professor' ? 'Docente' : 'Alumno';
 
   return (
     <div className="max-w-2xl mx-auto">
