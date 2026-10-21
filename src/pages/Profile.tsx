@@ -7,7 +7,9 @@ import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { useToast } from '../components/ui/Toast';
-import { AlertCircle } from 'lucide-react';
+import { Modal } from '../components/ui/Modal';
+import { PasswordCodeForm } from '../components/PasswordCodeForm';
+import { AlertCircle, KeyRound } from 'lucide-react';
 import {
   useField,
   validateName,
@@ -54,6 +56,7 @@ export const Profile: React.FC = () => {
   const legajo = useField('', validateLegajo);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   // Si un usuario no tiene fecha de nacimiento cargada, el campo queda vacío y solo se envía si
   // la completa.
@@ -245,6 +248,32 @@ export const Profile: React.FC = () => {
           </div>
         </form>
       </div>
+
+      <div className="w-full max-w-[640px] mt-6 bg-white border border-[#D6E4F7] rounded-xl shadow-xs p-8 flex flex-col sm:flex-row sm:items-center gap-4 sm:justify-between">
+        <div>
+          <h3 className="font-serif font-semibold text-lg text-[#0B2A66]">Contraseña</h3>
+          <p className="text-xs text-[#51607A] mt-1">
+            Se confirma con un código que le llega al correo. Al cambiarla se cierra la sesión en
+            todos los dispositivos.
+          </p>
+        </div>
+        <Button type="button" variant="outline" className="shrink-0" onClick={() => setPasswordOpen(true)}>
+          <KeyRound className="w-4 h-4 mr-1.5" />
+          Cambiar contraseña
+        </Button>
+      </div>
+
+      <Modal isOpen={passwordOpen} onClose={() => setPasswordOpen(false)} title="Cambiar contraseña">
+        <PasswordCodeForm
+          fixedEmail={user.email}
+          onSaved={async () => {
+            // El backend cerró todas las sesiones, incluida esta
+            await logout().catch(() => undefined);
+            success('Contraseña cambiada. Inicie sesión con la nueva');
+            navigate('/login', { replace: true });
+          }}
+        />
+      </Modal>
     </div>
   );
 };
