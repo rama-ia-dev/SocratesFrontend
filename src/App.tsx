@@ -10,6 +10,7 @@ import { ResetPassword } from './pages/ResetPassword';
 import { Home } from './pages/Home';
 import { Profile } from './pages/Profile';
 import { Sections } from './pages/Sections';
+import { ChairOverview } from './pages/ChairOverview';
 import { Professors } from './pages/Professors';
 import { Students } from './pages/Students';
 import { RegisterStudents } from './pages/RegisterStudents';
@@ -125,6 +126,16 @@ export default function App() {
               element={
                 <ProtectedRoute allowedRoles={['superadmin']}>
                   <Sections />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Estado de la cátedra (Solo super admin) */}
+            <Route
+              path="/catedra"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin']}>
+                  <ChairOverview />
                 </ProtectedRoute>
               }
             />
