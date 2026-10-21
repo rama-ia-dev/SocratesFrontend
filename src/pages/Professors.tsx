@@ -19,6 +19,7 @@ import { Pagination } from '../components/ui/Pagination';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { useToast } from '../components/ui/Toast';
 import { Search, MoreVertical, Plus, Edit2, AlertCircle } from 'lucide-react';
+import { validateName, professorSaveError } from '../lib/validation';
 
 export const Professors: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -96,8 +97,9 @@ export const Professors: React.FC = () => {
     e.preventDefault();
     setModalError(null);
 
-    if (!firstName.trim() || !lastName.trim()) {
-      setModalError('Ingrese nombre y apellido');
+    const nameError = validateName('nombre')(firstName) ?? validateName('apellido')(lastName);
+    if (nameError) {
+      setModalError(nameError);
       return;
     }
 
@@ -155,13 +157,7 @@ export const Professors: React.FC = () => {
       setIsModalOpen(false);
       fetchProfessors();
     } catch (err: any) {
-      if (err.status === 409 || err.message?.includes('existe')) {
-        setModalError('Ya existe un docente con ese correo');
-      } else if (err.status === 422 || err.message?.includes('dominio')) {
-        setModalError('No puede usar el dominio de los alumnos');
-      } else {
-        setModalError(err.message || 'Error al guardar docente');
-      }
+      setModalError(professorSaveError(err, 'Error al guardar docente'));
     } finally {
       setIsSaving(false);
     }
