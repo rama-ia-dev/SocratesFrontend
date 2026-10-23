@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../lib/api';
 import {
   ProfessorSectionYearPublic,
@@ -45,12 +45,15 @@ const MENU_ITEM_BASE =
 const MENU_ITEM_CLASS = `${MENU_ITEM_BASE} text-[#0F1F3D]`;
 const MENU_ITEM_DANGER_CLASS = `${MENU_ITEM_BASE} text-[#B91C1C]`;
 
-// Opciones del filtro de año: del año que viene hacia atrás.
-const currentYear = new Date().getFullYear();
-const YEAR_OPTIONS = Array.from({ length: 7 }, (_, i) => currentYear + 1 - i);
-
 export const Sections: React.FC = () => {
   const { success, error: toastError } = useToast();
+
+  // useToast devuelve funciones nuevas cada vez que aparece o se va un aviso: si las cargas
+  // dependieran de toastError, se repetirían con cada aviso. Se usa a través de una referencia.
+  const toastErrorRef = useRef(toastError);
+  useEffect(() => {
+    toastErrorRef.current = toastError;
+  }, [toastError]);
 
   const [activeTab, setActiveTab] = useState<'sections' | 'years'>('sections');
 
@@ -79,6 +82,9 @@ export const Sections: React.FC = () => {
   const [syYearFilter, setSyYearFilter] = useState<string>('');
   const [sySectionFilter, setSySectionFilter] = useState<string>('');
   const [loadingSY, setLoadingSY] = useState(true);
+  // Opciones del filtro de año: los años que tienen al menos un curso lectivo, del más reciente
+  // al más viejo (se pueden registrar de 2000 a 2100)
+  const [yearOptions, setYearOptions] = useState<number[]>([]);
 
   // Diálogo Crear/Modificar Curso Lectivo
   const [isSYModalOpen, setIsSYModalOpen] = useState(false);
@@ -137,11 +143,11 @@ export const Sections: React.FC = () => {
       setSections(res.items);
       setTotalSections(res.total);
     } catch {
-      toastError('Error al cargar comisiones');
+      toastErrorRef.current('Error al cargar comisiones');
     } finally {
       setLoadingSections(false);
     }
-  }, [sectionSearch, sectionOffset, toastError]);
+  }, [sectionSearch, sectionOffset]);
 
   // Cargar cursos lectivos
   const fetchSectionYears = useCallback(async () => {
@@ -173,11 +179,29 @@ export const Sections: React.FC = () => {
       setSectionYears(rows);
       setTotalSY(res.total);
     } catch {
-      toastError('Error al cargar cursos lectivos');
+      toastErrorRef.current('Error al cargar cursos lectivos');
     } finally {
       setLoadingSY(false);
     }
-  }, [syYearFilter, sySectionFilter, syOffset, toastError]);
+  }, [syYearFilter, sySectionFilter, syOffset]);
+
+  // Años con cursos lectivos, recorriendo todas las páginas (el backend devuelve hasta 100)
+  const fetchYearOptions = useCallback(async () => {
+    try {
+      const years = new Set<number>();
+      let offset = 0;
+      let total = 0;
+      do {
+        const res = await api.getSectionYears({ limit: 100, offset });
+        res.items.forEach((sy) => years.add(sy.year));
+        total = res.total;
+        offset += 100;
+      } while (offset < total);
+      setYearOptions([...years].sort((a, b) => b - a));
+    } catch {
+      toastErrorRef.current('Error al cargar los años de los cursos lectivos');
+    }
+  }, []);
 
   // Cargar lista de profesores para asignación
   const fetchProfessors = useCallback(async () => {
@@ -194,9 +218,9 @@ export const Sections: React.FC = () => {
       const res = await api.getSections({ limit: 100 });
       setAllSections(res.items);
     } catch {
-      toastError('Error al cargar comisiones');
+      toastErrorRef.current('Error al cargar comisiones');
     }
-  }, [toastError]);
+  }, []);
 
   useEffect(() => {
     fetchSections();
@@ -209,6 +233,10 @@ export const Sections: React.FC = () => {
   useEffect(() => {
     fetchSectionYears();
   }, [fetchSectionYears]);
+
+  useEffect(() => {
+    fetchYearOptions();
+  }, [fetchYearOptions]);
 
   useEffect(() => {
     fetchProfessors();
@@ -331,6 +359,7 @@ export const Sections: React.FC = () => {
       }
       setIsSYModalOpen(false);
       fetchSectionYears();
+      fetchYearOptions();
     } catch (err: any) {
       // El 422 del backend trae una lista de errores, no un texto: no se muestra tal cual
       if (err.status === 409) {
@@ -567,7 +596,8 @@ export const Sections: React.FC = () => {
             />
           </div>
 
-          {loadingSections ? (
+          {/* Al recargar después de guardar se dejan los datos anteriores hasta que lleguen los nuevos */}
+          {loadingSections && sections.length === 0 ? (
             <TableSkeleton rows={4} cols={2} />
           ) : sections.length === 0 ? (
             <EmptyState message="No se encontraron comisiones registradas." />
@@ -655,7 +685,11 @@ export const Sections: React.FC = () => {
                 }}
               >
                 <option value="">Todos los años</option>
-                {YEAR_OPTIONS.map((y) => (
+                {/* El año elegido se mantiene en la lista aunque se quede sin cursos lectivos */}
+                {(syYearFilter && !yearOptions.includes(Number(syYearFilter))
+                  ? [...yearOptions, Number(syYearFilter)].sort((a, b) => b - a)
+                  : yearOptions
+                ).map((y) => (
                   <option key={y} value={y}>
                     {y}
                   </option>
@@ -680,7 +714,7 @@ export const Sections: React.FC = () => {
             </div>
           </div>
 
-          {loadingSY ? (
+          {loadingSY && sectionYears.length === 0 ? (
             <TableSkeleton rows={4} cols={5} />
           ) : sectionYears.length === 0 ? (
             <EmptyState message="No se encontraron cursos lectivos para los filtros seleccionados." />
