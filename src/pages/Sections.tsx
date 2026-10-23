@@ -28,6 +28,7 @@ import {
   UserPlus,
   AlertCircle,
   Edit2,
+  Trash2,
 } from 'lucide-react';
 
 // Fila de la pestaña Cursos lectivos: el backend devuelve el curso lectivo solo; los docentes
@@ -36,6 +37,13 @@ type SectionYearRow = SectionYearPublic & {
   professors: { id_professor: number; first_name: string; last_name: string }[];
   project_count: number;
 };
+
+// Ítem de los menús de acciones. Un <button> centra el texto por defecto: si un ítem se partía en
+// dos líneas quedaba con otra sangría que el resto, por eso va alineado a la izquierda y sin cortes.
+const MENU_ITEM_BASE =
+  'w-full flex items-center gap-2 px-3 py-2 text-sm text-left whitespace-nowrap hover:bg-[#EFF6FF] cursor-pointer';
+const MENU_ITEM_CLASS = `${MENU_ITEM_BASE} text-[#0F1F3D]`;
+const MENU_ITEM_DANGER_CLASS = `${MENU_ITEM_BASE} text-[#B91C1C]`;
 
 export const Sections: React.FC = () => {
   const { success, error: toastError } = useToast();
@@ -112,6 +120,13 @@ export const Sections: React.FC = () => {
 
   // Todas las comisiones, para los selectores (la tabla de comisiones está paginada y filtrada)
   const [allSections, setAllSections] = useState<SectionPublic[]>([]);
+
+  // Diálogo Eliminar comisión o curso lectivo
+  const [deleteTarget, setDeleteTarget] = useState<
+    { kind: 'section'; item: SectionPublic } | { kind: 'sectionYear'; item: SectionYearRow } | null
+  >(null);
+  const [deleteModalError, setDeleteModalError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Menú contextual abierto
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -435,6 +450,70 @@ export const Sections: React.FC = () => {
     }
   };
 
+  // ==========================================
+  // Handlers Eliminar
+  // ==========================================
+  const handleOpenDelete = (
+    target: { kind: 'section'; item: SectionPublic } | { kind: 'sectionYear'; item: SectionYearRow }
+  ) => {
+    setDeleteTarget(target);
+    setDeleteModalError(null);
+    setOpenMenuId(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteModalError(null);
+    setDeleting(true);
+    try {
+      if (deleteTarget.kind === 'section') {
+        try {
+          await api.deleteSection(deleteTarget.item.id_section);
+        } catch (err: any) {
+          // Si otro usuario la eliminó mientras tanto, el resultado buscado ya se cumple
+          if (err.status !== 404) throw err;
+        }
+        success('Comisión eliminada');
+        // Si era la única fila de la página, se vuelve a la anterior (eso ya recarga la tabla)
+        if (sections.length === 1 && sectionOffset > 0) {
+          setSectionOffset(sectionOffset - 10);
+        } else {
+          fetchSections();
+        }
+        if (sySectionFilter === String(deleteTarget.item.id_section)) {
+          setSySectionFilter('');
+          setSyOffset(0);
+        }
+        fetchAllSections();
+      } else {
+        try {
+          await api.deleteSectionYear(deleteTarget.item.id_section_year);
+        } catch (err: any) {
+          if (err.status !== 404) throw err;
+        }
+        success('Curso lectivo eliminado');
+        if (sectionYears.length === 1 && syOffset > 0) {
+          setSyOffset(syOffset - 10);
+        } else {
+          fetchSectionYears();
+        }
+      }
+      setDeleteTarget(null);
+    } catch (err: any) {
+      if (err.status === 409) {
+        setDeleteModalError(
+          deleteTarget.kind === 'section'
+            ? 'No se puede eliminar: la comisión tiene cursos lectivos registrados. Elimínelos primero.'
+            : 'No se puede eliminar: el curso lectivo tiene docentes asignados o grupos registrados.'
+        );
+      } else {
+        setDeleteModalError('No se pudo eliminar. Intente de nuevo');
+      }
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const assignedProfIds = currentAssignments.map((a) => a.id_professor);
   const profIdsToAdd = selectedProfIds.filter((id) => !assignedProfIds.includes(id));
   const assignmentsToRemove = currentAssignments.filter(
@@ -558,10 +637,18 @@ export const Sections: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleOpenEditSection(sec)}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#0F1F3D] hover:bg-[#EFF6FF] cursor-pointer"
+                              className={MENU_ITEM_CLASS}
                             >
-                              <Edit2 className="w-3.5 h-3.5 text-[#1D4ED8]" />
+                              <Edit2 className="w-3.5 h-3.5 shrink-0 text-[#1D4ED8]" />
                               <span>Modificar</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDelete({ kind: 'section', item: sec })}
+                              className={MENU_ITEM_DANGER_CLASS}
+                            >
+                              <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                              <span>Eliminar</span>
                             </button>
                           </div>
                         )}
@@ -690,22 +777,30 @@ export const Sections: React.FC = () => {
                         </button>
 
                         {openMenuId === `sy-${sy.id_section_year}` && (
-                          <div className="absolute right-4 top-10 w-44 bg-white border border-[#D6E4F7] rounded-lg shadow-lg py-1 z-20 text-left">
+                          <div className="absolute right-4 top-10 w-52 bg-white border border-[#D6E4F7] rounded-lg shadow-lg py-1 z-20 text-left">
                             <button
                               type="button"
                               onClick={() => handleOpenEditSY(sy)}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#0F1F3D] hover:bg-[#EFF6FF] cursor-pointer"
+                              className={MENU_ITEM_CLASS}
                             >
-                              <Edit2 className="w-3.5 h-3.5 text-[#1D4ED8]" />
+                              <Edit2 className="w-3.5 h-3.5 shrink-0 text-[#1D4ED8]" />
                               <span>Modificar</span>
                             </button>
                             <button
                               type="button"
                               onClick={() => handleOpenAssignModal(sy)}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#0F1F3D] hover:bg-[#EFF6FF] cursor-pointer"
+                              className={MENU_ITEM_CLASS}
                             >
-                              <UserPlus className="w-3.5 h-3.5 text-[#1D4ED8]" />
+                              <UserPlus className="w-3.5 h-3.5 shrink-0 text-[#1D4ED8]" />
                               <span>Docentes asignados</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDelete({ kind: 'sectionYear', item: sy })}
+                              className={MENU_ITEM_DANGER_CLASS}
+                            >
+                              <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                              <span>Eliminar</span>
                             </button>
                           </div>
                         )}
@@ -980,6 +1075,63 @@ export const Sections: React.FC = () => {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* ========================================================= */}
+      {/* Diálogo Eliminar comisión / curso lectivo                */}
+      {/* ========================================================= */}
+      <Modal
+        isOpen={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        title={deleteTarget?.kind === 'section' ? 'Eliminar comisión' : 'Eliminar curso lectivo'}
+      >
+        {deleteModalError && (
+          <div
+            role="alert"
+            className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
+          >
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{deleteModalError}</span>
+          </div>
+        )}
+
+        {deleteTarget && (
+          <p className="text-sm text-[#0F1F3D]">
+            {deleteTarget.kind === 'section' ? (
+              <>
+                ¿Eliminar la comisión <span className="font-semibold">{deleteTarget.item.name}</span>?
+              </>
+            ) : (
+              <>
+                ¿Eliminar el curso lectivo{' '}
+                <span className="font-semibold">
+                  {deleteTarget.item.section_name} {deleteTarget.item.year}
+                </span>
+                ?
+              </>
+            )}{' '}
+            Esta acción no se puede deshacer.
+          </p>
+        )}
+
+        <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-[#D6E4F7]">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setDeleteTarget(null)}
+            disabled={deleting}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={handleConfirmDelete}
+            isLoading={deleting}
+          >
+            Eliminar
+          </Button>
+        </div>
       </Modal>
     </div>
   );
