@@ -28,9 +28,9 @@ const ReadOnlyField: React.FC<{ label: string; children: React.ReactNode; mono?:
   mono,
 }) => (
   <div>
-    <label className="block text-sm font-medium text-[#0F1F3D] mb-1.5">{label}</label>
+    <label className="block text-sm font-medium text-ink mb-1.5">{label}</label>
     <div
-      className={`w-full rounded-lg border border-[#D6E4F7] bg-[#F1F5F9] px-3 py-2 text-sm text-[#51607A] flex items-center gap-2 select-none ${
+      className={`w-full rounded-lg border border-line bg-fill-neutral px-3 py-2 text-sm text-ink-muted flex items-center gap-2 select-none ${
         mono ? 'font-mono' : ''
       }`}
     >
@@ -132,11 +132,11 @@ export const Profile: React.FC = () => {
     <div className="max-w-2xl mx-auto">
       <PageHeader title="Mi perfil" />
 
-      <div className="w-full max-w-[640px] bg-white border border-[#D6E4F7] rounded-xl shadow-xs p-8">
+      <div className="w-full max-w-[640px] bg-white border border-line rounded-xl shadow-xs p-8">
         {errorMessage && (
           <div
             role="alert"
-            className="mb-6 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2.5"
+            className="mb-6 p-3 rounded-lg bg-danger-soft border border-danger-line text-danger text-sm flex items-start gap-2.5"
           >
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{errorMessage}</span>
@@ -144,7 +144,7 @@ export const Profile: React.FC = () => {
         )}
 
         {emailChanged && (
-          <div className="mb-6 p-3 rounded-lg bg-[#FEF3C7] border border-[#FDE68A] text-[#B45309] text-xs">
+          <div className="mb-6 p-3 rounded-lg bg-warning-soft border border-warning-line text-warning text-xs">
             Al cambiar el correo se cerrará su sesión y deberá entrar con el correo nuevo. La
             contraseña no cambia.
           </div>
@@ -198,11 +198,11 @@ export const Profile: React.FC = () => {
             </div>
           )}
 
-          <div className="border-t border-[#D6E4F7] pt-5 space-y-4">
-            {/* Campos de solo lectura (fondo #F1F5F9) */}
+          <div className="border-t border-line pt-5 space-y-4">
+            {/* Campos de solo lectura (fondo fill-neutral) */}
             {!canEditAccount && (
               <>
-                <p className="text-xs text-[#51607A]">
+                <p className="text-xs text-ink-muted">
                   Correo, legajo y rol los modifica un administrador.
                 </p>
                 <ReadOnlyField label="Correo electrónico">{user.email}</ReadOnlyField>
@@ -228,7 +228,7 @@ export const Profile: React.FC = () => {
           </div>
 
           {/* Botones de acción */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#D6E4F7]">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-line">
             <Button
               type="button"
               variant="outline"
@@ -249,10 +249,10 @@ export const Profile: React.FC = () => {
         </form>
       </div>
 
-      <div className="w-full max-w-[640px] mt-6 bg-white border border-[#D6E4F7] rounded-xl shadow-xs p-8 flex flex-col sm:flex-row sm:items-center gap-4 sm:justify-between">
+      <div className="w-full max-w-[640px] mt-6 bg-white border border-line rounded-xl shadow-xs p-8 flex flex-col sm:flex-row sm:items-center gap-4 sm:justify-between">
         <div>
-          <h3 className="font-serif font-semibold text-lg text-[#0B2A66]">Contraseña</h3>
-          <p className="text-xs text-[#51607A] mt-1">
+          <h3 className="font-serif font-semibold text-lg text-navy">Contraseña</h3>
+          <p className="text-xs text-ink-muted mt-1">
             Se confirma con un código que le llega al correo. Al cambiarla se cierra la sesión en
             todos los dispositivos.
           </p>

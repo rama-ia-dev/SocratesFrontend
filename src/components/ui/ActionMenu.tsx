@@ -64,7 +64,7 @@ export const ActionMenu: React.FC<ActionMenuProps> = ({ items, label }) => {
         ref={buttonRef}
         type="button"
         onClick={toggle}
-        className="p-1 rounded text-[#51607A] hover:text-[#0F1F3D] hover:bg-[#EFF6FF] cursor-pointer"
+        className="p-1 rounded text-ink-muted hover:text-ink hover:bg-tint cursor-pointer"
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={Boolean(position)}
@@ -78,7 +78,7 @@ export const ActionMenu: React.FC<ActionMenuProps> = ({ items, label }) => {
             ref={menuRef}
             role="menu"
             style={{ top: position.top, left: position.left, width: MENU_WIDTH }}
-            className="fixed z-50 bg-white border border-[#D6E4F7] rounded-lg shadow-lg py-1 text-left"
+            className="fixed z-50 bg-white border border-line rounded-lg shadow-lg py-1 text-left"
           >
             {items.map((item) => (
               <button
@@ -89,7 +89,7 @@ export const ActionMenu: React.FC<ActionMenuProps> = ({ items, label }) => {
                   close();
                   item.onClick();
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#0F1F3D] hover:bg-[#EFF6FF] cursor-pointer"
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-ink hover:bg-tint cursor-pointer"
               >
                 {item.icon}
                 <span>{item.label}</span>

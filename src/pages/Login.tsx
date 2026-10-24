@@ -47,18 +47,18 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-[#F5F9FF]">
+    <div className="min-h-screen flex flex-col md:flex-row bg-canvas">
       {/* ========================================================= */}
       {/* Panel Izquierdo: Patrón de acanalado y baldosa con logo  */}
       {/* ========================================================= */}
-      <div className="hidden md:flex flex-1 bg-[#EFF6FF] fluted-column-pattern border-r border-[#D6E4F7] items-center justify-center p-12">
-        <div className="bg-white border border-[#D6E4F7] rounded-xl p-8 shadow-sm max-w-sm w-full text-center flex flex-col items-center">
+      <div className="hidden md:flex flex-1 bg-tint fluted-column-pattern border-r border-line items-center justify-center p-12">
+        <div className="bg-white border border-line rounded-xl p-8 shadow-sm max-w-sm w-full text-center flex flex-col items-center">
           <SocratesLogo size="xl" showText={true} />
           <div className="title-line mt-4 mb-4" />
-          <p className="text-sm font-medium text-[#51607A]">
+          <p className="text-sm font-medium text-ink-muted">
             Seminario Integrador
           </p>
-          <p className="text-xs text-[#51607A] mt-1">
+          <p className="text-xs text-ink-muted mt-1">
             Facultad Regional Córdoba
           </p>
         </div>
@@ -68,13 +68,13 @@ export const Login: React.FC = () => {
       {/* Panel Derecho: Tarjeta de 420px con formulario           */}
       {/* ========================================================= */}
       <div className="flex-1 flex items-center justify-center p-6 sm:p-12">
-        <div className="w-full max-w-[420px] bg-white border border-[#D6E4F7] rounded-xl shadow-md p-8 sm:p-10">
+        <div className="w-full max-w-[420px] bg-white border border-line rounded-xl shadow-md p-8 sm:p-10">
           {/* Logo en versión móvil */}
           <div className="md:hidden flex justify-center mb-6">
             <SocratesLogo size="md" showText={true} />
           </div>
 
-          <h2 className="font-serif font-semibold text-2xl sm:text-3xl text-[#0B2A66] mb-1">
+          <h2 className="font-serif font-semibold text-2xl sm:text-3xl text-navy mb-1">
             Iniciar sesión
           </h2>
           <div className="title-line mb-6" />
@@ -82,7 +82,7 @@ export const Login: React.FC = () => {
           {errorMessage && (
             <div
               role="alert"
-              className="mb-6 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2.5"
+              className="mb-6 p-3 rounded-lg bg-danger-soft border border-danger-line text-danger text-sm flex items-start gap-2.5"
             >
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{errorMessage}</span>
@@ -130,7 +130,7 @@ export const Login: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="text-[#51607A] hover:text-[#0F1F3D] focus:outline-none cursor-pointer"
+                    className="text-ink-muted hover:text-ink focus:outline-none cursor-pointer"
                     aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
                   >
                     {showPassword ? (
@@ -156,7 +156,7 @@ export const Login: React.FC = () => {
             <div className="text-center pt-2">
               <Link
                 to="/password/reset"
-                className="text-sm font-medium text-[#1D4ED8] hover:text-[#1E40AF] hover:underline"
+                className="text-sm font-medium text-primary hover:text-primary-hover hover:underline"
               >
                 Crear o restablecer contraseña
               </Link>

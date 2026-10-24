@@ -21,7 +21,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const baseStyles =
-      'inline-flex items-center justify-center font-medium transition-colors select-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAE6FD] focus-visible:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none cursor-pointer';
+      'inline-flex items-center justify-center font-medium transition-colors select-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-light focus-visible:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none cursor-pointer';
 
     const sizeStyles = {
       sm: 'text-xs px-3 py-1.5 h-8 gap-1.5',
@@ -31,15 +31,15 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variantStyles = {
       primary:
-        'bg-[#1D4ED8] hover:bg-[#1E40AF] text-white shadow-xs active:bg-[#1E40AF]',
+        'bg-primary hover:bg-primary-hover text-white shadow-xs active:bg-primary-hover',
       secondary:
-        'bg-[#EFF6FF] hover:bg-[#E0F2FE] text-[#1D4ED8] border border-[#D6E4F7]',
+        'bg-tint hover:bg-tint-strong text-primary border border-line',
       outline:
-        'bg-white hover:bg-[#F5F9FF] text-[#0F1F3D] border border-[#D6E4F7] shadow-2xs',
+        'bg-white hover:bg-canvas text-ink border border-line shadow-2xs',
       destructive:
-        'bg-[#B91C1C] hover:bg-[#991B1B] text-white shadow-xs',
+        'bg-danger hover:bg-danger-hover text-white shadow-xs',
       ghost:
-        'bg-transparent hover:bg-[#EFF6FF] text-[#51607A] hover:text-[#0F1F3D]',
+        'bg-transparent hover:bg-tint text-ink-muted hover:text-ink',
     }[variant];
 
     return (

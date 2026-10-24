@@ -28,9 +28,9 @@ export const SocratesLogo: React.FC<SocratesLogoProps> = ({
 
   // En fondo oscuro, la figura arquitectónica usa trazos blancos y celestes brillantes
   // para que resalte con nitidez, elegancia y luminosidad en lugar de verse apagada u oscura.
-  const primaryStroke = isDark ? '#FFFFFF' : '#0B2A66';
-  const secondaryStroke = isDark ? '#38BDF8' : '#1D4ED8';
-  const accentStroke = isDark ? '#7DD3FC' : '#7DD3FC';
+  const primaryStroke = isDark ? 'stroke-white' : 'stroke-navy';
+  const secondaryStroke = isDark ? 'stroke-accent-strong' : 'stroke-primary';
+  const accentStroke = 'stroke-accent';
 
   return (
     <div className={`flex items-center gap-3 select-none ${className}`}>
@@ -38,8 +38,8 @@ export const SocratesLogo: React.FC<SocratesLogoProps> = ({
       <div
         className={`flex items-center justify-center rounded-lg shadow-xs shrink-0 transition-colors ${
           isDark
-            ? 'bg-[#061A3D] border border-white/15 text-white'
-            : 'bg-white border border-[#D6E4F7] text-[#0B2A66]'
+            ? 'bg-navy-deep border border-white/15 text-white'
+            : 'bg-white border border-line text-navy'
         }`}
         style={{ width: dim.icon + 12, height: dim.icon + 12 }}
       >
@@ -53,52 +53,52 @@ export const SocratesLogo: React.FC<SocratesLogoProps> = ({
           {/* Frontispicio de templo y columna clásica griega */}
           <path
             d="M6 13L20 6L34 13"
-            stroke={primaryStroke}
+            className={primaryStroke}
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
           <path
             d="M8 15H32"
-            stroke={secondaryStroke}
+            className={secondaryStroke}
             strokeWidth="2"
             strokeLinecap="round"
           />
           {/* Fustes acanalados clásicos */}
           <path
             d="M12 17V30"
-            stroke={primaryStroke}
+            className={primaryStroke}
             strokeWidth="2"
             strokeLinecap="round"
           />
           <path
             d="M17.33 17V30"
-            stroke={accentStroke}
+            className={accentStroke}
             strokeWidth="1.75"
             strokeLinecap="round"
           />
           <path
             d="M22.67 17V30"
-            stroke={accentStroke}
+            className={accentStroke}
             strokeWidth="1.75"
             strokeLinecap="round"
           />
           <path
             d="M28 17V30"
-            stroke={primaryStroke}
+            className={primaryStroke}
             strokeWidth="2"
             strokeLinecap="round"
           />
           {/* Estilóbato / Base */}
           <path
             d="M8 32H32"
-            stroke={secondaryStroke}
+            className={secondaryStroke}
             strokeWidth="2"
             strokeLinecap="round"
           />
           <path
             d="M5 34H35"
-            stroke={primaryStroke}
+            className={primaryStroke}
             strokeWidth="2.5"
             strokeLinecap="round"
           />
@@ -108,7 +108,7 @@ export const SocratesLogo: React.FC<SocratesLogoProps> = ({
       {showText && (
         <span
           className={`font-serif font-semibold tracking-tight ${dim.text} ${
-            invertText ? 'text-white' : 'text-[#0B2A66]'
+            invertText ? 'text-white' : 'text-navy'
           }`}
         >
           Sócrates

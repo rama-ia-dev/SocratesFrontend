@@ -113,7 +113,7 @@ export const EditStudentModal: React.FC<{
       {error && (
         <div
           role="alert"
-          className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
+          className="mb-4 p-3 rounded-lg bg-danger-soft border border-danger-line text-danger text-sm flex items-start gap-2"
         >
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{error}</span>
@@ -121,7 +121,7 @@ export const EditStudentModal: React.FC<{
       )}
 
       {legajoChanged && (
-        <div className="mb-4 p-3 rounded-lg bg-[#EFF6FF] border border-[#BAE6FD] text-[#1D4ED8] text-xs">
+        <div className="mb-4 p-3 rounded-lg bg-tint border border-accent-light text-primary text-xs">
           El correo de ingreso pasará a ser{' '}
           <span className="font-mono font-semibold">{legajo.value}@sistemas.frc.utn.edu.ar</span>
         </div>
@@ -163,7 +163,7 @@ export const EditStudentModal: React.FC<{
           />
         </div>
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-[#D6E4F7]">
+        <div className="flex justify-end gap-3 pt-4 border-t border-line">
           <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
             Cancelar
           </Button>

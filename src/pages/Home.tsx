@@ -66,7 +66,7 @@ export const Home: React.FC = () => {
       />
 
       {modules.length === 0 && (
-        <p className="text-sm text-[#51607A]">Todavía no hay módulos disponibles para su rol.</p>
+        <p className="text-sm text-ink-muted">Todavía no hay módulos disponibles para su rol.</p>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -76,21 +76,21 @@ export const Home: React.FC = () => {
             <div
               key={mod.path}
               onClick={() => navigate(mod.path)}
-              className="bg-white border border-[#D6E4F7] rounded-xl p-6 shadow-2xs hover:shadow-md hover:border-[#1D4ED8] transition-all cursor-pointer group flex flex-col justify-between"
+              className="bg-white border border-line rounded-xl p-6 shadow-2xs hover:shadow-md hover:border-primary transition-all cursor-pointer group flex flex-col justify-between"
             >
               <div>
-                <div className="w-12 h-12 rounded-lg bg-[#EFF6FF] border border-[#BAE6FD] flex items-center justify-center text-[#1D4ED8] mb-4 group-hover:scale-105 transition-transform">
+                <div className="w-12 h-12 rounded-lg bg-tint border border-accent-light flex items-center justify-center text-primary mb-4 group-hover:scale-105 transition-transform">
                   <Icon className="w-6 h-6" />
                 </div>
-                <h3 className="font-serif font-semibold text-lg text-[#0B2A66] mb-2 group-hover:text-[#1D4ED8] transition-colors">
+                <h3 className="font-serif font-semibold text-lg text-navy mb-2 group-hover:text-primary transition-colors">
                   {mod.title}
                 </h3>
-                <p className="text-sm text-[#51607A] leading-relaxed">
+                <p className="text-sm text-ink-muted leading-relaxed">
                   {mod.desc}
                 </p>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-[#D6E4F7]/60 flex items-center justify-between text-sm font-medium text-[#1D4ED8]">
+              <div className="mt-6 pt-4 border-t border-line/60 flex items-center justify-between text-sm font-medium text-primary">
                 <span>Acceder al módulo</span>
                 <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
               </div>

@@ -259,7 +259,7 @@ export const Users: React.FC = () => {
                   variant="outline"
                   onClick={() => navigate('/estudiantes/nuevo')}
                 >
-                  <GraduationCap className="w-4 h-4 mr-1.5 text-[#1D4ED8]" />
+                  <GraduationCap className="w-4 h-4 mr-1.5 text-primary" />
                   Registrar estudiantes
                 </Button>
                 <Button variant="primary" onClick={handleOpenCreateProf}>
@@ -316,7 +316,7 @@ export const Users: React.FC = () => {
                 <TableHead>Rol</TableHead>
                 <TableHead>Año de ingreso</TableHead>
                 {/* Fija a la derecha: con la tabla más ancha que la pantalla, las acciones siguen a la vista */}
-                <TableHead className="w-20 text-right sticky right-0 bg-[#EFF6FF]">Acciones</TableHead>
+                <TableHead className="w-20 text-right sticky right-0 bg-tint">Acciones</TableHead>
               </tr>
             </TableHeader>
             <tbody>
@@ -329,13 +329,13 @@ export const Users: React.FC = () => {
                         name={`${u.last_name} ${u.first_name}`}
                         size="sm"
                       />
-                      <span className="min-w-0 font-medium text-[#0F1F3D] [overflow-wrap:anywhere]">
+                      <span className="min-w-0 font-medium text-ink [overflow-wrap:anywhere]">
                         {u.last_name}, {u.first_name}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-[#51607A]">{u.email}</TableCell>
-                  <TableCell className="font-mono text-[#51607A]">
+                  <TableCell className="text-ink-muted">{u.email}</TableCell>
+                  <TableCell className="font-mono text-ink-muted">
                     {u.legajo}
                   </TableCell>
                   <TableCell>
@@ -347,16 +347,16 @@ export const Users: React.FC = () => {
                       <Badge variant="student">Alumno</Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-[#51607A]">
+                  <TableCell className="text-ink-muted">
                     {u.role === 'student' ? u.enrollment_year || '—' : '—'}
                   </TableCell>
-                  <TableCell className="text-right sticky right-0 bg-white border-b border-[#D6E4F7]">
+                  <TableCell className="text-right sticky right-0 bg-white border-b border-line">
                     <ActionMenu
                       label={`Acciones de ${u.first_name} ${u.last_name}`}
                       items={[
                         {
                           label: 'Modificar',
-                          icon: <Edit2 className="w-3.5 h-3.5 text-[#1D4ED8]" />,
+                          icon: <Edit2 className="w-3.5 h-3.5 text-primary" />,
                           onClick: () =>
                             u.role === 'professor' ? handleOpenEditProf(u) : handleOpenEditStudent(u),
                         },
@@ -388,7 +388,7 @@ export const Users: React.FC = () => {
         {profCreateError && (
           <div
             role="alert"
-            className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
+            className="mb-4 p-3 rounded-lg bg-danger-soft border border-danger-line text-danger text-sm flex items-start gap-2"
           >
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{profCreateError}</span>
@@ -448,15 +448,15 @@ export const Users: React.FC = () => {
                 checked={profCreateIsSuperAdmin}
                 onChange={(e) => setProfCreateIsSuperAdmin(e.target.checked)}
                 disabled={isSavingProfCreate}
-                className="w-4 h-4 rounded border-[#D6E4F7] text-[#1D4ED8] focus:ring-[#BAE6FD]"
+                className="w-4 h-4 rounded border-line text-primary focus:ring-accent-light"
               />
-              <span className="text-sm font-medium text-[#0F1F3D]">
+              <span className="text-sm font-medium text-ink">
                 Super administrador
               </span>
             </label>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-[#D6E4F7]">
+          <div className="flex justify-end gap-3 pt-4 border-t border-line">
             <Button
               type="button"
               variant="outline"
@@ -487,7 +487,7 @@ export const Users: React.FC = () => {
         {profEditError && (
           <div
             role="alert"
-            className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
+            className="mb-4 p-3 rounded-lg bg-danger-soft border border-danger-line text-danger text-sm flex items-start gap-2"
           >
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{profEditError}</span>
@@ -495,7 +495,7 @@ export const Users: React.FC = () => {
         )}
 
         {profEmailChanged && (
-          <div className="mb-4 p-3 rounded-lg bg-[#FEF3C7] border border-[#FDE68A] text-[#B45309] text-xs">
+          <div className="mb-4 p-3 rounded-lg bg-warning-soft border border-warning-line text-warning text-xs">
             Al cambiar el correo se cerrará la sesión del docente.
           </div>
         )}
@@ -551,20 +551,20 @@ export const Users: React.FC = () => {
                 checked={profEditIsSuperAdmin}
                 onChange={(e) => setProfEditIsSuperAdmin(e.target.checked)}
                 disabled={isEditingSelf || isSavingProfEdit}
-                className="w-4 h-4 rounded border-[#D6E4F7] text-[#1D4ED8] focus:ring-[#BAE6FD]"
+                className="w-4 h-4 rounded border-line text-primary focus:ring-accent-light"
               />
-              <span className="text-sm font-medium text-[#0F1F3D]">
+              <span className="text-sm font-medium text-ink">
                 Super administrador
               </span>
             </label>
             {isEditingSelf && (
-              <p className="text-xs text-[#B45309] mt-1 pl-7">
+              <p className="text-xs text-warning mt-1 pl-7">
                 No puede quitarse a sí mismo el rol de super administrador
               </p>
             )}
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-[#D6E4F7]">
+          <div className="flex justify-end gap-3 pt-4 border-t border-line">
             <Button
               type="button"
               variant="outline"

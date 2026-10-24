@@ -23,11 +23,11 @@ export const Pagination: React.FC<PaginationProps> = ({
   const hasNext = offset + limit < total;
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-3 px-1 text-sm text-[#51607A]">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-3 px-1 text-sm text-ink-muted">
       <div>
-        Mostrando <span className="font-medium text-[#0F1F3D]">{start}</span> a{' '}
-        <span className="font-medium text-[#0F1F3D]">{end}</span> de{' '}
-        <span className="font-medium text-[#0F1F3D]">{total}</span> registros
+        Mostrando <span className="font-medium text-ink">{start}</span> a{' '}
+        <span className="font-medium text-ink">{end}</span> de{' '}
+        <span className="font-medium text-ink">{total}</span> registros
       </div>
 
       <div className="flex items-center gap-2">

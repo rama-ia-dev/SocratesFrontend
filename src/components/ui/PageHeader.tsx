@@ -16,12 +16,12 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   return (
     <div className={`mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 ${className}`}>
       <div>
-        <h1 className="font-serif font-semibold text-2xl sm:text-3xl text-[#0B2A66] tracking-tight">
+        <h1 className="font-serif font-semibold text-2xl sm:text-3xl text-navy tracking-tight">
           {title}
         </h1>
         <div className="title-line mt-2" />
         {subtitle && (
-          <p className="mt-2 text-sm text-[#51607A]">{subtitle}</p>
+          <p className="mt-2 text-sm text-ink-muted">{subtitle}</p>
         )}
       </div>
       {action && <div className="shrink-0">{action}</div>}

@@ -189,32 +189,32 @@ export const Students: React.FC = () => {
                 <TableHead>Correo de ingreso</TableHead>
                 <TableHead>Año de ingreso</TableHead>
                 <TableHead>Equipo</TableHead>
-                <TableHead className="w-20 text-right sticky right-0 bg-[#EFF6FF]">Acciones</TableHead>
+                <TableHead className="w-20 text-right sticky right-0 bg-tint">Acciones</TableHead>
               </tr>
             </TableHeader>
             <tbody>
               {students.map((st) => (
                 <TableRow key={st.id_student}>
-                  <TableCell className="font-mono font-medium text-[#0F1F3D]">{st.legajo}</TableCell>
+                  <TableCell className="font-mono font-medium text-ink">{st.legajo}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3 min-w-[160px]">
                       <InitialsAvatar name={`${st.last_name} ${st.first_name}`} size="sm" />
-                      <span className="font-medium text-[#0F1F3D]">
+                      <span className="font-medium text-ink">
                         {st.last_name}, {st.first_name}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono text-[#51607A] text-xs">{st.email}</TableCell>
-                  <TableCell className="text-[#51607A]">{st.enrollment_year}</TableCell>
+                  <TableCell className="font-mono text-ink-muted text-xs">{st.email}</TableCell>
+                  <TableCell className="text-ink-muted">{st.enrollment_year}</TableCell>
                   <TableCell className="min-w-[160px]">
                     {st.groups.length === 0 ? (
-                      <span className="text-xs italic text-[#8A9AB5]">Sin equipo</span>
+                      <span className="text-xs italic text-ink-subtle">Sin equipo</span>
                     ) : (
                       <ul className="space-y-0.5">
                         {st.groups.map((g) => (
                           <li key={g.id_project}>
-                            <span className="text-sm text-[#0F1F3D]">Equipo {g.group_number}</span>
-                            <span className="text-xs text-[#51607A]">
+                            <span className="text-sm text-ink">Equipo {g.group_number}</span>
+                            <span className="text-xs text-ink-muted">
                               {' '}
                               · {g.section_name} ({g.year})
                               {g.project_name ? ` · ${g.project_name}` : ''}
@@ -230,13 +230,13 @@ export const Students: React.FC = () => {
                       </ul>
                     )}
                   </TableCell>
-                  <TableCell className="text-right sticky right-0 bg-white border-b border-[#D6E4F7]">
+                  <TableCell className="text-right sticky right-0 bg-white border-b border-line">
                     <ActionMenu
                       label={`Acciones de ${st.first_name} ${st.last_name}`}
                       items={[
                         {
                           label: 'Modificar',
-                          icon: <Edit2 className="w-3.5 h-3.5 text-[#1D4ED8]" />,
+                          icon: <Edit2 className="w-3.5 h-3.5 text-primary" />,
                           onClick: () => setEditingStudent(st),
                         },
                       ]}

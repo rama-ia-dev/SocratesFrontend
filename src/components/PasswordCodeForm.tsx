@@ -145,18 +145,18 @@ export const PasswordCodeForm: React.FC<PasswordCodeFormProps> = ({ fixedEmail, 
       <div className="flex items-center gap-2 mb-6">
         <div
           className={`flex-1 h-1.5 rounded-full transition-colors ${
-            step >= 1 ? 'bg-[#1D4ED8]' : 'bg-[#D6E4F7]'
+            step >= 1 ? 'bg-primary' : 'bg-line'
           }`}
         />
         <div
           className={`flex-1 h-1.5 rounded-full transition-colors ${
-            step >= 2 ? 'bg-[#1D4ED8]' : 'bg-[#D6E4F7]'
+            step >= 2 ? 'bg-primary' : 'bg-line'
           }`}
         />
       </div>
 
       {infoMessage && (
-        <div className="mb-6 p-3 rounded-lg bg-[#EFF6FF] border border-[#BAE6FD] text-[#1D4ED8] text-sm">
+        <div className="mb-6 p-3 rounded-lg bg-tint border border-accent-light text-primary text-sm">
           {infoMessage}
         </div>
       )}
@@ -164,7 +164,7 @@ export const PasswordCodeForm: React.FC<PasswordCodeFormProps> = ({ fixedEmail, 
       {errorMessage && (
         <div
           role="alert"
-          className="mb-6 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2.5"
+          className="mb-6 p-3 rounded-lg bg-danger-soft border border-danger-line text-danger text-sm flex items-start gap-2.5"
         >
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{errorMessage}</span>
@@ -174,9 +174,9 @@ export const PasswordCodeForm: React.FC<PasswordCodeFormProps> = ({ fixedEmail, 
       {step === 1 ? (
         <form onSubmit={handleStep1Submit} className="space-y-4" noValidate>
           {fixedEmail ? (
-            <p className="text-sm text-[#51607A]">
+            <p className="text-sm text-ink-muted">
               Para confirmar el cambio le vamos a enviar un código de 6 dígitos a{' '}
-              <span className="font-medium text-[#0F1F3D] break-all">{fixedEmail}</span>.
+              <span className="font-medium text-ink break-all">{fixedEmail}</span>.
             </p>
           ) : (
             <div>
@@ -207,7 +207,7 @@ export const PasswordCodeForm: React.FC<PasswordCodeFormProps> = ({ fixedEmail, 
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="text-[#51607A] hover:text-[#0F1F3D] focus:outline-none cursor-pointer"
+                  className="text-ink-muted hover:text-ink focus:outline-none cursor-pointer"
                   aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -232,7 +232,7 @@ export const PasswordCodeForm: React.FC<PasswordCodeFormProps> = ({ fixedEmail, 
                 <button
                   type="button"
                   onClick={() => setShowRepeatPassword(!showRepeatPassword)}
-                  className="text-[#51607A] hover:text-[#0F1F3D] focus:outline-none cursor-pointer"
+                  className="text-ink-muted hover:text-ink focus:outline-none cursor-pointer"
                   aria-label={showRepeatPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
                 >
                   {showRepeatPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -249,9 +249,9 @@ export const PasswordCodeForm: React.FC<PasswordCodeFormProps> = ({ fixedEmail, 
         </form>
       ) : (
         <form onSubmit={handleStep2Submit} className="space-y-5" noValidate>
-          <p className="text-sm text-[#51607A]">
+          <p className="text-sm text-ink-muted">
             {fixedEmail ? 'Le enviamos un código de 6 dígitos a ' : 'Si '}
-            <span className="font-medium text-[#0F1F3D] break-all">{email.trim()}</span>
+            <span className="font-medium text-ink break-all">{email.trim()}</span>
             {fixedEmail ? '.' : ' está registrado, le enviamos un código de 6 dígitos.'}
           </p>
 
@@ -280,7 +280,7 @@ export const PasswordCodeForm: React.FC<PasswordCodeFormProps> = ({ fixedEmail, 
               type="button"
               onClick={handleResendCode}
               disabled={isLoading || resendIn > 0}
-              className="text-sm font-medium text-[#1D4ED8] hover:underline cursor-pointer disabled:opacity-50"
+              className="text-sm font-medium text-primary hover:underline cursor-pointer disabled:opacity-50"
             >
               {resendIn > 0 ? `Reenviar código en ${resendIn} s` : 'Reenviar código'}
             </button>
@@ -292,7 +292,7 @@ export const PasswordCodeForm: React.FC<PasswordCodeFormProps> = ({ fixedEmail, 
                 setInfoMessage(null);
                 setErrorMessage(null);
               }}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-[#51607A] hover:text-[#0F1F3D] cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-ink cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
               {fixedEmail ? 'Modificar contraseña' : 'Modificar correo o contraseña'}

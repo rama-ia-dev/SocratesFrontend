@@ -41,9 +41,9 @@ type SectionYearRow = SectionYearPublic & {
 // Ítem de los menús de acciones. Un <button> centra el texto por defecto: si un ítem se partía en
 // dos líneas quedaba con otra sangría que el resto, por eso va alineado a la izquierda y sin cortes.
 const MENU_ITEM_BASE =
-  'w-full flex items-center gap-2 px-3 py-2 text-sm text-left whitespace-nowrap hover:bg-[#EFF6FF] cursor-pointer';
-const MENU_ITEM_CLASS = `${MENU_ITEM_BASE} text-[#0F1F3D]`;
-const MENU_ITEM_DANGER_CLASS = `${MENU_ITEM_BASE} text-[#B91C1C]`;
+  'w-full flex items-center gap-2 px-3 py-2 text-sm text-left whitespace-nowrap hover:bg-tint cursor-pointer';
+const MENU_ITEM_CLASS = `${MENU_ITEM_BASE} text-ink`;
+const MENU_ITEM_DANGER_CLASS = `${MENU_ITEM_BASE} text-danger`;
 
 export const Sections: React.FC = () => {
   const { success, error: toastError } = useToast();
@@ -552,14 +552,14 @@ export const Sections: React.FC = () => {
       />
 
       {/* Pestañas de Navegación */}
-      <div className="flex items-center gap-1 border-b border-[#D6E4F7] mb-6">
+      <div className="flex items-center gap-1 border-b border-line mb-6">
         <button
           type="button"
           onClick={() => setActiveTab('sections')}
           className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
             activeTab === 'sections'
-              ? 'border-[#1D4ED8] text-[#1D4ED8]'
-              : 'border-transparent text-[#51607A] hover:text-[#0F1F3D]'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-ink-muted hover:text-ink'
           }`}
         >
           Comisiones
@@ -569,8 +569,8 @@ export const Sections: React.FC = () => {
           onClick={() => setActiveTab('years')}
           className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
             activeTab === 'years'
-              ? 'border-[#1D4ED8] text-[#1D4ED8]'
-              : 'border-transparent text-[#51607A] hover:text-[#0F1F3D]'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-ink-muted hover:text-ink'
           }`}
         >
           Cursos lectivos
@@ -613,7 +613,7 @@ export const Sections: React.FC = () => {
                 <tbody>
                   {sections.map((sec) => (
                     <TableRow key={sec.id_section}>
-                      <TableCell className="font-semibold text-[#0B2A66]">
+                      <TableCell className="font-semibold text-navy">
                         {sec.name}
                       </TableCell>
                       <TableCell className="text-right relative">
@@ -626,20 +626,20 @@ export const Sections: React.FC = () => {
                                 : `sec-${sec.id_section}`
                             )
                           }
-                          className="p-1 rounded text-[#51607A] hover:text-[#0F1F3D] hover:bg-[#EFF6FF] cursor-pointer"
+                          className="p-1 rounded text-ink-muted hover:text-ink hover:bg-tint cursor-pointer"
                           aria-label="Abrir menú de acciones"
                         >
                           <MoreVertical className="w-4 h-4" />
                         </button>
 
                         {openMenuId === `sec-${sec.id_section}` && (
-                          <div className="absolute right-4 top-10 w-36 bg-white border border-[#D6E4F7] rounded-lg shadow-lg py-1 z-20 text-left">
+                          <div className="absolute right-4 top-10 w-36 bg-white border border-line rounded-lg shadow-lg py-1 z-20 text-left">
                             <button
                               type="button"
                               onClick={() => handleOpenEditSection(sec)}
                               className={MENU_ITEM_CLASS}
                             >
-                              <Edit2 className="w-3.5 h-3.5 shrink-0 text-[#1D4ED8]" />
+                              <Edit2 className="w-3.5 h-3.5 shrink-0 text-primary" />
                               <span>Modificar</span>
                             </button>
                             <button
@@ -733,7 +733,7 @@ export const Sections: React.FC = () => {
                 <tbody>
                   {sectionYears.map((sy) => (
                     <TableRow key={sy.id_section_year}>
-                      <TableCell className="font-semibold text-[#0B2A66]">
+                      <TableCell className="font-semibold text-navy">
                         {sy.section_name}
                       </TableCell>
                       <TableCell className="font-mono text-sm">
@@ -745,13 +745,13 @@ export const Sections: React.FC = () => {
                             sy.professors.map((p) => (
                               <span
                                 key={p.id_professor}
-                                className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-[#EFF6FF] text-[#1D4ED8] border border-[#BAE6FD]"
+                                className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-tint text-primary border border-accent-light"
                               >
                                 {p.first_name} {p.last_name}
                               </span>
                             ))
                           ) : (
-                            <span className="text-xs text-[#94A3B8] italic">
+                            <span className="text-xs text-ink-faint italic">
                               Sin docentes asignados
                             </span>
                           )}
@@ -770,20 +770,20 @@ export const Sections: React.FC = () => {
                                 : `sy-${sy.id_section_year}`
                             )
                           }
-                          className="p-1 rounded text-[#51607A] hover:text-[#0F1F3D] hover:bg-[#EFF6FF] cursor-pointer"
+                          className="p-1 rounded text-ink-muted hover:text-ink hover:bg-tint cursor-pointer"
                           aria-label="Abrir menú de acciones"
                         >
                           <MoreVertical className="w-4 h-4" />
                         </button>
 
                         {openMenuId === `sy-${sy.id_section_year}` && (
-                          <div className="absolute right-4 top-10 w-52 bg-white border border-[#D6E4F7] rounded-lg shadow-lg py-1 z-20 text-left">
+                          <div className="absolute right-4 top-10 w-52 bg-white border border-line rounded-lg shadow-lg py-1 z-20 text-left">
                             <button
                               type="button"
                               onClick={() => handleOpenEditSY(sy)}
                               className={MENU_ITEM_CLASS}
                             >
-                              <Edit2 className="w-3.5 h-3.5 shrink-0 text-[#1D4ED8]" />
+                              <Edit2 className="w-3.5 h-3.5 shrink-0 text-primary" />
                               <span>Modificar</span>
                             </button>
                             <button
@@ -791,7 +791,7 @@ export const Sections: React.FC = () => {
                               onClick={() => handleOpenAssignModal(sy)}
                               className={MENU_ITEM_CLASS}
                             >
-                              <UserPlus className="w-3.5 h-3.5 shrink-0 text-[#1D4ED8]" />
+                              <UserPlus className="w-3.5 h-3.5 shrink-0 text-primary" />
                               <span>Docentes asignados</span>
                             </button>
                             <button
@@ -832,7 +832,7 @@ export const Sections: React.FC = () => {
         {sectionModalError && (
           <div
             role="alert"
-            className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
+            className="mb-4 p-3 rounded-lg bg-danger-soft border border-danger-line text-danger text-sm flex items-start gap-2"
           >
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{sectionModalError}</span>
@@ -853,7 +853,7 @@ export const Sections: React.FC = () => {
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-3 border-t border-[#D6E4F7]">
+          <div className="flex justify-end gap-3 pt-3 border-t border-line">
             <Button
               type="button"
               variant="outline"
@@ -884,7 +884,7 @@ export const Sections: React.FC = () => {
         {syModalError && (
           <div
             role="alert"
-            className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
+            className="mb-4 p-3 rounded-lg bg-danger-soft border border-danger-line text-danger text-sm flex items-start gap-2"
           >
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{syModalError}</span>
@@ -944,11 +944,11 @@ export const Sections: React.FC = () => {
               disabled={savingSY}
             />
           </div>
-          <p className="text-xs text-[#51607A] -mt-2">
+          <p className="text-xs text-ink-muted -mt-2">
             Vale para todos los equipos de este curso lectivo.
           </p>
 
-          <div className="flex justify-end gap-3 pt-3 border-t border-[#D6E4F7]">
+          <div className="flex justify-end gap-3 pt-3 border-t border-line">
             <Button
               type="button"
               variant="outline"
@@ -978,7 +978,7 @@ export const Sections: React.FC = () => {
         maxWidth="lg"
       >
         {targetSYForAssign && (
-          <div className="mb-4 p-3 rounded-lg bg-[#EFF6FF] border border-[#BAE6FD] text-sm flex items-center justify-between text-[#0B2A66]">
+          <div className="mb-4 p-3 rounded-lg bg-tint border border-accent-light text-sm flex items-center justify-between text-navy">
             <div>
               <span className="font-semibold">Comisión: </span>
               <span>{targetSYForAssign.section_name}</span>
@@ -993,7 +993,7 @@ export const Sections: React.FC = () => {
         {assignModalError && (
           <div
             role="alert"
-            className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
+            className="mb-4 p-3 rounded-lg bg-danger-soft border border-danger-line text-danger text-sm flex items-start gap-2"
           >
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{assignModalError}</span>
@@ -1002,13 +1002,13 @@ export const Sections: React.FC = () => {
 
         <form onSubmit={handleSaveAssign} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[#0F1F3D] mb-2">
+            <label className="block text-sm font-medium text-ink mb-2">
               Docentes
             </label>
             {loadingAssigned ? (
-              <p className="text-sm text-[#51607A] py-4 text-center">Cargando docentes...</p>
+              <p className="text-sm text-ink-muted py-4 text-center">Cargando docentes...</p>
             ) : (
-              <div className="max-h-56 overflow-y-auto border border-[#D6E4F7] rounded-lg divide-y divide-[#D6E4F7] bg-white">
+              <div className="max-h-56 overflow-y-auto border border-line rounded-lg divide-y divide-line bg-white">
                 {allProfessors.map((prof) => {
                   const isAssigned = assignedProfIds.includes(prof.id_user);
                   const isSelected = selectedProfIds.includes(prof.id_user);
@@ -1017,28 +1017,28 @@ export const Sections: React.FC = () => {
                       key={prof.id_user}
                       onClick={() => toggleSelectProfessor(prof.id_user)}
                       className={`flex items-center justify-between px-3.5 py-2.5 text-sm cursor-pointer transition-colors ${
-                        isSelected ? 'bg-[#EFF6FF]' : 'hover:bg-[#F5F9FF]'
+                        isSelected ? 'bg-tint' : 'hover:bg-canvas'
                       }`}
                     >
                       <div>
-                        <span className="font-medium text-[#0F1F3D]">
+                        <span className="font-medium text-ink">
                           {prof.last_name}, {prof.first_name}
                         </span>
-                        <span className="text-xs text-[#51607A] ml-2">
+                        <span className="text-xs text-ink-muted ml-2">
                           Leg. {prof.legajo}
                         </span>
                         {isAssigned && !isSelected && (
-                          <span className="text-xs text-[#B91C1C] italic ml-2">Se quita</span>
+                          <span className="text-xs text-danger italic ml-2">Se quita</span>
                         )}
                         {!isAssigned && isSelected && (
-                          <span className="text-xs text-[#1D4ED8] italic ml-2">Nuevo</span>
+                          <span className="text-xs text-primary italic ml-2">Nuevo</span>
                         )}
                       </div>
                       <input
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => {}} // controlado por el div onClick
-                        className="rounded border-[#D6E4F7] text-[#1D4ED8] focus:ring-[#BAE6FD] pointer-events-none"
+                        className="rounded border-line text-primary focus:ring-accent-light pointer-events-none"
                       />
                     </div>
                   );
@@ -1048,7 +1048,7 @@ export const Sections: React.FC = () => {
           </div>
 
           {assignmentsToRemove.length > 0 && (
-            <p className="text-sm text-[#B91C1C]">
+            <p className="text-sm text-danger">
               Se quitará a:{' '}
               {assignmentsToRemove
                 .map((a) => `${a.professor_last_name}, ${a.professor_first_name}`)
@@ -1056,7 +1056,7 @@ export const Sections: React.FC = () => {
             </p>
           )}
 
-          <div className="flex justify-end gap-3 pt-3 border-t border-[#D6E4F7]">
+          <div className="flex justify-end gap-3 pt-3 border-t border-line">
             <Button
               type="button"
               variant="outline"
@@ -1088,7 +1088,7 @@ export const Sections: React.FC = () => {
         {deleteModalError && (
           <div
             role="alert"
-            className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
+            className="mb-4 p-3 rounded-lg bg-danger-soft border border-danger-line text-danger text-sm flex items-start gap-2"
           >
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{deleteModalError}</span>
@@ -1096,7 +1096,7 @@ export const Sections: React.FC = () => {
         )}
 
         {deleteTarget && (
-          <p className="text-sm text-[#0F1F3D]">
+          <p className="text-sm text-ink">
             {deleteTarget.kind === 'section' ? (
               <>
                 ¿Eliminar la comisión <span className="font-semibold">{deleteTarget.item.name}</span>?
@@ -1114,7 +1114,7 @@ export const Sections: React.FC = () => {
           </p>
         )}
 
-        <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-[#D6E4F7]">
+        <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-line">
           <Button
             type="button"
             variant="outline"

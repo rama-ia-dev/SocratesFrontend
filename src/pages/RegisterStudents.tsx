@@ -216,11 +216,11 @@ export const RegisterStudents: React.FC = () => {
       {/* Pestaña: Registro Manual                                  */}
       {/* ========================================================= */}
       {activeTab === 'manual' && (
-        <div className="max-w-2xl bg-white border border-[#D6E4F7] rounded-xl shadow-xs p-8">
+        <div className="max-w-2xl bg-white border border-line rounded-xl shadow-xs p-8">
           {manualError && (
             <div
               role="alert"
-              className="mb-6 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2.5"
+              className="mb-6 p-3 rounded-lg bg-danger-soft border border-danger-line text-danger text-sm flex items-start gap-2.5"
             >
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{manualError}</span>
@@ -237,9 +237,9 @@ export const RegisterStudents: React.FC = () => {
                 onChange={(e) => legajo.setValue(digitsOnly(e.target.value))}
                 disabled={isSubmittingManual}
               />
-              <div className="mt-2 text-xs text-[#51607A] flex items-center gap-1.5">
-                <span className="font-medium text-[#0F1F3D]">Correo de ingreso:</span>
-                <span className="font-mono bg-[#F1F5F9] px-2 py-0.5 rounded border border-[#D6E4F7]">
+              <div className="mt-2 text-xs text-ink-muted flex items-center gap-1.5">
+                <span className="font-medium text-ink">Correo de ingreso:</span>
+                <span className="font-mono bg-fill-neutral px-2 py-0.5 rounded border border-line">
                   {calculatedEmail}
                 </span>
               </div>
@@ -281,7 +281,7 @@ export const RegisterStudents: React.FC = () => {
               />
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-[#D6E4F7]">
+            <div className="flex justify-end gap-3 pt-4 border-t border-line">
               <Button
                 type="button"
                 variant="outline"
@@ -317,19 +317,19 @@ export const RegisterStudents: React.FC = () => {
             onDrop={handleDrop}
             className={`relative rounded-xl p-8 text-center transition-all ${
               uploadState === 'error'
-                ? 'border-2 border-[#B91C1C] bg-[#FEE2E2]/20'
+                ? 'border-2 border-danger bg-danger-soft/20'
                 : isDragging
-                ? 'border-2 border-[#1D4ED8] bg-[#EFF6FF]'
-                : 'border-2 border-dashed border-[#7DD3FC] bg-[#F0F9FF]'
+                ? 'border-2 border-primary bg-tint'
+                : 'border-2 border-dashed border-accent bg-tint-soft'
             }`}
           >
             {uploadState === 'loading' ? (
               <div className="py-6 max-w-xs mx-auto space-y-3">
-                <p className="text-sm font-medium text-[#0F1F3D]">
+                <p className="text-sm font-medium text-ink">
                   Leyendo archivo Excel...
                 </p>
-                <div className="w-full bg-[#BAE6FD] h-2 rounded-full overflow-hidden">
-                  <div className="bg-[#1D4ED8] h-full w-2/3 animate-pulse" />
+                <div className="w-full bg-accent-light h-2 rounded-full overflow-hidden">
+                  <div className="bg-primary h-full w-2/3 animate-pulse" />
                 </div>
                 <Button
                   variant="outline"
@@ -340,16 +340,16 @@ export const RegisterStudents: React.FC = () => {
                 </Button>
               </div>
             ) : uploadState === 'loaded' && excelFile ? (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-lg border border-[#D6E4F7]">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-lg border border-line">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-lg bg-[#DCFCE7] text-[#15803D]">
+                  <div className="p-2.5 rounded-lg bg-success-soft text-success">
                     <FileSpreadsheet className="w-6 h-6" />
                   </div>
                   <div className="text-left">
-                    <p className="text-sm font-semibold text-[#0F1F3D]">
+                    <p className="text-sm font-semibold text-ink">
                       {excelFile.name}
                     </p>
-                    <p className="text-xs text-[#51607A]">
+                    <p className="text-xs text-ink-muted">
                       {(excelFile.size / 1024).toFixed(1)} KB
                     </p>
                   </div>
@@ -357,7 +357,7 @@ export const RegisterStudents: React.FC = () => {
 
                 <div className="flex items-center gap-2">
                   <label className="cursor-pointer">
-                    <span className="text-xs font-medium text-[#1D4ED8] hover:underline px-2 py-1">
+                    <span className="text-xs font-medium text-primary hover:underline px-2 py-1">
                       Reemplazar
                     </span>
                     <input
@@ -371,7 +371,7 @@ export const RegisterStudents: React.FC = () => {
                     variant="ghost"
                     size="sm"
                     onClick={handleRemoveFile}
-                    className="text-[#B91C1C] hover:bg-[#FEE2E2]"
+                    className="text-danger hover:bg-danger-soft"
                   >
                     <X className="w-4 h-4 mr-1" />
                     Eliminar
@@ -380,14 +380,14 @@ export const RegisterStudents: React.FC = () => {
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center space-y-3 py-4">
-                <div className="w-12 h-12 rounded-full bg-white shadow-xs border border-[#BAE6FD] flex items-center justify-center text-[#1D4ED8]">
+                <div className="w-12 h-12 rounded-full bg-white shadow-xs border border-accent-light flex items-center justify-center text-primary">
                   <UploadCloud className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-[#0F1F3D]">
+                  <p className="text-sm font-medium text-ink">
                     Arrastre el archivo aquí o haga clic para seleccionarlo
                   </p>
-                  <p className="text-xs text-[#51607A] mt-0.5">
+                  <p className="text-xs text-ink-muted mt-0.5">
                     Archivo Excel (.xlsx)
                   </p>
                 </div>
@@ -418,7 +418,7 @@ export const RegisterStudents: React.FC = () => {
           {excelErrorMsg && (
             <div
               role="alert"
-              className="p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2.5"
+              className="p-3 rounded-lg bg-danger-soft border border-danger-line text-danger text-sm flex items-start gap-2.5"
             >
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{excelErrorMsg}</span>
@@ -429,7 +429,7 @@ export const RegisterStudents: React.FC = () => {
           {uploadState === 'loaded' && previewRows.length > 0 && (
             <div className="space-y-4">
               {/* Alerta obligatoria de advertencia fija */}
-              <div className="p-3.5 rounded-lg bg-[#FEF3C7] border border-[#FDE68A] text-[#B45309] text-sm flex items-start gap-2.5">
+              <div className="p-3.5 rounded-lg bg-warning-soft border border-warning-line text-warning text-sm flex items-start gap-2.5">
                 <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <span className="font-semibold">
@@ -441,7 +441,7 @@ export const RegisterStudents: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleFixSampleData}
-                    className="shrink-0 text-xs font-semibold underline text-[#1D4ED8] hover:text-[#1E40AF] cursor-pointer ml-2"
+                    className="shrink-0 text-xs font-semibold underline text-primary hover:text-primary-hover cursor-pointer ml-2"
                     title="Simular corrección automática de los errores"
                   >
                     Corregir datos de muestra
@@ -451,18 +451,18 @@ export const RegisterStudents: React.FC = () => {
 
               {/* Resumen */}
               <div className="flex items-center justify-between text-sm font-medium px-1">
-                <span className="text-[#0F1F3D]">
+                <span className="text-ink">
                   {validCount} filas válidas · {errorCount} con error
                 </span>
-                <span className="text-xs text-[#51607A]">
+                <span className="text-xs text-ink-muted">
                   Total: {previewRows.length} registros
                 </span>
               </div>
 
               {/* Tabla de previsualización */}
-              <div className="overflow-x-auto rounded-xl border border-[#D6E4F7] bg-white">
-                <table className="w-full text-left text-sm text-[#0F1F3D]">
-                  <thead className="bg-[#EFF6FF] border-b border-[#D6E4F7] text-[12px] font-semibold text-[#51607A] uppercase tracking-wider">
+              <div className="overflow-x-auto rounded-xl border border-line bg-white">
+                <table className="w-full text-left text-sm text-ink">
+                  <thead className="bg-tint border-b border-line text-[12px] font-semibold text-ink-muted uppercase tracking-wider">
                     <tr>
                       <th className="px-4 py-3 w-16">Fila</th>
                       <th className="px-4 py-3">Legajo</th>
@@ -472,37 +472,37 @@ export const RegisterStudents: React.FC = () => {
                       <th className="px-4 py-3">Estado</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#D6E4F7]">
+                  <tbody className="divide-y divide-line">
                     {previewRows.map((row) => (
                       <tr
                         key={row.row}
                         className={
                           row.status === 'error'
-                            ? 'bg-[#FEE2E2]/30'
-                            : 'hover:bg-[#E0F2FE]/30'
+                            ? 'bg-danger-soft/30'
+                            : 'hover:bg-tint-strong/30'
                         }
                       >
-                        <td className="px-4 py-3 font-mono text-xs text-[#51607A]">
+                        <td className="px-4 py-3 font-mono text-xs text-ink-muted">
                           {row.row}
                         </td>
                         <td className="px-4 py-3 font-mono">{row.legajo}</td>
                         <td className="px-4 py-3 font-medium">
                           {row.last_name}, {row.first_name}
                         </td>
-                        <td className="px-4 py-3 text-[#51607A]">
+                        <td className="px-4 py-3 text-ink-muted">
                           {row.birth_date}
                         </td>
-                        <td className="px-4 py-3 text-[#51607A]">
+                        <td className="px-4 py-3 text-ink-muted">
                           {row.enrollment_year}
                         </td>
                         <td className="px-4 py-3">
                           {row.status === 'valid' ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#15803D]">
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-success">
                               <CheckCircle2 className="w-3.5 h-3.5" />
                               Válido
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#B91C1C]">
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-danger">
                               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                               Error: {row.errorMessage}
                             </span>
@@ -515,7 +515,7 @@ export const RegisterStudents: React.FC = () => {
               </div>
 
               {/* Botones de acción */}
-              <div className="flex justify-end gap-3 pt-4 border-t border-[#D6E4F7]">
+              <div className="flex justify-end gap-3 pt-4 border-t border-line">
                 <Button
                   type="button"
                   variant="outline"

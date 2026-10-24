@@ -236,9 +236,9 @@ export const ChairOverview: React.FC = () => {
 
   // Color de la barra de grupos aprobados: rojo hasta 33 %, amarillo hasta 66 % y verde desde 67 %
   const progressColor = (progress: number): string => {
-    if (progress < 34) return 'bg-[#DC2626]';
-    if (progress < 67) return 'bg-[#F59E0B]';
-    return 'bg-[#16A34A]';
+    if (progress < 34) return 'bg-danger-vivid';
+    if (progress < 67) return 'bg-warning-vivid';
+    return 'bg-success-vivid';
   };
 
   // Estados de la etapa "En desarrollo" que tienen al menos un grupo
@@ -306,12 +306,12 @@ export const ChairOverview: React.FC = () => {
             ].map((card) => (
               <div
                 key={card.label}
-                className="p-4 rounded-lg bg-white border border-[#D6E4F7]"
+                className="p-4 rounded-lg bg-white border border-line"
               >
-                <p className="text-xs font-medium text-[#51607A]">{card.label}</p>
+                <p className="text-xs font-medium text-ink-muted">{card.label}</p>
                 <p
                   className={`mt-1 font-mono text-2xl font-semibold ${
-                    card.alert ? 'text-[#B91C1C]' : 'text-[#0B2A66]'
+                    card.alert ? 'text-danger' : 'text-navy'
                   }`}
                 >
                   {card.value}
@@ -350,17 +350,17 @@ export const ChairOverview: React.FC = () => {
                   const students = studentCounts[row.id_section_year];
                   return (
                     <TableRow key={row.id_section_year}>
-                      <TableCell className="font-semibold text-[#0B2A66]">
+                      <TableCell className="font-semibold text-navy">
                         {row.section_name}
                       </TableCell>
                       <TableCell className="font-mono text-sm">{row.year}</TableCell>
                       <TableCell>
                         {progress === null ? (
-                          <span className="text-xs text-[#94A3B8]">Sin grupos</span>
+                          <span className="text-xs text-ink-faint">Sin grupos</span>
                         ) : (
                           <div className="flex items-center gap-2 min-w-28">
                             <div
-                              className="h-2 flex-1 rounded-full bg-[#E2E8F0] overflow-hidden"
+                              className="h-2 flex-1 rounded-full bg-line-neutral overflow-hidden"
                               role="progressbar"
                               aria-valuenow={progress}
                               aria-valuemin={0}
@@ -372,7 +372,7 @@ export const ChairOverview: React.FC = () => {
                                 style={{ width: `${progress}%` }}
                               />
                             </div>
-                            <span className="font-mono text-xs text-[#51607A] w-9 text-right">
+                            <span className="font-mono text-xs text-ink-muted w-9 text-right">
                               {progress}%
                             </span>
                           </div>
@@ -384,13 +384,13 @@ export const ChairOverview: React.FC = () => {
                             row.professors.map((p) => (
                               <span
                                 key={p.id_professor}
-                                className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-[#EFF6FF] text-[#1D4ED8] border border-[#BAE6FD] whitespace-nowrap"
+                                className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-tint text-primary border border-accent-light whitespace-nowrap"
                               >
                                 {p.first_name} {p.last_name}
                               </span>
                             ))
                           ) : (
-                            <span className="text-xs font-medium text-[#B91C1C]">
+                            <span className="text-xs font-medium text-danger">
                               Sin docentes
                             </span>
                           )}
@@ -403,7 +403,7 @@ export const ChairOverview: React.FC = () => {
                         <TableCell
                           key={stage}
                           className={`text-center font-mono text-sm ${
-                            row.stages[stage] === 0 ? 'text-[#94A3B8]' : ''
+                            row.stages[stage] === 0 ? 'text-ink-faint' : ''
                           }`}
                         >
                           {stage === 'developing' && row.stages.developing > 0 ? (
@@ -418,9 +418,9 @@ export const ChairOverview: React.FC = () => {
                               ))}
                               {/* Con más de un estado, se suma el total de la etapa */}
                               {developingStatusesOf(row).length > 1 && (
-                                <span className="mt-0.5 pt-0.5 border-t border-[#D6E4F7] text-[#51607A]">
+                                <span className="mt-0.5 pt-0.5 border-t border-line text-ink-muted">
                                   Total:{' '}
-                                  <span className="font-mono font-semibold text-[#0F1F3D]">
+                                  <span className="font-mono font-semibold text-ink">
                                     {row.stages.developing}
                                   </span>
                                 </span>

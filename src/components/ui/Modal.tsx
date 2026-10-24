@@ -43,24 +43,24 @@ export const Modal: React.FC<ModalProps> = ({
     >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-[#0B2A66]/30 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-navy/30 backdrop-blur-xs transition-opacity"
         onClick={onClose}
       />
 
       {/* Modal Dialog Box */}
       <div
-        className={`relative w-full ${maxWidthClass} rounded-xl bg-white border border-[#D6E4F7] shadow-xl overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150`}
+        className={`relative w-full ${maxWidthClass} rounded-xl bg-white border border-line shadow-xl overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150`}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#D6E4F7] bg-[#F5F9FF]/50">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-line bg-canvas/50">
           <div>
-            <h3 className="font-serif font-semibold text-lg text-[#0B2A66]">
+            <h3 className="font-serif font-semibold text-lg text-navy">
               {title}
             </h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1 text-[#51607A] hover:text-[#0F1F3D] hover:bg-[#E0F2FE] transition-colors cursor-pointer"
+            className="rounded-lg p-1 text-ink-muted hover:text-ink hover:bg-tint-strong transition-colors cursor-pointer"
             aria-label="Cerrar ventana"
           >
             <X className="w-5 h-5" />

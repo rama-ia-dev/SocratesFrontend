@@ -5,8 +5,8 @@ export const Table: React.FC<{ children: React.ReactNode; className?: string }> 
   className = '',
 }) => {
   return (
-    <div className="w-full overflow-x-auto rounded-xl border border-[#D6E4F7] bg-white shadow-2xs">
-      <table className={`w-full text-left border-collapse text-sm text-[#0F1F3D] ${className}`}>
+    <div className="w-full overflow-x-auto rounded-xl border border-line bg-white shadow-2xs">
+      <table className={`w-full text-left border-collapse text-sm text-ink ${className}`}>
         {children}
       </table>
     </div>
@@ -15,7 +15,7 @@ export const Table: React.FC<{ children: React.ReactNode; className?: string }> 
 
 export const TableHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
-    <thead className="bg-[#EFF6FF] border-b border-[#D6E4F7] text-[12px] font-semibold text-[#51607A] uppercase tracking-wider select-none">
+    <thead className="bg-tint border-b border-line text-[12px] font-semibold text-ink-muted uppercase tracking-wider select-none">
       {children}
     </thead>
   );
@@ -29,7 +29,7 @@ export const TableRow: React.FC<{
   return (
     <tr
       onClick={onClick}
-      className={`h-14 border-b border-[#D6E4F7] last:border-b-0 hover:bg-[#E0F2FE]/40 transition-colors ${
+      className={`h-14 border-b border-line last:border-b-0 hover:bg-tint-strong/40 transition-colors ${
         onClick ? 'cursor-pointer' : ''
       } ${className}`}
     >
@@ -72,7 +72,7 @@ export const InitialsAvatar: React.FC<{
 
   return (
     <div
-      className={`rounded-full bg-[#E0F2FE] text-[#1D4ED8] font-semibold flex items-center justify-center shrink-0 border border-[#BAE6FD] ${sizeClass} ${className}`}
+      className={`rounded-full bg-tint-strong text-primary font-semibold flex items-center justify-center shrink-0 border border-accent-light ${sizeClass} ${className}`}
     >
       {initials}
     </div>

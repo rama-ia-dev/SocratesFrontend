@@ -1,27 +1,58 @@
 @import "tailwindcss";
 
+/* Colores de Sócrates. Las pantallas usan estos tokens (bg-primary, text-ink-muted…), nunca
+   un hex suelto: cambiar el diseño es cambiar estos valores. */
 @theme {
   --font-sans: 'Inter', sans-serif;
   --font-serif: 'Source Serif 4', Georgia, serif;
 
-  --color-app-bg: #F5F9FF;
-  --color-card-bg: #FFFFFF;
-  --color-primary-blue: #1D4ED8;
+  /* Fondo de la app y texto */
+  --color-canvas: #F5F9FF;
+  --color-ink: #0F1F3D;
+  --color-ink-muted: #51607A;
+  --color-ink-subtle: #8A9AB5;
+  --color-ink-faint: #94A3B8;
+
+  /* Bordes y rellenos neutros */
+  --color-line: #D6E4F7;
+  --color-line-neutral: #E2E8F0;
+  --color-line-neutral-strong: #CBD5E1;
+  --color-fill-neutral: #F1F5F9;
+  --color-fill-neutral-soft: #F8FAFC;
+
+  /* Azules de la marca */
+  --color-primary: #1D4ED8;
   --color-primary-hover: #1E40AF;
-  --color-navy-title: #0B2A66;
-  --color-sky-hover: #E0F2FE;
-  --color-sky-focus: #BAE6FD;
-  --color-sky-accent: #7DD3FC;
-  --color-sky-header: #EFF6FF;
-  --color-border-blue: #D6E4F7;
-  --color-text-main: #0F1F3D;
-  --color-text-muted: #51607A;
+  --color-navy: #0B2A66;
+  --color-navy-deep: #061A3D;
+  --color-tint: #EFF6FF;
+  --color-tint-soft: #F0F9FF;
+  --color-tint-strong: #E0F2FE;
+  --color-accent-light: #BAE6FD;
+  --color-accent: #7DD3FC;
+  --color-accent-strong: #38BDF8;
+
+  /* Estados */
+  --color-danger: #B91C1C;
+  --color-danger-hover: #991B1B;
+  --color-danger-vivid: #DC2626;
+  --color-danger-light: #F87171;
+  --color-danger-line: #FCA5A5;
+  --color-danger-soft: #FEE2E2;
+  --color-warning: #B45309;
+  --color-warning-vivid: #F59E0B;
+  --color-warning-line: #FDE68A;
+  --color-warning-soft: #FEF3C7;
+  --color-success: #15803D;
+  --color-success-vivid: #16A34A;
+  --color-success-line: #86EFAC;
+  --color-success-soft: #DCFCE7;
 }
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  color: #0F1F3D;
-  background-color: #F5F9FF;
+  color: var(--color-ink);
+  background-color: var(--color-canvas);
 }
 
 .font-serif {
@@ -31,8 +62,8 @@ body {
 .fluted-column-pattern {
   background-image: repeating-linear-gradient(
     to right,
-    #BAE6FD 0px,
-    #BAE6FD 1px,
+    var(--color-accent-light) 0px,
+    var(--color-accent-light) 1px,
     transparent 1px,
     transparent 12px
   );
@@ -41,5 +72,5 @@ body {
 .title-line {
   height: 2px;
   width: 48px;
-  background-color: #7DD3FC;
+  background-color: var(--color-accent);
 }

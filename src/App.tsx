@@ -26,8 +26,8 @@ const ProtectedRoute: React.FC<{
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F9FF]">
-        <div className="w-8 h-8 rounded-full border-2 border-[#1D4ED8] border-t-transparent animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-canvas">
+        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
       </div>
     );
   }
@@ -61,8 +61,8 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F9FF]">
-        <div className="w-8 h-8 rounded-full border-2 border-[#1D4ED8] border-t-transparent animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-canvas">
+        <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
       </div>
     );
   }
