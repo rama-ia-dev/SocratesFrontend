@@ -12,6 +12,7 @@ import {
   LogOut,
   Menu,
   X,
+  ChevronsUpDown,
   ChevronDown,
   Shield,
   BarChart3,
@@ -23,6 +24,10 @@ interface NavItem {
   icon: React.ElementType;
 }
 
+// Fondo del menú lateral y de la barra del celular: la identidad UTN
+const NAV_BG = 'nav-utn';
+const BAR_BG = 'nav-utn-bar';
+
 export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout, switchMockRole } = useAuth();
   const navigate = useNavigate();
@@ -30,14 +35,15 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement>(null);
+  const desktopUserRef = useRef<HTMLDivElement>(null);
+  const mobileUserRef = useRef<HTMLDivElement>(null);
 
-  // Cerrar menú usuario al hacer clic fuera
+  // Cerrar el menú de usuario al hacer clic fuera
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
-        setIsUserMenuOpen(false);
-      }
+      const target = e.target as Node;
+      const inside = [desktopUserRef, mobileUserRef].some((r) => r.current?.contains(target));
+      if (!inside) setIsUserMenuOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -89,7 +95,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   // La misma lista de secciones en el menú lateral y en el menú del celular
   const navList = (
-    <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
+    <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
       {navItems.map((item) => {
         const Icon = item.icon;
         return (
@@ -99,8 +105,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 ${
                 isActive
-                  ? 'bg-white/12 text-white font-semibold'
-                  : 'text-accent-light/85 hover:bg-white/6 hover:text-white font-medium'
+                  ? 'bg-white text-navy font-semibold'
+                  : 'text-accent-light/85 hover:bg-white/8 hover:text-white font-medium'
               }`
             }
           >
@@ -112,12 +118,45 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     </nav>
   );
 
+  // Opciones del usuario: se abren hacia arriba desde el pie del menú lateral y hacia abajo en celular
+  const userMenu = (placement: string, withName = false) => (
+    <div
+      role="menu"
+      className={`absolute ${placement} w-60 bg-white border border-line rounded-xl shadow-[0_8px_24px_-8px_rgba(15,31,61,0.25)] p-1.5 z-50`}
+    >
+      {withName && (
+        <div className="px-3 py-2 border-b border-line mb-1">
+          <div className="text-sm font-medium text-ink truncate">{fullName}</div>
+          <div className="text-xs text-ink-muted">{roleLabel}</div>
+        </div>
+      )}
+      <button
+        type="button"
+        role="menuitem"
+        onClick={() => navigate('/perfil')}
+        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink hover:bg-fill-neutral rounded-lg transition-colors cursor-pointer text-left"
+      >
+        <User className="w-4 h-4 text-ink-muted" />
+        <span>Mi perfil</span>
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        onClick={handleLogout}
+        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-danger hover:bg-danger-soft rounded-lg transition-colors cursor-pointer text-left"
+      >
+        <LogOut className="w-4 h-4" />
+        <span>Cerrar sesión</span>
+      </button>
+    </div>
+  );
+
   return (
     <div className="min-h-screen flex bg-canvas text-ink">
       {/* ========================================================= */}
-      {/* Menú lateral de escritorio: la identidad UTN (navy)       */}
+      {/* Menú lateral de escritorio: secciones y, al pie, el usuario */}
       {/* ========================================================= */}
-      <aside className="hidden md:flex flex-col w-60 bg-navy fixed inset-y-0 left-0 z-30 select-none">
+      <aside className={`hidden md:flex flex-col w-60 ${NAV_BG} fixed inset-y-0 left-0 z-30 select-none`}>
         <div className="h-16 px-5 flex items-center">
           <NavLink to="/" className="flex items-center gap-3 rounded-lg">
             <SocratesLogo size="sm" showText={true} invertText={true} />
@@ -155,77 +194,59 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             </div>
           </div>
         )}
+
+        <div className="p-3 border-t border-white/10 relative" ref={desktopUserRef}>
+          <button
+            type="button"
+            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+            className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-white/8 transition-colors cursor-pointer text-left"
+            aria-expanded={isUserMenuOpen}
+            aria-haspopup="menu"
+            aria-label="Menú de usuario"
+          >
+            <InitialsAvatar name={fullName} size="md" colors="bg-white text-navy border-white" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-white truncate">{fullName}</div>
+              <div className="text-xs text-accent-light/85 truncate">{roleLabel}</div>
+            </div>
+            <ChevronsUpDown className="w-4 h-4 text-accent-light/85 shrink-0" />
+          </button>
+          {isUserMenuOpen && userMenu('bottom-full left-3 mb-2')}
+        </div>
       </aside>
 
       {/* ========================================================= */}
       {/* Contenedor principal                                      */}
       {/* ========================================================= */}
       <div className="flex-1 min-w-0 md:pl-60 flex flex-col min-h-screen">
-        {/* Barra superior clara: menú del celular y el usuario, que aparece solo acá */}
-        <header className="h-16 bg-white/90 backdrop-blur-sm border-b border-line px-4 sm:px-8 flex items-center justify-between sticky top-0 z-20">
-          <div className="flex items-center gap-2">
+        {/* Barra del celular: en escritorio no hace falta, el menú lateral tiene todo */}
+        <header className={`md:hidden h-14 ${BAR_BG} px-3 flex items-center justify-between sticky top-0 z-20`}>
+          <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen(true)}
-              className="md:hidden p-2 -ml-2 rounded-lg text-ink-muted hover:bg-fill-neutral hover:text-ink transition-colors cursor-pointer"
+              className="p-2 rounded-lg text-accent-light hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
               aria-label="Abrir menú de navegación"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="md:hidden">
-              <SocratesLogo size="sm" showText={true} />
-            </div>
+            <SocratesLogo size="sm" showText={true} invertText={true} />
           </div>
 
-          <div className="relative" ref={userMenuRef}>
+          <div className="relative" ref={mobileUserRef}>
             <button
               type="button"
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-              className="flex items-center gap-3 py-1.5 pl-2 pr-2 sm:pl-3 rounded-lg hover:bg-fill-neutral transition-colors cursor-pointer text-left"
+              className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
               aria-expanded={isUserMenuOpen}
               aria-haspopup="menu"
               aria-label="Menú de usuario"
             >
-              <span className="hidden sm:flex flex-col items-end leading-tight max-w-56">
-                <span className="text-sm font-medium text-ink truncate max-w-full">{fullName}</span>
-                <span className="text-xs text-ink-muted">{roleLabel}</span>
-              </span>
-              <InitialsAvatar name={fullName} size="md" colors="bg-navy text-white border-navy" />
-              <ChevronDown
-                className={`w-4 h-4 text-ink-muted transition-transform duration-150 ${isUserMenuOpen ? 'rotate-180' : ''}`}
-              />
+              <InitialsAvatar name={fullName} size="sm" colors="bg-white text-navy border-white" />
+              <ChevronDown className="w-4 h-4 text-accent-light" />
             </button>
-
-            {isUserMenuOpen && (
-              <div
-                role="menu"
-                className="absolute right-0 top-full mt-2 w-60 bg-white border border-line rounded-xl shadow-[0_8px_24px_-8px_rgba(15,31,61,0.18)] p-1.5 z-50"
-              >
-                {/* En celular el nombre no entra en la barra: se muestra acá */}
-                <div className="sm:hidden px-3 py-2 border-b border-line mb-1">
-                  <div className="text-sm font-medium text-ink truncate">{fullName}</div>
-                  <div className="text-xs text-ink-muted">{roleLabel}</div>
-                </div>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => navigate('/perfil')}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink hover:bg-fill-neutral rounded-lg transition-colors cursor-pointer text-left"
-                >
-                  <User className="w-4 h-4 text-ink-muted" />
-                  <span>Mi perfil</span>
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-danger hover:bg-danger-soft rounded-lg transition-colors cursor-pointer text-left"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span>Cerrar sesión</span>
-                </button>
-              </div>
-            )}
+            {/* En celular el nombre no entra en la barra: va al principio del menú */}
+            {isUserMenuOpen && userMenu('right-0 top-full mt-2', true)}
           </div>
         </header>
 
@@ -244,8 +265,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             className="fixed inset-0 bg-navy-deep/40"
             onClick={() => setIsMobileMenuOpen(false)}
           />
-          <div className="relative flex flex-col w-72 max-w-[85vw] bg-navy shadow-2xl z-10">
-            <div className="h-16 px-5 flex items-center justify-between">
+          <div className={`relative flex flex-col w-72 max-w-[85vw] ${NAV_BG} shadow-2xl z-10`}>
+            <div className="h-14 px-4 flex items-center justify-between">
               <SocratesLogo size="sm" showText={true} invertText={true} />
               <button
                 type="button"
@@ -257,6 +278,13 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               </button>
             </div>
             {navList}
+            <div className="p-4 border-t border-white/10 flex items-center gap-3">
+              <InitialsAvatar name={fullName} size="md" colors="bg-white text-navy border-white" />
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-white truncate">{fullName}</div>
+                <div className="text-xs text-accent-light/85 truncate">{roleLabel}</div>
+              </div>
+            </div>
           </div>
         </div>
       )}
