@@ -60,8 +60,10 @@ export const TableCell: React.FC<{
 export const InitialsAvatar: React.FC<{
   name: string;
   size?: 'sm' | 'md';
+  // Reemplaza los colores por defecto; si se pasaran en className competirían con ellos.
+  colors?: string;
   className?: string;
-}> = ({ name, size = 'md', className = '' }) => {
+}> = ({ name, size = 'md', colors = 'bg-tint-strong text-primary border-accent-light', className = '' }) => {
   const parts = name.trim().split(/\s+/);
   const initials =
     parts.length > 1
@@ -72,7 +74,7 @@ export const InitialsAvatar: React.FC<{
 
   return (
     <div
-      className={`rounded-full bg-tint-strong text-primary font-semibold flex items-center justify-center shrink-0 border border-accent-light ${sizeClass} ${className}`}
+      className={`rounded-full font-semibold flex items-center justify-center shrink-0 border ${colors} ${sizeClass} ${className}`}
     >
       {initials}
     </div>

@@ -184,7 +184,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             <InitialsAvatar
               name={fullName}
               size="md"
-              className="bg-white text-navy border-white font-bold ring-2 ring-white/50 shrink-0"
+              colors="bg-white text-primary border-white"
+              className="font-bold ring-2 ring-white/50 shrink-0"
             />
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold text-white truncate">
@@ -262,7 +263,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               <InitialsAvatar
                 name={fullName}
                 size="sm"
-                className="bg-white text-navy-deep border-white font-bold ring-2 ring-white/50 group-hover:ring-white transition-all shadow-xs"
+                colors="bg-white text-navy-deep border-white"
+                className="font-bold ring-2 ring-white/50 group-hover:ring-white transition-all shadow-xs"
               />
             </button>
           </div>
@@ -323,7 +325,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                 <InitialsAvatar
                   name={fullName}
                   size="md"
-                  className="bg-white text-navy border-white font-bold ring-2 ring-white/50"
+                  colors="bg-white text-primary border-white"
+                  className="font-bold ring-2 ring-white/50"
                 />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold text-white truncate">

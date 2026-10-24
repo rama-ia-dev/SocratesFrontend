@@ -368,10 +368,9 @@ export const RegisterStudents: React.FC = () => {
                     />
                   </label>
                   <Button
-                    variant="ghost"
+                    variant="ghostDanger"
                     size="sm"
                     onClick={handleRemoveFile}
-                    className="text-danger hover:bg-danger-soft"
                   >
                     <X className="w-4 h-4 mr-1" />
                     Eliminar
