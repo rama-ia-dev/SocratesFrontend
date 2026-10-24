@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Input } from '../components/ui/Input';
+import { DateField } from '../components/ui/DateField';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { InitialsAvatar } from '../components/ui/Table';
@@ -194,10 +195,9 @@ export const Profile: React.FC = () => {
           </div>
 
           <div>
-            <Input
+            <DateField
               label="Fecha de nacimiento"
               optional
-              type="date"
               min={minBirthDate()}
               max={maxBirthDate()}
               {...birthDate.inputProps}

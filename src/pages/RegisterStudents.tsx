@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { StudentCreate } from '../types/api';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Input } from '../components/ui/Input';
+import { DateField } from '../components/ui/DateField';
 import { Button } from '../components/ui/Button';
 import { useToast } from '../components/ui/Toast';
 import {
@@ -256,9 +257,8 @@ export const RegisterStudents: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
+              <DateField
                 label="Fecha de nacimiento"
-                type="date"
                 min={minBirthDate()}
                 max={maxBirthDate()}
                 {...birthDate.inputProps}

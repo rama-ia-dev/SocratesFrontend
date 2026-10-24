@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { DateField } from '../components/ui/DateField';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
@@ -465,9 +466,8 @@ export const Users: React.FC = () => {
           </div>
 
           <div>
-            <Input
+            <DateField
               label="Fecha de nacimiento"
-              type="date"
               min={minBirthDate()}
               max={maxBirthDate()}
               {...profCreateBirthDate.inputProps}
@@ -562,9 +562,8 @@ export const Users: React.FC = () => {
           </div>
 
           <div>
-            <Input
+            <DateField
               label="Fecha de nacimiento"
-              type="date"
               min={minBirthDate()}
               max={maxBirthDate()}
               {...profEditBirthDate.inputProps}

@@ -3,6 +3,7 @@ import { AlertCircle } from 'lucide-react';
 import { api } from '../lib/api';
 import { Modal } from './ui/Modal';
 import { Input } from './ui/Input';
+import { DateField } from './ui/DateField';
 import { Button } from './ui/Button';
 import { useToast } from './ui/Toast';
 import {
@@ -138,9 +139,8 @@ export const EditStudentModal: React.FC<{
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {birthDateKnown && (
-            <Input
+            <DateField
               label="Fecha de nacimiento"
-              type="date"
               min={minBirthDate()}
               max={maxBirthDate()}
               {...birthDate.inputProps}
