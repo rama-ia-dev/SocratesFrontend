@@ -21,25 +21,26 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const baseStyles =
-      'inline-flex items-center justify-center font-medium transition-colors select-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-light focus-visible:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none cursor-pointer';
+      'inline-flex items-center justify-center font-medium whitespace-nowrap transition-colors duration-150 select-none rounded-lg disabled:opacity-50 disabled:pointer-events-none cursor-pointer';
 
     const sizeStyles = {
-      sm: 'text-xs px-3 py-1.5 h-8 gap-1.5',
-      md: 'text-sm px-4 py-2 h-10 gap-2',
-      lg: 'text-base px-6 py-2.5 h-12 gap-2.5',
+      sm: 'text-[13px] px-3 h-8 gap-1.5',
+      md: 'text-sm px-4 h-10 gap-2',
+      lg: 'text-[15px] px-5 h-11 gap-2',
     }[size];
 
+    // El relleno lleno se reserva para la acción principal y para borrar; el resto va con borde
     const variantStyles = {
       primary:
-        'bg-primary hover:bg-primary-hover text-white shadow-xs active:bg-primary-hover',
+        'bg-primary hover:bg-primary-hover active:bg-primary-hover text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_1px_2px_rgba(15,31,61,0.12)]',
       secondary:
-        'bg-tint hover:bg-tint-strong text-primary border border-line',
+        'bg-tint hover:bg-tint-strong text-primary border border-tint-strong',
       outline:
-        'bg-white hover:bg-canvas text-ink border border-line shadow-2xs',
+        'bg-white hover:bg-canvas active:bg-fill-neutral text-ink border border-line hover:border-line-neutral-strong shadow-[0_1px_2px_rgba(15,31,61,0.04)]',
       destructive:
-        'bg-danger hover:bg-danger-hover text-white shadow-xs',
+        'bg-danger hover:bg-danger-hover text-white shadow-[0_1px_2px_rgba(15,31,61,0.12)]',
       ghost:
-        'bg-transparent hover:bg-tint text-ink-muted hover:text-ink',
+        'bg-transparent hover:bg-fill-neutral text-ink-muted hover:text-ink',
       ghostDanger:
         'bg-transparent hover:bg-danger-soft text-danger hover:text-ink',
     }[variant];

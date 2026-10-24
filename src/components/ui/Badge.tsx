@@ -2,7 +2,7 @@ import React from 'react';
 
 export interface BadgeProps {
   children: React.ReactNode;
-  variant?: 'superadmin' | 'professor' | 'student' | 'public' | 'protected' | 'private' | 'neutral';
+  variant?: 'superadmin' | 'professor' | 'student' | 'leader' | 'public' | 'protected' | 'private' | 'neutral';
   className?: string;
 }
 
@@ -16,6 +16,7 @@ export const Badge: React.FC<BadgeProps> = ({
     superadmin: 'bg-navy text-white border border-navy',
     professor: 'bg-tint text-primary border border-tint-strong',
     student: 'bg-fill-neutral text-ink-muted border border-line-neutral',
+    leader: 'bg-warning-soft text-warning border border-warning-line',
     public: 'bg-success-soft text-success border border-success-line',
     protected: 'bg-warning-soft text-warning border border-warning-line',
     private: 'bg-danger-soft text-danger border border-danger-line',

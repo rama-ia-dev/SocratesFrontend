@@ -22,6 +22,8 @@ interface NavItem {
   label: string;
   path: string;
   icon: React.ElementType;
+  /** Otras rutas que pertenecen a esta sección y la dejan marcada. */
+  also?: string[];
 }
 
 // Fondo del menú lateral y de la barra del celular: la identidad UTN
@@ -69,7 +71,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       return [
         { label: 'Comisiones', path: '/comisiones', icon: Layers },
         { label: 'Estado de la cátedra', path: '/catedra', icon: BarChart3 },
-        { label: 'Usuarios', path: '/usuarios', icon: Users },
+        // Las pantallas de estudiantes y docentes se abren desde Usuarios
+        { label: 'Usuarios', path: '/usuarios', icon: Users, also: ['/estudiantes', '/docentes'] },
       ];
     }
 
@@ -104,7 +107,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             to={item.path}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 ${
-                isActive
+                isActive || item.also?.some((p) => location.pathname.startsWith(p))
                   ? 'bg-white text-navy font-semibold'
                   : 'text-accent-light/85 hover:bg-white/8 hover:text-white font-medium'
               }`

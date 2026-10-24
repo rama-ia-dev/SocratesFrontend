@@ -1,5 +1,6 @@
 import React from 'react';
 import { ChevronDown } from 'lucide-react';
+import { describedBy, FieldLabel, FieldMessages, fieldClasses } from './Input';
 
 export interface SelectOption {
   value: string | number;
@@ -35,21 +36,17 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
     return (
       <div className="w-full">
         {label && (
-          <label
-            htmlFor={selectId}
-            className="block text-sm font-medium text-ink mb-1.5"
-          >
+          <FieldLabel htmlFor={selectId} optional={optional}>
             {label}
-            {optional && <span className="font-normal text-ink-muted"> (opcional)</span>}
-          </label>
+          </FieldLabel>
         )}
         <div className="relative">
           <select
             id={selectId}
             ref={ref}
-            className={`w-full appearance-none rounded-lg border bg-white px-3 py-2 pr-10 text-sm text-ink transition-colors focus:outline-none focus:ring-2 focus:ring-accent-light focus:border-primary disabled:bg-fill-neutral disabled:text-ink-muted disabled:cursor-not-allowed ${
-              error ? 'border-danger' : 'border-line'
-            } ${className}`}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={describedBy(selectId, error ? undefined : helperText, error)}
+            className={`${fieldClasses(error)} appearance-none pr-10 cursor-pointer ${className}`}
             {...props}
           >
             {options
@@ -64,11 +61,8 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             <ChevronDown className="w-4 h-4" />
           </div>
         </div>
-        {error ? (
-          <p className="mt-1 text-xs text-danger font-medium">{error}</p>
-        ) : helperText ? (
-          <p className="mt-1 text-xs text-ink-muted">{helperText}</p>
-        ) : null}
+        {/* En un desplegable el error reemplaza a la ayuda, como hasta ahora */}
+        <FieldMessages id={selectId} helperText={error ? undefined : helperText} error={error} />
       </div>
     );
   }

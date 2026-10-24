@@ -20,7 +20,7 @@ import { Pagination } from '../components/ui/Pagination';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { ActionMenu } from '../components/ui/ActionMenu';
 import { EditStudentModal } from '../components/EditStudentModal';
-import { Search, Plus, RefreshCw, Edit2 } from 'lucide-react';
+import { Search, SearchX, Plus, RefreshCw, Edit2, CloudOff, GraduationCap } from 'lucide-react';
 
 const PAGE_SIZE = 10;
 
@@ -146,7 +146,9 @@ export const Students: React.FC = () => {
         <TableSkeleton rows={4} cols={5} />
       ) : loadError ? (
         <EmptyState
-          message="No se pudo cargar el listado de estudiantes."
+          icon={<CloudOff className="w-5 h-5" />}
+          message="No se pudo cargar el listado de estudiantes"
+          description="Puede ser un problema de conexión. Pruebe de nuevo en unos segundos."
           action={
             <Button variant="outline" size="sm" onClick={fetchStudents}>
               <RefreshCw className="w-4 h-4 mr-1.5" />
@@ -156,12 +158,20 @@ export const Students: React.FC = () => {
         />
       ) : students.length === 0 ? (
         <EmptyState
+          icon={hasFilters ? <SearchX className="w-5 h-5" /> : <GraduationCap className="w-5 h-5" />}
           message={
             hasFilters
-              ? 'No hay estudiantes que coincidan con la búsqueda.'
+              ? 'Ningún estudiante coincide con la búsqueda'
               : user?.is_super_admin
-                ? 'Todavía no hay estudiantes registrados.'
-                : 'Todavía no hay estudiantes en sus cursos lectivos. Aparecen cuando se suman a un equipo.'
+                ? 'Todavía no hay estudiantes registrados'
+                : 'Todavía no hay estudiantes en sus cursos lectivos'
+          }
+          description={
+            hasFilters
+              ? 'Revise el nombre, apellido o legajo, o muestre todos los cursos lectivos.'
+              : user?.is_super_admin
+                ? undefined
+                : 'Aparecen cuando se suman a un equipo.'
           }
           action={
             hasFilters ? (
@@ -181,7 +191,16 @@ export const Students: React.FC = () => {
         />
       ) : (
         <>
-          <Table>
+          {/* Anchos fijos por columna: al filtrar, la tabla no cambia de forma */}
+          <Table className="table-fixed min-w-[960px]">
+            <colgroup>
+              <col className="w-[10%]" />
+              <col className="w-[24%]" />
+              <col className="w-[24%]" />
+              <col className="w-[11%]" />
+              <col className="w-[31%]" />
+              <col className="w-16" />
+            </colgroup>
             <TableHeader>
               <tr>
                 <TableHead>Legajo</TableHead>
@@ -189,24 +208,28 @@ export const Students: React.FC = () => {
                 <TableHead>Correo de ingreso</TableHead>
                 <TableHead>Año de ingreso</TableHead>
                 <TableHead>Equipo</TableHead>
-                <TableHead className="w-20 text-right sticky right-0 bg-tint">Acciones</TableHead>
+                <TableHead className="sticky right-0 bg-canvas">
+                  <span className="sr-only">Acciones</span>
+                </TableHead>
               </tr>
             </TableHeader>
             <tbody>
               {students.map((st) => (
                 <TableRow key={st.id_student}>
-                  <TableCell className="font-mono font-medium text-ink">{st.legajo}</TableCell>
+                  <TableCell className="font-medium text-ink tabular-nums">{st.legajo}</TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-3 min-w-[160px]">
+                    <div className="flex items-center gap-3">
                       <InitialsAvatar name={`${st.last_name} ${st.first_name}`} size="sm" />
-                      <span className="font-medium text-ink">
+                      <span className="min-w-0 font-medium text-ink [overflow-wrap:anywhere]">
                         {st.last_name}, {st.first_name}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono text-ink-muted text-xs">{st.email}</TableCell>
-                  <TableCell className="text-ink-muted">{st.enrollment_year}</TableCell>
-                  <TableCell className="min-w-[160px]">
+                  <TableCell className="text-ink-muted">
+                    <span className="block truncate" title={st.email}>{st.email}</span>
+                  </TableCell>
+                  <TableCell className="text-ink-muted tabular-nums">{st.enrollment_year}</TableCell>
+                  <TableCell>
                     {st.groups.length === 0 ? (
                       <span className="text-xs italic text-ink-subtle">Sin equipo</span>
                     ) : (
@@ -220,7 +243,7 @@ export const Students: React.FC = () => {
                               {g.project_name ? ` · ${g.project_name}` : ''}
                             </span>
                             {g.is_leader && (
-                              <Badge variant="superadmin" className="ml-1.5">Jefe</Badge>
+                              <Badge variant="leader" className="ml-1.5">Jefe</Badge>
                             )}
                             {g.status && g.status.code !== 'active' && (
                               <Badge variant="neutral" className="ml-1.5">{g.status.name}</Badge>
@@ -230,7 +253,7 @@ export const Students: React.FC = () => {
                       </ul>
                     )}
                   </TableCell>
-                  <TableCell className="text-right sticky right-0 bg-white border-b border-line">
+                  <TableCell className="text-right sticky right-0 bg-white group-hover:bg-canvas transition-colors duration-150">
                     <ActionMenu
                       label={`Acciones de ${st.first_name} ${st.last_name}`}
                       items={[

@@ -26,6 +26,7 @@ import {
   minBirthDate,
   digitsOnly,
 } from '../lib/validation';
+import { Alert } from '../components/ui/Alert';
 
 interface PreviewRow {
   row: number;
@@ -218,13 +219,7 @@ export const RegisterStudents: React.FC = () => {
       {activeTab === 'manual' && (
         <div className="max-w-2xl bg-white border border-line rounded-xl shadow-xs p-8">
           {manualError && (
-            <div
-              role="alert"
-              className="mb-6 p-3 rounded-lg bg-danger-soft border border-danger-line text-danger text-sm flex items-start gap-2.5"
-            >
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{manualError}</span>
-            </div>
+            <Alert className="mb-6">{manualError}</Alert>
           )}
 
           <form onSubmit={handleSubmitManual} className="space-y-5" noValidate>
@@ -415,13 +410,7 @@ export const RegisterStudents: React.FC = () => {
           </div>
 
           {excelErrorMsg && (
-            <div
-              role="alert"
-              className="p-3 rounded-lg bg-danger-soft border border-danger-line text-danger text-sm flex items-start gap-2.5"
-            >
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{excelErrorMsg}</span>
-            </div>
+            <Alert>{excelErrorMsg}</Alert>
           )}
 
           {/* Vista previa si el archivo fue cargado */}

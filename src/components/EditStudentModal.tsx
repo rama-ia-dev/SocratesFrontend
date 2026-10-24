@@ -16,6 +16,7 @@ import {
   minBirthDate,
   digitsOnly,
 } from '../lib/validation';
+import { Alert } from './ui/Alert';
 
 export interface EditableStudent {
   id: number;
@@ -111,20 +112,14 @@ export const EditStudentModal: React.FC<{
   return (
     <Modal isOpen onClose={onClose} title="Modificar estudiante">
       {error && (
-        <div
-          role="alert"
-          className="mb-4 p-3 rounded-lg bg-danger-soft border border-danger-line text-danger text-sm flex items-start gap-2"
-        >
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-          <span>{error}</span>
-        </div>
+        <Alert className="mb-4">{error}</Alert>
       )}
 
       {legajoChanged && (
-        <div className="mb-4 p-3 rounded-lg bg-tint border border-accent-light text-primary text-xs">
+        <Alert tone="info" className="mb-4">
           El correo de ingreso pasará a ser{' '}
           <span className="font-mono font-semibold">{legajo.value}@sistemas.frc.utn.edu.ar</span>
-        </div>
+        </Alert>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>

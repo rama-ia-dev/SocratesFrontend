@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { SocratesLogo } from '../components/ui/SocratesLogo';
+import { AuthLayout } from '../components/layout/AuthLayout';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
-import { Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { validateEmail, STUDENT_EMAIL_HELP, STUDENT_EMAIL_PLACEHOLDER } from '../lib/validation';
+import { Alert } from '../components/ui/Alert';
 
 export const Login: React.FC = () => {
   const { login } = useAuth();
@@ -47,46 +48,9 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-canvas">
-      {/* ========================================================= */}
-      {/* Panel Izquierdo: Patrón de acanalado y baldosa con logo  */}
-      {/* ========================================================= */}
-      <div className="hidden md:flex flex-1 bg-tint fluted-column-pattern border-r border-line items-center justify-center p-12">
-        <div className="bg-white border border-line rounded-xl p-8 shadow-sm max-w-sm w-full text-center flex flex-col items-center">
-          <SocratesLogo size="xl" showText={true} />
-          <div className="title-line mt-4 mb-4" />
-          <p className="text-sm font-medium text-ink-muted">
-            Seminario Integrador
-          </p>
-          <p className="text-xs text-ink-muted mt-1">
-            Facultad Regional Córdoba
-          </p>
-        </div>
-      </div>
-
-      {/* ========================================================= */}
-      {/* Panel Derecho: Tarjeta de 420px con formulario           */}
-      {/* ========================================================= */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12">
-        <div className="w-full max-w-[420px] bg-white border border-line rounded-xl shadow-md p-8 sm:p-10">
-          {/* Logo en versión móvil */}
-          <div className="md:hidden flex justify-center mb-6">
-            <SocratesLogo size="md" showText={true} />
-          </div>
-
-          <h2 className="font-serif font-semibold text-2xl sm:text-3xl text-navy mb-1">
-            Iniciar sesión
-          </h2>
-          <div className="title-line mb-6" />
-
+    <AuthLayout title="Iniciar sesión" subtitle="Ingrese con su correo institucional.">
           {errorMessage && (
-            <div
-              role="alert"
-              className="mb-6 p-3 rounded-lg bg-danger-soft border border-danger-line text-danger text-sm flex items-start gap-2.5"
-            >
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{errorMessage}</span>
-            </div>
+            <Alert className="mb-6">{errorMessage}</Alert>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5" noValidate>
@@ -156,14 +120,12 @@ export const Login: React.FC = () => {
             <div className="text-center pt-2">
               <Link
                 to="/password/reset"
-                className="text-sm font-medium text-primary hover:text-primary-hover hover:underline"
+                className="text-sm font-medium text-primary hover:text-primary-hover hover:underline underline-offset-2"
               >
                 Crear o restablecer contraseña
               </Link>
             </div>
           </form>
-        </div>
-      </div>
-    </div>
+    </AuthLayout>
   );
 };

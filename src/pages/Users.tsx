@@ -42,6 +42,7 @@ import {
   digitsOnly,
   showProfessorSaveError,
 } from '../lib/validation';
+import { Alert } from '../components/ui/Alert';
 
 export const Users: React.FC = () => {
   const navigate = useNavigate();
@@ -425,13 +426,7 @@ export const Users: React.FC = () => {
         title="Registrar docente"
       >
         {profCreateError && (
-          <div
-            role="alert"
-            className="mb-4 p-3 rounded-lg bg-danger-soft border border-danger-line text-danger text-sm flex items-start gap-2"
-          >
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{profCreateError}</span>
-          </div>
+          <Alert className="mb-4">{profCreateError}</Alert>
         )}
 
         <form onSubmit={handleSaveProfCreate} className="space-y-4" noValidate>
@@ -524,19 +519,13 @@ export const Users: React.FC = () => {
         title="Modificar docente"
       >
         {profEditError && (
-          <div
-            role="alert"
-            className="mb-4 p-3 rounded-lg bg-danger-soft border border-danger-line text-danger text-sm flex items-start gap-2"
-          >
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{profEditError}</span>
-          </div>
+          <Alert className="mb-4">{profEditError}</Alert>
         )}
 
         {profEmailChanged && (
-          <div className="mb-4 p-3 rounded-lg bg-warning-soft border border-warning-line text-warning text-xs">
+          <Alert tone="warning" className="mb-4">
             Al cambiar el correo se cerrará la sesión del docente.
-          </div>
+          </Alert>
         )}
 
         <form onSubmit={handleSaveProfEdit} className="space-y-4" noValidate>

@@ -18,6 +18,8 @@ import {
 import { Pagination } from '../components/ui/Pagination';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { useToast } from '../components/ui/Toast';
+import { Button } from '../components/ui/Button';
+import { SearchX, BarChart3 } from 'lucide-react';
 
 // El backend devuelve, además de lo tipado, el mínimo y máximo de integrantes del curso lectivo
 // y el estado actual de cada proyecto.
@@ -291,9 +293,9 @@ export const ChairOverview: React.FC = () => {
           </div>
         </div>
 
-        {/* Totales del filtro */}
+        {/* Totales del filtro: una sola franja, no tarjetas sueltas */}
         {!loading && summary && summary.section_years > 0 && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <dl className="grid grid-cols-2 lg:grid-cols-4 rounded-xl border border-line bg-white divide-line max-lg:[&>div:nth-child(-n+2)]:border-b lg:divide-x max-lg:[&>div:nth-child(odd)]:border-r">
             {[
               { label: 'Cursos lectivos', value: summary.section_years, alert: false },
               { label: 'Grupos', value: summary.projects, alert: false },
@@ -304,30 +306,61 @@ export const ChairOverview: React.FC = () => {
                 alert: summary.without_professors > 0,
               },
             ].map((card) => (
-              <div
-                key={card.label}
-                className="p-4 rounded-lg bg-white border border-line"
-              >
-                <p className="text-xs font-medium text-ink-muted">{card.label}</p>
-                <p
-                  className={`mt-1 font-mono text-2xl font-semibold ${
-                    card.alert ? 'text-danger' : 'text-navy'
+              <div key={card.label} className="px-5 py-3.5 border-line">
+                <dt className="text-[13px] text-ink-muted">{card.label}</dt>
+                <dd
+                  className={`mt-0.5 text-xl font-semibold tabular-nums ${
+                    card.alert ? 'text-danger' : 'text-ink'
                   }`}
                 >
                   {card.value}
-                </p>
+                </dd>
               </div>
             ))}
-          </div>
+          </dl>
         )}
 
         {loading ? (
           <TableSkeleton rows={4} cols={8} />
         ) : rows.length === 0 ? (
-          <EmptyState message="No se encontraron cursos lectivos para los filtros seleccionados." />
+          yearFilter || sectionFilter ? (
+            <EmptyState
+              icon={<SearchX className="w-5 h-5" />}
+              message="Ningún curso lectivo coincide con los filtros"
+              action={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setYearFilter(''); setSectionFilter(''); setOffset(0); }}
+                >
+                  Limpiar filtros
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState
+              icon={<BarChart3 className="w-5 h-5" />}
+              message="Todavía no hay cursos lectivos"
+              description="El estado de la cátedra aparece cuando se registra el primer curso lectivo en Comisiones."
+            />
+          )
         ) : (
           <>
-            <Table>
+            {/* Anchos fijos por columna: al filtrar, la tabla no cambia de forma */}
+            <Table className="table-fixed min-w-[1340px]">
+              <colgroup>
+                <col className="w-[120px]" />
+                <col className="w-[64px]" />
+                <col className="w-[150px]" />
+                <col className="w-[260px]" />
+                <col className="w-[80px]" />
+                <col className="w-[100px]" />
+                <col className="w-[150px]" />
+                <col className="w-[96px]" />
+                <col className="w-[100px]" />
+                <col className="w-[100px]" />
+                <col className="w-[120px]" />
+              </colgroup>
               <TableHeader>
                 <tr>
                   <TableHead>Comisión</TableHead>
@@ -350,10 +383,10 @@ export const ChairOverview: React.FC = () => {
                   const students = studentCounts[row.id_section_year];
                   return (
                     <TableRow key={row.id_section_year}>
-                      <TableCell className="font-semibold text-navy">
+                      <TableCell className="font-medium text-ink">
                         {row.section_name}
                       </TableCell>
-                      <TableCell className="font-mono text-sm">{row.year}</TableCell>
+                      <TableCell className="text-ink-muted tabular-nums">{row.year}</TableCell>
                       <TableCell>
                         {progress === null ? (
                           <span className="text-xs text-ink-faint">Sin grupos</span>
@@ -372,7 +405,7 @@ export const ChairOverview: React.FC = () => {
                                 style={{ width: `${progress}%` }}
                               />
                             </div>
-                            <span className="font-mono text-xs text-ink-muted w-9 text-right">
+                            <span className="text-xs text-ink-muted tabular-nums w-9 text-right">
                               {progress}%
                             </span>
                           </div>
@@ -384,7 +417,8 @@ export const ChairOverview: React.FC = () => {
                             row.professors.map((p) => (
                               <span
                                 key={p.id_professor}
-                                className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-tint text-primary border border-accent-light whitespace-nowrap"
+                                title={`${p.first_name} ${p.last_name}`}
+                                className="inline-block max-w-full truncate px-2 py-0.5 rounded-md text-xs font-medium bg-tint text-navy border border-tint-strong"
                               >
                                 {p.first_name} {p.last_name}
                               </span>
@@ -396,13 +430,13 @@ export const ChairOverview: React.FC = () => {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-center font-mono text-sm font-semibold">
+                      <TableCell className="text-center font-semibold tabular-nums">
                         {row.project_count}
                       </TableCell>
                       {(Object.keys(STAGE_LABELS) as Stage[]).map((stage) => (
                         <TableCell
                           key={stage}
-                          className={`text-center font-mono text-sm ${
+                          className={`text-center tabular-nums ${
                             row.stages[stage] === 0 ? 'text-ink-faint' : ''
                           }`}
                         >
@@ -411,7 +445,7 @@ export const ChairOverview: React.FC = () => {
                               {developingStatusesOf(row).map((s) => (
                                 <span key={s.code}>
                                   {s.name}:{' '}
-                                  <span className="font-mono font-semibold">
+                                  <span className="font-semibold tabular-nums">
                                     {row.developing_detail[s.code]}
                                   </span>
                                 </span>
@@ -420,7 +454,7 @@ export const ChairOverview: React.FC = () => {
                               {developingStatusesOf(row).length > 1 && (
                                 <span className="mt-0.5 pt-0.5 border-t border-line text-ink-muted">
                                   Total:{' '}
-                                  <span className="font-mono font-semibold text-ink">
+                                  <span className="font-semibold tabular-nums text-ink">
                                     {row.stages.developing}
                                   </span>
                                 </span>
@@ -431,10 +465,10 @@ export const ChairOverview: React.FC = () => {
                           )}
                         </TableCell>
                       ))}
-                      <TableCell className="text-center font-mono text-sm">
+                      <TableCell className="text-center tabular-nums">
                         {students ?? '…'}
                       </TableCell>
-                      <TableCell className="text-center font-mono text-sm whitespace-nowrap">
+                      <TableCell className="text-center tabular-nums whitespace-nowrap">
                         {row.min_students !== undefined && row.max_students !== undefined
                           ? `${row.min_students} – ${row.max_students}`
                           : '—'}

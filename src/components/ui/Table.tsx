@@ -59,7 +59,7 @@ export const TableCell: React.FC<{
 
 export const InitialsAvatar: React.FC<{
   name: string;
-  size?: 'sm' | 'md';
+  size?: 'sm' | 'md' | 'lg';
   // Reemplaza los colores por defecto; si se pasaran en className competirían con ellos.
   colors?: string;
   className?: string;
@@ -70,7 +70,11 @@ export const InitialsAvatar: React.FC<{
       ? `${parts[0][0]}${parts[1][0]}`.toUpperCase()
       : `${parts[0]?.[0] || '?'}`.toUpperCase();
 
-  const sizeClass = size === 'sm' ? 'w-7 h-7 text-[11px]' : 'w-9 h-9 text-xs';
+  const sizeClass = {
+    sm: 'w-7 h-7 text-[11px]',
+    md: 'w-9 h-9 text-xs',
+    lg: 'w-14 h-14 text-lg',
+  }[size];
 
   return (
     <div

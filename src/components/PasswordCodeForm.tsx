@@ -10,6 +10,7 @@ import {
   STUDENT_EMAIL_HELP,
   STUDENT_EMAIL_PLACEHOLDER,
 } from '../lib/validation';
+import { Alert } from './ui/Alert';
 
 const RESEND_WAIT_SECONDS = 60;
 
@@ -156,19 +157,13 @@ export const PasswordCodeForm: React.FC<PasswordCodeFormProps> = ({ fixedEmail, 
       </div>
 
       {infoMessage && (
-        <div className="mb-6 p-3 rounded-lg bg-tint border border-accent-light text-primary text-sm">
+        <Alert tone="info" className="mb-6">
           {infoMessage}
-        </div>
+        </Alert>
       )}
 
       {errorMessage && (
-        <div
-          role="alert"
-          className="mb-6 p-3 rounded-lg bg-danger-soft border border-danger-line text-danger text-sm flex items-start gap-2.5"
-        >
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-          <span>{errorMessage}</span>
-        </div>
+        <Alert className="mb-6">{errorMessage}</Alert>
       )}
 
       {step === 1 ? (
