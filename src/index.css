@@ -6,19 +6,20 @@
   --font-sans: 'Inter', sans-serif;
   --font-serif: 'Source Serif 4', Georgia, serif;
 
-  /* Fondo de la app y texto */
-  --color-canvas: #F5F9FF;
-  --color-ink: #0F1F3D;
-  --color-ink-muted: #51607A;
-  --color-ink-subtle: #8A9AB5;
-  --color-ink-faint: #94A3B8;
+  /* Fondo de la app y texto. Los neutros llevan un tinte apenas azul: ni gris ni blanco puros. */
+  --color-white: oklch(99.7% 0.002 255);
+  --color-canvas: oklch(97.9% 0.006 255);
+  --color-ink: oklch(25% 0.045 262);
+  --color-ink-muted: oklch(50% 0.03 262);
+  --color-ink-subtle: oklch(66% 0.025 262);
+  --color-ink-faint: oklch(70% 0.02 262);
 
   /* Bordes y rellenos neutros */
-  --color-line: #D6E4F7;
-  --color-line-neutral: #E2E8F0;
-  --color-line-neutral-strong: #CBD5E1;
-  --color-fill-neutral: #F1F5F9;
-  --color-fill-neutral-soft: #F8FAFC;
+  --color-line: oklch(91.8% 0.014 255);
+  --color-line-neutral: oklch(93% 0.008 255);
+  --color-line-neutral-strong: oklch(87% 0.012 255);
+  --color-fill-neutral: oklch(96% 0.006 255);
+  --color-fill-neutral-soft: oklch(98% 0.004 255);
 
   /* Azules de la marca */
   --color-primary: #1D4ED8;
@@ -47,6 +48,28 @@
   --color-success-vivid: #16A34A;
   --color-success-line: #86EFAC;
   --color-success-soft: #DCFCE7;
+}
+
+/* El espacio de la barra de scroll queda reservado: el contenido no se corre cuando aparece. */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* El foco se marca solo al navegar con teclado, con el color de la app. Los campos de texto
+   mantienen su anillo al hacer clic, porque ahí sí indica dónde se escribe. */
+:where(button, a, [role='tab'], summary):focus {
+  outline: none;
+}
+:where(button, a, [role='tab'], summary):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
 
 body {

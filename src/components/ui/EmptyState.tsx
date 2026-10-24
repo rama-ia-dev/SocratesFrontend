@@ -2,6 +2,8 @@ import React from 'react';
 
 interface EmptyStateProps {
   message: string;
+  /** Explica por qué no hay nada o qué se puede hacer. */
+  description?: string;
   icon?: React.ReactNode;
   action?: React.ReactNode;
   className?: string;
@@ -9,18 +11,22 @@ interface EmptyStateProps {
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
   message,
+  description,
   icon,
   action,
   className = '',
 }) => {
   return (
-    <div
-      className={`relative overflow-hidden rounded-xl border border-line bg-white p-8 text-center fluted-column-pattern ${className}`}
-    >
-      <div className="relative z-10 max-w-sm mx-auto flex flex-col items-center justify-center">
-        {icon && <div className="text-primary mb-2">{icon}</div>}
-        <p className="text-sm font-medium text-ink-muted">{message}</p>
-        {action && <div className="mt-4">{action}</div>}
+    <div className={`rounded-xl border border-line bg-white px-6 py-12 text-center ${className}`}>
+      <div className="max-w-md mx-auto flex flex-col items-center">
+        {icon && (
+          <div className="mb-4 w-11 h-11 rounded-full bg-fill-neutral text-ink-muted flex items-center justify-center">
+            {icon}
+          </div>
+        )}
+        <p className="text-[15px] font-semibold text-ink">{message}</p>
+        {description && <p className="mt-1 text-sm text-ink-muted">{description}</p>}
+        {action && <div className="mt-5">{action}</div>}
       </div>
     </div>
   );

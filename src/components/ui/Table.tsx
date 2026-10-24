@@ -5,7 +5,7 @@ export const Table: React.FC<{ children: React.ReactNode; className?: string }> 
   className = '',
 }) => {
   return (
-    <div className="w-full overflow-x-auto rounded-xl border border-line bg-white shadow-2xs">
+    <div className="w-full overflow-x-auto rounded-xl border border-line bg-white">
       <table className={`w-full text-left border-collapse text-sm text-ink ${className}`}>
         {children}
       </table>
@@ -15,7 +15,7 @@ export const Table: React.FC<{ children: React.ReactNode; className?: string }> 
 
 export const TableHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
-    <thead className="bg-tint border-b border-line text-[12px] font-semibold text-ink-muted uppercase tracking-wider select-none">
+    <thead className="bg-canvas border-b border-line text-[13px] font-medium text-ink-muted select-none">
       {children}
     </thead>
   );
@@ -29,7 +29,7 @@ export const TableRow: React.FC<{
   return (
     <tr
       onClick={onClick}
-      className={`h-14 border-b border-line last:border-b-0 hover:bg-tint-strong/40 transition-colors ${
+      className={`group h-[52px] border-b border-line last:border-b-0 hover:bg-canvas transition-colors duration-150 ${
         onClick ? 'cursor-pointer' : ''
       } ${className}`}
     >
@@ -42,7 +42,7 @@ export const TableHead: React.FC<{
   children: React.ReactNode;
   className?: string;
 }> = ({ children, className = '' }) => {
-  return <th className={`px-4 py-3 font-semibold text-[12px] ${className}`}>{children}</th>;
+  return <th className={`px-4 h-10 font-medium ${className}`}>{children}</th>;
 };
 
 export const TableCell: React.FC<{
@@ -51,7 +51,7 @@ export const TableCell: React.FC<{
   onClick?: (e: React.MouseEvent) => void;
 }> = ({ children, className = '', onClick }) => {
   return (
-    <td onClick={onClick} className={`px-4 py-3.5 align-middle ${className}`}>
+    <td onClick={onClick} className={`px-4 py-2.5 align-middle ${className}`}>
       {children}
     </td>
   );
@@ -63,14 +63,14 @@ export const InitialsAvatar: React.FC<{
   // Reemplaza los colores por defecto; si se pasaran en className competirían con ellos.
   colors?: string;
   className?: string;
-}> = ({ name, size = 'md', colors = 'bg-tint-strong text-primary border-accent-light', className = '' }) => {
+}> = ({ name, size = 'md', colors = 'bg-tint text-navy border-tint-strong', className = '' }) => {
   const parts = name.trim().split(/\s+/);
   const initials =
     parts.length > 1
       ? `${parts[0][0]}${parts[1][0]}`.toUpperCase()
       : `${parts[0]?.[0] || '?'}`.toUpperCase();
 
-  const sizeClass = size === 'sm' ? 'w-7 h-7 text-xs' : 'w-9 h-9 text-xs';
+  const sizeClass = size === 'sm' ? 'w-7 h-7 text-[11px]' : 'w-9 h-9 text-xs';
 
   return (
     <div

@@ -12,9 +12,10 @@ export const Badge: React.FC<BadgeProps> = ({
   className = '',
 }) => {
   const variantStyles = {
-    superadmin: 'bg-tint text-primary border border-accent-light',
-    professor: 'bg-fill-neutral text-ink border border-line-neutral-strong',
-    student: 'bg-fill-neutral-soft text-ink-muted border border-line-neutral',
+    // Los roles se distinguen por tono, de más neutro (alumno) a más institucional (super admin)
+    superadmin: 'bg-navy text-white border border-navy',
+    professor: 'bg-tint text-primary border border-tint-strong',
+    student: 'bg-fill-neutral text-ink-muted border border-line-neutral',
     public: 'bg-success-soft text-success border border-success-line',
     protected: 'bg-warning-soft text-warning border border-warning-line',
     private: 'bg-danger-soft text-danger border border-danger-line',
