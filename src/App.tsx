@@ -164,7 +164,7 @@ export default function App() {
             <Route
               path="/estudiantes/nuevo"
               element={
-                <ProtectedRoute allowedRoles={['superadmin']}>
+                <ProtectedRoute allowedRoles={['superadmin', 'professor']}>
                   <RegisterStudents />
                 </ProtectedRoute>
               }
