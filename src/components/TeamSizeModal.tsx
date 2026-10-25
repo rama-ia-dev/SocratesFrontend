@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
-import { AlertCircle } from 'lucide-react';
 import { api } from '../lib/api';
 import type { SectionYearPublic } from '../types/api';
 import { Modal } from './ui/Modal';
 import { Input } from './ui/Input';
 import { Button } from './ui/Button';
+import { Alert } from './ui/Alert';
+import { digitsOnly } from '../lib/validation';
 
 const MIN = 1;
 const MAX = 100; // rango que acepta el backend
-
-const digitsOnly = (v: string) => v.replace(/\D/g, '');
 
 // Cupo de integrantes por equipo de un curso lectivo (SCRUM-19): PATCH /section-years/{id}.
 // Vale para todos los equipos del curso lectivo. Hoy el backend se lo permite solo al super administrador.
@@ -65,16 +64,8 @@ export const TeamSizeModal: React.FC<{
 
   return (
     <Modal isOpen onClose={() => !isSaving && onClose()} title="Cupo de integrantes por equipo">
-      {error && (
-        <div
-          role="alert"
-          className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
-        >
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-          <span>{error}</span>
-        </div>
-      )}
-      <p className="mb-4 text-sm text-[#51607A]">
+      {error && <Alert className="mb-4">{error}</Alert>}
+      <p className="mb-4 text-sm text-ink-muted">
         Vale para todos los equipos de {sectionYear.section_name} ({sectionYear.year}).
       </p>
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -100,7 +91,7 @@ export const TeamSizeModal: React.FC<{
             helperText="Cuántos alumnos admite como máximo"
           />
         </div>
-        <div className="flex justify-end gap-3 pt-4 border-t border-[#D6E4F7]">
+        <div className="flex justify-end gap-3 pt-4 border-t border-line">
           <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
             Cancelar
           </Button>
