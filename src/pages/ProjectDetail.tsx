@@ -25,14 +25,18 @@ const Field: React.FC<{ label: string; value?: string | null }> = ({ label, valu
   </section>
 );
 
-// Integrantes con su contacto; el jefe del grupo primero
-const Members: React.FC<{ members: ProjectMember[] }> = ({ members }) => {
+// Integrantes con su contacto; el jefe del grupo primero. El cupo va aparte: es del curso lectivo
+// y se exige recién al asegurar el equipo, no es la cantidad que tiene hoy.
+const Members: React.FC<{ members: ProjectMember[]; cupo?: React.ReactNode }> = ({ members, cupo }) => {
   const sorted = [...members].sort((a, b) => Number(b.is_leader) - Number(a.is_leader));
   return (
     <section className="rounded-xl border border-line bg-white">
-      <h2 className="px-5 pt-4 sm:px-6 text-[15px] font-semibold text-ink">
-        Integrantes <span className="font-normal text-ink-muted">({members.length})</span>
-      </h2>
+      <div className="px-5 pt-4 sm:px-6 flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1">
+        <h2 className="text-[15px] font-semibold text-ink">
+          Integrantes <span className="font-normal text-ink-muted">({members.length})</span>
+        </h2>
+        {cupo && <p className="text-sm text-ink-muted">{cupo}</p>}
+      </div>
       {sorted.length === 0 ? (
         <p className="px-5 sm:px-6 pt-1.5 pb-4 text-sm italic text-ink-subtle">Todavía no se sumó ningún alumno</p>
       ) : (
@@ -170,24 +174,6 @@ export const ProjectDetail: React.FC = () => {
         </div>
         <p className="mt-1.5 text-sm text-ink-muted">
           Comisión {project.section_name} · Ciclo lectivo {project.year}
-          {sectionYear?.min_students !== undefined && sectionYear.max_students !== undefined && (
-            <>
-              {' '}
-              · Cupo: de {sectionYear.min_students} a {sectionYear.max_students} integrantes
-              {user?.is_super_admin && (
-                <>
-                  {' '}
-                  <button
-                    type="button"
-                    onClick={() => setIsSizeOpen(true)}
-                    className="text-primary font-medium hover:underline cursor-pointer"
-                  >
-                    Modificar cupo
-                  </button>
-                </>
-              )}
-            </>
-          )}
         </p>
         <p className="mt-1 text-xs text-ink-subtle">{PRIVACY_HELP[project.privacy]}</p>
       </header>
@@ -207,7 +193,29 @@ export const ProjectDetail: React.FC = () => {
         </div>
       )}
 
-      <Members members={project.members} />
+      <Members
+        members={project.members}
+        cupo={
+          sectionYear?.min_students !== undefined &&
+          sectionYear.max_students !== undefined && (
+            <>
+              Cupo para asegurar el equipo: de {sectionYear.min_students} a {sectionYear.max_students}
+              {user?.is_super_admin && (
+                <>
+                  {' · '}
+                  <button
+                    type="button"
+                    onClick={() => setIsSizeOpen(true)}
+                    className="text-primary font-medium hover:underline cursor-pointer"
+                  >
+                    Modificar cupo
+                  </button>
+                </>
+              )}
+            </>
+          )
+        }
+      />
 
       {isSizeOpen && sectionYear && (
         <TeamSizeModal
