@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, RefreshCw } from 'lucide-react';
+import { CloudOff, Eye, FolderKanban, RefreshCw, SearchX } from 'lucide-react';
 import { api } from '../lib/api';
 import type { ProjectPrivacy, ProjectPublic, SectionYearPublic } from '../types/api';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Select } from '../components/ui/Select';
+import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Table, TableHeader, TableRow, TableHead, TableCell } from '../components/ui/Table';
@@ -87,31 +88,37 @@ export const Projects: React.FC = () => {
     <div className="space-y-6">
       <PageHeader title="Equipos de trabajo" subtitle="Equipos de cada comisión y su proyecto" />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Select
-          aria-label="Año"
-          value={year}
-          onChange={changeFilter(setYear)}
-          options={[
-            { value: '', label: 'Todos los años' },
-            ...yearOptions.map((y) => ({ value: y, label: String(y) })),
-          ]}
-        />
-        <Select
-          aria-label="Comisión"
-          value={section}
-          onChange={changeFilter(setSection)}
-          options={[
-            { value: '', label: 'Todas las comisiones' },
-            ...sectionOptions.map(([id, name]) => ({ value: id, label: name })),
-          ]}
-        />
-        <Select
-          aria-label="Privacidad"
+      {/* Años y comisiones pueden ser muchos: desplegables. La privacidad tiene tres: a la vista */}
+      <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:w-[440px] shrink-0">
+          <Select
+            aria-label="Año"
+            value={year}
+            onChange={changeFilter(setYear)}
+            options={[
+              { value: '', label: 'Todos los años' },
+              ...yearOptions.map((y) => ({ value: y, label: String(y) })),
+            ]}
+          />
+          <Select
+            aria-label="Comisión"
+            value={section}
+            onChange={changeFilter(setSection)}
+            options={[
+              { value: '', label: 'Todas las comisiones' },
+              ...sectionOptions.map(([id, name]) => ({ value: id, label: name })),
+            ]}
+          />
+        </div>
+        <SegmentedControl
+          label="Filtrar por privacidad"
           value={privacy}
-          onChange={changeFilter((v) => setPrivacy(v as ProjectPrivacy | ''))}
+          onChange={(v) => {
+            setPrivacy(v);
+            setOffset(0);
+          }}
           options={[
-            { value: '', label: 'Todas las privacidades' },
+            { value: '' as const, label: 'Todos' },
             ...(Object.keys(PRIVACY_LABEL) as ProjectPrivacy[]).map((p) => ({
               value: p,
               label: PRIVACY_LABEL[p],
@@ -124,7 +131,9 @@ export const Projects: React.FC = () => {
         <TableSkeleton rows={5} cols={5} />
       ) : loadError ? (
         <EmptyState
-          message="No se pudieron cargar los equipos de trabajo."
+          icon={<CloudOff className="w-5 h-5" />}
+          message="No se pudieron cargar los equipos de trabajo"
+          description="Puede ser un problema de conexión. Pruebe de nuevo en unos segundos."
           action={
             <Button variant="outline" size="sm" onClick={fetchProjects}>
               <RefreshCw className="w-4 h-4 mr-1.5" />
@@ -134,11 +143,13 @@ export const Projects: React.FC = () => {
         />
       ) : projects.length === 0 ? (
         <EmptyState
+          icon={hasFilters ? <SearchX className="w-5 h-5" /> : <FolderKanban className="w-5 h-5" />}
           message={
             hasFilters
-              ? 'No hay equipos de trabajo para los filtros elegidos.'
-              : 'Todavía no hay equipos de trabajo que pueda ver.'
+              ? 'Ningún equipo de trabajo coincide con los filtros'
+              : 'Todavía no hay equipos de trabajo que pueda ver'
           }
+          description={hasFilters ? 'Pruebe con otro año, otra comisión u otra privacidad.' : undefined}
           action={
             hasFilters ? (
               <Button
@@ -158,7 +169,17 @@ export const Projects: React.FC = () => {
         />
       ) : (
         <>
-          <Table>
+          {/* Anchos fijos por columna: al filtrar, la tabla no cambia de forma */}
+          <Table className="table-fixed min-w-[900px]">
+            <colgroup>
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
+              <col className="w-[9%]" />
+              <col className="w-[33%]" />
+              <col className="w-[18%]" />
+              <col className="w-[16%]" />
+              <col className="w-16" />
+            </colgroup>
             <TableHeader>
               <tr>
                 <TableHead>Equipo</TableHead>
@@ -167,22 +188,25 @@ export const Projects: React.FC = () => {
                 <TableHead>Nombre del proyecto</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Privacidad</TableHead>
-                <TableHead className="w-16 text-right sticky right-0 bg-[#EFF6FF]">Acciones</TableHead>
+                {/* Fija a la derecha: con la tabla más ancha que la pantalla, las acciones siguen a la vista */}
+                <TableHead className="sticky right-0 bg-canvas">
+                  <span className="sr-only">Acciones</span>
+                </TableHead>
               </tr>
             </TableHeader>
             <tbody>
               {projects.map((p) => (
                 <TableRow key={p.id_project} onClick={() => navigate(`/equipos/${p.id_project}`)}>
-                  <TableCell className="font-semibold whitespace-nowrap">{teamLabel(p)}</TableCell>
+                  <TableCell className="font-semibold text-ink whitespace-nowrap">{teamLabel(p)}</TableCell>
                   <TableCell>{p.section_name}</TableCell>
-                  <TableCell className="font-mono text-[#51607A]">{p.year}</TableCell>
-                  <TableCell className="min-w-[200px]">
+                  <TableCell className="text-ink-muted tabular-nums">{p.year}</TableCell>
+                  <TableCell className="[overflow-wrap:anywhere]">
                     {p.restricted ? (
-                      <span className="italic text-[#51607A]">Detalle reservado</span>
+                      <span className="italic text-ink-muted">Detalle reservado</span>
                     ) : p.name ? (
                       p.name
                     ) : (
-                      <span className="italic text-[#8A9AB5]">Sin nombre todavía</span>
+                      <span className="italic text-ink-subtle">Sin nombre todavía</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -195,14 +219,14 @@ export const Projects: React.FC = () => {
                   <TableCell>
                     <Badge variant={p.privacy}>{PRIVACY_LABEL[p.privacy]}</Badge>
                   </TableCell>
-                  <TableCell className="text-right sticky right-0 bg-white border-b border-[#D6E4F7]">
+                  <TableCell className="text-right sticky right-0 bg-white group-hover:bg-canvas transition-colors duration-150">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         navigate(`/equipos/${p.id_project}`);
                       }}
-                      className="p-1.5 rounded text-[#51607A] hover:text-[#1D4ED8] hover:bg-[#EFF6FF] cursor-pointer"
+                      className="p-1.5 rounded-md text-ink-muted hover:text-primary hover:bg-tint transition-colors duration-150 cursor-pointer"
                       aria-label={`Ver ${teamLabel(p)} de ${p.section_name} ${p.year}`}
                       title="Ver detalle"
                     >
