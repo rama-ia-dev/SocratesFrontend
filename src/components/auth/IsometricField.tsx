@@ -1,5 +1,75 @@
 import React, { useEffect, useRef } from 'react';
 
+const S = 34; // medio ancho de la tapa del bloque
+const HS = S / 2; // medio alto: proporción 2:1, como la columna del logo
+const BASE = 9; // altura mínima del bloque
+const STEP = 0.5; // de a cuánto sube un bloque, en píxeles
+
+const Z_MAX = 48; // más de lo que sube un bloque con el puntero encima y una onda a la vez
+const CELL_W = S * 2 + 2; // un píxel de margen a cada lado para el borde
+const CELL_H = HS * 2 + BASE + Z_MAX + 2;
+const SHEET_COLS = 10;
+
+/**
+ * Todas las alturas de un bloque dibujadas una vez, en una sola hoja. Por cuadro solo se copian
+ * recortes de esa hoja, que la placa de video hace de un tirón; dibujar las miles de caras en cada
+ * cuadro trababa la pantalla en placas integradas.
+ */
+const blockSheet = (ratio: number) => {
+  const count = Z_MAX / STEP + 1;
+  const sheet = document.createElement('canvas');
+  sheet.width = Math.ceil(SHEET_COLS * CELL_W * ratio);
+  sheet.height = Math.ceil(Math.ceil(count / SHEET_COLS) * CELL_H * ratio);
+  const g = sheet.getContext('2d')!;
+  g.scale(ratio, ratio);
+  for (let i = 0; i < count; i++) {
+    g.save();
+    g.translate((i % SHEET_COLS) * CELL_W, Math.floor(i / SHEET_COLS) * CELL_H);
+    drawBlock(g, i * STEP);
+    g.restore();
+  }
+  return sheet;
+};
+
+/** Un bloque de altura z, con el pie apoyado en el borde de abajo de su celda. */
+const drawBlock = (g: CanvasRenderingContext2D, z: number) => {
+  const e = Math.min(1, z / 30);
+  const x = S + 1;
+  const top = CELL_H - 1 - HS - BASE - z;
+  const bottom = top + BASE + z;
+
+  // Cara superior
+  g.beginPath();
+  g.moveTo(x, top - HS);
+  g.lineTo(x + S, top);
+  g.lineTo(x, top + HS);
+  g.lineTo(x - S, top);
+  g.closePath();
+  g.fillStyle = `rgb(${24 + e * 50},${58 + e * 90},${140 + e * 100})`;
+  g.fill();
+  g.strokeStyle = `rgba(125,211,252,${0.18 + e * 0.6})`;
+  g.lineWidth = 1;
+  g.stroke();
+  // Cara izquierda
+  g.beginPath();
+  g.moveTo(x - S, top);
+  g.lineTo(x, top + HS);
+  g.lineTo(x, bottom + HS);
+  g.lineTo(x - S, bottom);
+  g.closePath();
+  g.fillStyle = `rgb(${10 + e * 14},${28 + e * 30},${74 + e * 50})`;
+  g.fill();
+  // Cara derecha, la más oscura
+  g.beginPath();
+  g.moveTo(x + S, top);
+  g.lineTo(x, top + HS);
+  g.lineTo(x, bottom + HS);
+  g.lineTo(x + S, bottom);
+  g.closePath();
+  g.fillStyle = `rgb(${6 + e * 8},${18 + e * 18},${50 + e * 34})`;
+  g.fill();
+};
+
 /**
  * Fondo de las pantallas sin sesión: un campo de bloques con la perspectiva isométrica del logo.
  * Los bloques se levantan cerca del puntero, un clic manda una onda y, sin puntero, el campo
@@ -23,6 +93,9 @@ export const IsometricField: React.FC<{ className?: string }> = ({ className = '
     const waves: { x: number; y: number; t: number }[] = [];
     // Altura de cada bloque, suavizada por separado para que el campo "respire"
     let heights = new Float32Array(0);
+    // Hoja con los bloques; se rehace si cambia la densidad de píxeles de la pantalla
+    let sheet: HTMLCanvasElement | null = null;
+    let sheetRatio = 0;
 
     const resize = () => {
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -32,13 +105,15 @@ export const IsometricField: React.FC<{ className?: string }> = ({ className = '
       canvas.width = Math.round(w * ratio);
       canvas.height = Math.round(h * ratio);
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      if (ratio !== sheetRatio) {
+        sheet = blockSheet(ratio);
+        sheetRatio = ratio;
+      }
     };
 
     const draw = (now: number, dt: number) => {
-      const s = 34; // medio ancho de la tapa del bloque
-      const hs = s / 2; // medio alto: proporción 2:1, como la columna del logo
-      const cols = Math.ceil(w / (s * 2)) + 2;
-      const rows = Math.ceil(h / hs) + 4;
+      const cols = Math.ceil(w / (S * 2)) + 2;
+      const rows = Math.ceil(h / HS) + 4;
       if (heights.length !== cols * rows) heights = new Float32Array(cols * rows);
       const reach = 230;
       const k = reduced ? 1 : 1 - Math.exp(-dt / 160);
@@ -47,8 +122,8 @@ export const IsometricField: React.FC<{ className?: string }> = ({ className = '
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           // Filas alternadas corridas medio bloque: la grilla queda en rombos
-          const x = c * s * 2 + (r % 2 ? s : 0) - s;
-          const y = r * hs - hs * 2;
+          const x = c * S * 2 + (r % 2 ? S : 0) - S;
+          const y = r * HS - HS * 2;
           const d = Math.hypot(x - p.x, y - p.y);
           let lift = d < reach ? Math.pow(1 - d / reach, 1.6) * 34 : 0;
           for (const wv of waves) {
@@ -60,42 +135,15 @@ export const IsometricField: React.FC<{ className?: string }> = ({ className = '
           lift += reduced ? 0 : (Math.sin(now / 1400 + c * 0.55 + r * 0.32) + 1) * 2.2;
           const i = r * cols + c;
           heights[i] += (lift - heights[i]) * k;
-          const z = heights[i];
-          const e = Math.min(1, z / 30);
-          const base = 9; // altura mínima del bloque
-          const top = y - base - z;
-          const bottom = top + base + z;
-
-          // Cara superior
-          ctx.beginPath();
-          ctx.moveTo(x, top - hs);
-          ctx.lineTo(x + s, top);
-          ctx.lineTo(x, top + hs);
-          ctx.lineTo(x - s, top);
-          ctx.closePath();
-          ctx.fillStyle = `rgb(${24 + e * 50},${58 + e * 90},${140 + e * 100})`;
-          ctx.fill();
-          ctx.strokeStyle = `rgba(125,211,252,${0.18 + e * 0.6})`;
-          ctx.lineWidth = 1;
-          ctx.stroke();
-          // Cara izquierda
-          ctx.beginPath();
-          ctx.moveTo(x - s, top);
-          ctx.lineTo(x, top + hs);
-          ctx.lineTo(x, bottom + hs);
-          ctx.lineTo(x - s, bottom);
-          ctx.closePath();
-          ctx.fillStyle = `rgb(${10 + e * 14},${28 + e * 30},${74 + e * 50})`;
-          ctx.fill();
-          // Cara derecha, la más oscura
-          ctx.beginPath();
-          ctx.moveTo(x + s, top);
-          ctx.lineTo(x, top + hs);
-          ctx.lineTo(x, bottom + hs);
-          ctx.lineTo(x + s, bottom);
-          ctx.closePath();
-          ctx.fillStyle = `rgb(${6 + e * 8},${18 + e * 18},${50 + e * 34})`;
-          ctx.fill();
+          // El pie del bloque queda siempre en y + HS: el recorte se apoya ahí, sea cual sea su altura
+          const n = Math.min(Z_MAX / STEP, Math.max(0, Math.round(heights[i] / STEP)));
+          const sx = (n % SHEET_COLS) * CELL_W * sheetRatio;
+          const sy = Math.floor(n / SHEET_COLS) * CELL_H * sheetRatio;
+          ctx.drawImage(
+            sheet!,
+            sx, sy, CELL_W * sheetRatio, CELL_H * sheetRatio,
+            x - S - 1, y + HS + 1 - CELL_H, CELL_W, CELL_H
+          );
         }
       }
     };

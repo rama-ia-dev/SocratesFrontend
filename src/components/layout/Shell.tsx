@@ -39,12 +39,13 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const desktopUserRef = useRef<HTMLDivElement>(null);
   const mobileUserRef = useRef<HTMLDivElement>(null);
+  const drawerUserRef = useRef<HTMLDivElement>(null);
 
   // Cerrar el menú de usuario al hacer clic fuera
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
-      const inside = [desktopUserRef, mobileUserRef].some((r) => r.current?.contains(target));
+      const inside = [desktopUserRef, mobileUserRef, drawerUserRef].some((r) => r.current?.contains(target));
       if (!inside) setIsUserMenuOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -154,6 +155,25 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     </div>
   );
 
+  // Pie del menú lateral y del panel del celular: el usuario, que abre sus opciones
+  const userButton = (
+    <button
+      type="button"
+      onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+      className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-white/8 transition-colors cursor-pointer text-left"
+      aria-expanded={isUserMenuOpen}
+      aria-haspopup="menu"
+      aria-label="Menú de usuario"
+    >
+      <InitialsAvatar name={fullName} size="md" colors="bg-white text-navy border-white" />
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-semibold text-white truncate">{fullName}</div>
+        <div className="text-xs text-accent-light/85 truncate">{roleLabel}</div>
+      </div>
+      <ChevronsUpDown className="w-4 h-4 text-accent-light/85 shrink-0" />
+    </button>
+  );
+
   return (
     <div className="min-h-screen flex bg-canvas text-ink">
       {/* ========================================================= */}
@@ -199,21 +219,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         )}
 
         <div className="p-3 border-t border-white/10 relative" ref={desktopUserRef}>
-          <button
-            type="button"
-            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-white/8 transition-colors cursor-pointer text-left"
-            aria-expanded={isUserMenuOpen}
-            aria-haspopup="menu"
-            aria-label="Menú de usuario"
-          >
-            <InitialsAvatar name={fullName} size="md" colors="bg-white text-navy border-white" />
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-white truncate">{fullName}</div>
-              <div className="text-xs text-accent-light/85 truncate">{roleLabel}</div>
-            </div>
-            <ChevronsUpDown className="w-4 h-4 text-accent-light/85 shrink-0" />
-          </button>
+          {userButton}
           {isUserMenuOpen && userMenu('bottom-full left-3 mb-2')}
         </div>
       </aside>
@@ -249,7 +255,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               <ChevronDown className="w-4 h-4 text-accent-light" />
             </button>
             {/* En celular el nombre no entra en la barra: va al principio del menú */}
-            {isUserMenuOpen && userMenu('right-0 top-full mt-2', true)}
+            {isUserMenuOpen && !isMobileMenuOpen && userMenu('right-0 top-full mt-2', true)}
           </div>
         </header>
 
@@ -281,12 +287,10 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               </button>
             </div>
             {navList}
-            <div className="p-4 border-t border-white/10 flex items-center gap-3">
-              <InitialsAvatar name={fullName} size="md" colors="bg-white text-navy border-white" />
-              <div className="min-w-0">
-                <div className="text-sm font-semibold text-white truncate">{fullName}</div>
-                <div className="text-xs text-accent-light/85 truncate">{roleLabel}</div>
-              </div>
+            {/* El mismo pie que el menú lateral de escritorio: tocarlo abre Mi perfil y Cerrar sesión */}
+            <div className="p-3 border-t border-white/10 relative" ref={drawerUserRef}>
+              {userButton}
+              {isUserMenuOpen && userMenu('bottom-full left-3 mb-2')}
             </div>
           </div>
         </div>
