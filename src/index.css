@@ -54,6 +54,10 @@
 html {
   scrollbar-gutter: stable;
 }
+/* Las pantallas sin sesión no lo necesitan, y sobre su fondo azul se vería como una franja clara */
+html:has(.auth-page) {
+  scrollbar-gutter: auto;
+}
 
 /* El foco se marca solo al navegar con teclado, con el color de la app. Los campos de texto
    mantienen su anillo al hacer clic, porque ahí sí indica dónde se escribe. */
@@ -77,10 +81,58 @@ html {
 .dialog-in { animation: dialog-in 180ms cubic-bezier(0.22, 1, 0.36, 1); }
 .pop-in { animation: pop-in 140ms cubic-bezier(0.22, 1, 0.36, 1); }
 
+/* ---- Pantallas sin sesión: entradas animadas, borde de luz y brillo del botón ---- */
+@keyframes enter-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes enter-pop {
+  from { opacity: 0; transform: translateY(10px) scale(0.92); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes letter-in {
+  from { opacity: 0; transform: translateY(0.45em); filter: blur(4px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+.enter-up { animation: enter-up 700ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.enter-pop { animation: enter-pop 900ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.letter-in { display: inline-block; animation: letter-in 650ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Tarjeta con un reflejo que sigue al puntero sobre el borde (--mx/--my los pone el componente) */
+.spot-card { position: relative; isolation: isolate; }
+.spot-card::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: radial-gradient(260px circle at var(--mx, 50%) var(--my, -40%), #7DD3FC, rgba(29, 78, 216, 0.55) 40%, transparent 70%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Botón principal de las pantallas sin sesión: un brillo lo cruza al pasar el puntero */
+.auth-page button[type='submit'] { position: relative; overflow: hidden; }
+.auth-page button[type='submit']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.auth-page button[type='submit']:hover::after { transform: translateX(120%); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+    /* Sin esto, las entradas escalonadas igual esperan su turno antes de aparecer */
+    animation-delay: 0ms !important;
   }
 }
 
@@ -105,13 +157,4 @@ body {
 .nav-utn-bar {
   background-color: var(--color-navy);
   background-image: linear-gradient(90deg, var(--color-navy-deep) 0%, var(--color-navy) 55%, color-mix(in oklab, var(--color-navy), var(--color-accent-strong) 40%) 100%);
-}
-
-/* Panel del login: el mismo degradado, más amplio y con dos brillos celestes */
-.auth-utn {
-  background-color: var(--color-navy-deep);
-  background-image:
-    radial-gradient(70% 55% at 100% 0%, color-mix(in oklab, var(--color-accent-strong) 30%, transparent), transparent 70%),
-    radial-gradient(90% 60% at 0% 100%, color-mix(in oklab, var(--color-primary) 55%, transparent), transparent 70%),
-    linear-gradient(160deg, var(--color-navy-deep) 0%, var(--color-navy) 55%, color-mix(in oklab, var(--color-navy), var(--color-primary) 35%) 100%);
 }
