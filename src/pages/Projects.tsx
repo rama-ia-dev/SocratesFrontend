@@ -12,14 +12,46 @@ import { Table, TableHeader, TableRow, TableHead, TableCell } from '../component
 import { Pagination } from '../components/ui/Pagination';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { PRIVACY_LABEL, STATUS_VARIANT, teamLabel } from '../lib/projects';
+import { useAuth } from '../context/AuthContext';
 
 const PAGE_SIZE = 10;
+
+type Scope = 'all' | 'mine';
+
+type ProjectFilters = { year: number | null; id_section: number | null; privacy: ProjectPrivacy | null };
+
+// Todos los equipos de un curso lectivo, recorriendo las páginas del backend (de a 100 como máximo)
+const allProjectsOf = async (id_section_year: number, filters: ProjectFilters) => {
+  const items: ProjectPublic[] = [];
+  for (let offset = 0; ; offset += 100) {
+    const res = await api.getProjects({ ...filters, id_section_year, limit: 100, offset });
+    items.push(...res.items);
+    if (items.length >= res.total || res.items.length === 0) return items;
+  }
+};
+
+// El mismo orden que usa el backend: año más reciente, comisión y número de equipo
+const byYearSectionNumber = (a: ProjectPublic, b: ProjectPublic) =>
+  b.year - a.year || a.section_name.localeCompare(b.section_name, 'es') || a.group_number - b.group_number;
 
 // Equipos de trabajo (SCRUM-105). El backend decide qué equipos ve cada usuario según la
 // privacidad: los privados solo aparecen para sus integrantes, los docentes del curso y los
 // super administradores.
 export const Projects: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // El docente ve también equipos de cursos ajenos (los públicos); puede quedarse solo con los suyos
+  const isProfessor = user?.role === 'professor' && !user.is_super_admin;
+  const [scope, setScope] = useState<Scope>('all');
+  const [mySectionYears, setMySectionYears] = useState<number[] | null>(null);
+
+  useEffect(() => {
+    if (!isProfessor || !user) return;
+    api
+      .getProfessorSectionYears({ id_professor: user.id_user, limit: 100 })
+      .then((res) => setMySectionYears(res.items.map((a) => a.id_section_year)))
+      .catch(() => setMySectionYears([]));
+  }, [isProfessor, user]);
 
   const [projects, setProjects] = useState<ProjectPublic[]>([]);
   const [total, setTotal] = useState(0);
@@ -51,28 +83,38 @@ export const Projects: React.FC = () => {
 
   const requestId = useRef(0);
   const fetchProjects = useCallback(async () => {
+    // Los cursos del docente todavía no llegaron: se sigue mostrando la carga
+    if (scope === 'mine' && mySectionYears === null) return;
     // Si se cambian los filtros rápido, una respuesta vieja no pisa la nueva
     const current = ++requestId.current;
     setIsLoading(true);
     setLoadError(false);
+    const filters: ProjectFilters = {
+      year: year ? Number(year) : null,
+      id_section: section ? Number(section) : null,
+      privacy: privacy || null,
+    };
     try {
-      const res = await api.getProjects({
-        year: year ? Number(year) : null,
-        id_section: section ? Number(section) : null,
-        privacy: privacy || null,
-        limit: PAGE_SIZE,
-        offset,
-      });
-      if (current !== requestId.current) return;
-      setProjects(res.items);
-      setTotal(res.total);
+      if (scope === 'mine') {
+        // El backend filtra por un solo curso lectivo: con varios, se piden todos y se pagina acá
+        const lists = await Promise.all((mySectionYears ?? []).map((id) => allProjectsOf(id, filters)));
+        if (current !== requestId.current) return;
+        const mine = lists.flat().sort(byYearSectionNumber);
+        setProjects(mine.slice(offset, offset + PAGE_SIZE));
+        setTotal(mine.length);
+      } else {
+        const res = await api.getProjects({ ...filters, limit: PAGE_SIZE, offset });
+        if (current !== requestId.current) return;
+        setProjects(res.items);
+        setTotal(res.total);
+      }
     } catch {
       if (current !== requestId.current) return;
       setLoadError(true);
     } finally {
       if (current === requestId.current) setIsLoading(false);
     }
-  }, [year, section, privacy, offset]);
+  }, [year, section, privacy, offset, scope, mySectionYears]);
 
   useEffect(() => {
     fetchProjects();
@@ -82,11 +124,26 @@ export const Projects: React.FC = () => {
     setter(e.target.value);
     setOffset(0);
   };
-  const hasFilters = Boolean(year || section || privacy);
+  const hasFilters = Boolean(year || section || privacy || scope === 'mine');
 
   return (
     <div className="space-y-6">
       <PageHeader title="Equipos de trabajo" subtitle="Equipos de cada comisión y su proyecto" />
+
+      {isProfessor && (
+        <SegmentedControl
+          label="Qué cursos lectivos mostrar"
+          value={scope}
+          onChange={(v) => {
+            setScope(v);
+            setOffset(0);
+          }}
+          options={[
+            { value: 'all' as const, label: 'Todos los cursos' },
+            { value: 'mine' as const, label: 'Mis cursos' },
+          ]}
+        />
+      )}
 
       {/* Años y comisiones pueden ser muchos: desplegables. La privacidad tiene tres: a la vista */}
       <div className="flex flex-col lg:flex-row lg:items-center gap-3">
@@ -159,6 +216,7 @@ export const Projects: React.FC = () => {
                   setYear('');
                   setSection('');
                   setPrivacy('');
+                  setScope('all');
                   setOffset(0);
                 }}
               >
