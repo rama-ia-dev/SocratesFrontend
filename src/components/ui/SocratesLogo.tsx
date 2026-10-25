@@ -1,119 +1,94 @@
 import React from 'react';
+import isotipo from '../../assets/socrates-isotipo.svg';
 
 interface SocratesLogoProps {
   className?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   showText?: boolean;
+  /** Texto en blanco, para fondos azules. El isotipo es el mismo en cualquier fondo. */
   invertText?: boolean;
-  darkBg?: boolean;
 }
 
+const SIZES = {
+  sm: { icon: 40, text: 'text-lg' },
+  md: { icon: 48, text: 'text-xl' },
+  lg: { icon: 60, text: 'text-2xl' },
+  xl: { icon: 80, text: 'text-3xl' },
+};
+
+/** Isotipo y nombre en una línea: menú lateral y barra del celular. */
 export const SocratesLogo: React.FC<SocratesLogoProps> = ({
   className = '',
   size = 'md',
   showText = true,
   invertText = false,
-  darkBg,
 }) => {
-  const isDark = darkBg !== undefined ? darkBg : invertText;
-
-  const sizeMap = {
-    sm: { icon: 28, text: 'text-lg' },
-    md: { icon: 36, text: 'text-xl' },
-    lg: { icon: 48, text: 'text-2xl' },
-    xl: { icon: 64, text: 'text-4xl' },
-  };
-
-  const dim = sizeMap[size];
-
-  // En fondo oscuro, la figura arquitectónica usa trazos blancos y celestes brillantes
-  // para que resalte con nitidez, elegancia y luminosidad en lugar de verse apagada u oscura.
-  const primaryStroke = isDark ? '#FFFFFF' : '#0B2A66';
-  const secondaryStroke = isDark ? '#38BDF8' : '#1D4ED8';
-  const accentStroke = isDark ? '#7DD3FC' : '#7DD3FC';
+  const dim = SIZES[size];
 
   return (
-    <div className={`flex items-center gap-3 select-none ${className}`}>
-      {/* Emblema clásico arquitectónico Sócrates */}
-      <div
-        className={`flex items-center justify-center rounded-lg shadow-xs shrink-0 transition-colors ${
-          isDark
-            ? 'bg-[#061A3D] border border-white/15 text-white'
-            : 'bg-white border border-[#D6E4F7] text-[#0B2A66]'
-        }`}
-        style={{ width: dim.icon + 12, height: dim.icon + 12 }}
-      >
-        <svg
-          width={dim.icon}
-          height={dim.icon}
-          viewBox="0 0 40 40"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          {/* Frontispicio de templo y columna clásica griega */}
-          <path
-            d="M6 13L20 6L34 13"
-            stroke={primaryStroke}
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M8 15H32"
-            stroke={secondaryStroke}
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          {/* Fustes acanalados clásicos */}
-          <path
-            d="M12 17V30"
-            stroke={primaryStroke}
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          <path
-            d="M17.33 17V30"
-            stroke={accentStroke}
-            strokeWidth="1.75"
-            strokeLinecap="round"
-          />
-          <path
-            d="M22.67 17V30"
-            stroke={accentStroke}
-            strokeWidth="1.75"
-            strokeLinecap="round"
-          />
-          <path
-            d="M28 17V30"
-            stroke={primaryStroke}
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          {/* Estilóbato / Base */}
-          <path
-            d="M8 32H32"
-            stroke={secondaryStroke}
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          <path
-            d="M5 34H35"
-            stroke={primaryStroke}
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          />
-        </svg>
-      </div>
+    <div className={`flex items-center gap-2.5 select-none ${className}`}>
+      <img
+        src={isotipo}
+        alt={showText ? '' : 'Sócrates'}
+        width={dim.icon}
+        height={dim.icon}
+        className="shrink-0"
+        draggable={false}
+      />
 
       {showText && (
         <span
-          className={`font-serif font-semibold tracking-tight ${dim.text} ${
-            invertText ? 'text-white' : 'text-[#0B2A66]'
+          className={`font-serif font-bold tracking-[0.02em] leading-none ${dim.text} ${
+            invertText ? 'text-white' : 'text-navy'
           }`}
         >
-          Sócrates
+          {/* Como en el logo completo: en mayúsculas y con tilde */}
+          SÓCRATES
         </span>
       )}
     </div>
   );
 };
+
+/** Logo completo: isotipo, nombre y "Gestor de proyectos", apilados. */
+export const SocratesLockup: React.FC<{
+  className?: string;
+  invert?: boolean;
+  iconSize?: number;
+  /** Entrada animada: la columna aparece y las letras del nombre suben una por una. */
+  animated?: boolean;
+  hideIcon?: boolean;
+}> = ({ className = '', invert = false, iconSize = 160, animated = false, hideIcon = false }) => (
+  <div className={`flex flex-col items-center select-none ${className}`} role="img" aria-label="Sócrates, gestor de proyectos">
+    {!hideIcon && (
+      <img
+        src={isotipo}
+        alt=""
+        width={iconSize}
+        height={iconSize}
+        draggable={false}
+        className={animated ? 'enter-pop' : ''}
+      />
+    )}
+    <span
+      className={`mt-3 font-serif font-bold leading-none tracking-[0.01em] ${invert ? 'text-white' : 'text-navy'}`}
+      style={{ fontSize: iconSize * 0.3 }}
+    >
+      {animated
+        ? [...'SÓCRATES'].map((ch, i) => (
+            <span key={i} className="letter-in" style={{ animationDelay: `${250 + i * 55}ms` }}>
+              {ch}
+            </span>
+          ))
+        : 'SÓCRATES'}
+    </span>
+    <span
+      className={`mt-2 font-semibold leading-none tracking-[0.14em] ${invert ? 'text-accent' : 'text-primary'} ${
+        animated ? 'enter-up' : ''
+      }`}
+      style={{ fontSize: iconSize * 0.088, animationDelay: animated ? '800ms' : undefined }}
+    >
+      GESTOR DE PROYECTOS
+    </span>
+  </div>
+);

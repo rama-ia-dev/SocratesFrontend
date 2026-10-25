@@ -41,32 +41,25 @@ export const Modal: React.FC<ModalProps> = ({
       aria-modal="true"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
     >
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-[#0B2A66]/30 backdrop-blur-xs transition-opacity"
-        onClick={onClose}
-      />
+      {/* Fondo */}
+      <div className="fixed inset-0 bg-navy-deep/45" onClick={onClose} />
 
-      {/* Modal Dialog Box */}
+      {/* Ventana */}
       <div
-        className={`relative w-full ${maxWidthClass} rounded-xl bg-white border border-[#D6E4F7] shadow-xl overflow-hidden z-10 animate-in fade-in zoom-in-95 duration-150`}
+        className={`relative w-full ${maxWidthClass} rounded-2xl bg-white shadow-[0_24px_48px_-12px_rgba(6,26,61,0.35)] z-10 dialog-in`}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#D6E4F7] bg-[#F5F9FF]/50">
-          <div>
-            <h3 className="font-serif font-semibold text-lg text-[#0B2A66]">
-              {title}
-            </h3>
-          </div>
+        <div className="flex items-start justify-between gap-4 px-6 pt-5">
+          <h3 className="text-[17px] font-semibold text-ink leading-snug pt-1">{title}</h3>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1 text-[#51607A] hover:text-[#0F1F3D] hover:bg-[#E0F2FE] transition-colors cursor-pointer"
+            className="-mr-2 rounded-lg p-1.5 text-ink-muted hover:text-ink hover:bg-fill-neutral transition-colors cursor-pointer"
             aria-label="Cerrar ventana"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-6">{children}</div>
+        <div className="px-6 pt-4 pb-6">{children}</div>
       </div>
     </div>
   );

@@ -18,8 +18,10 @@ import {
 import { Pagination } from '../components/ui/Pagination';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { useToast } from '../components/ui/Toast';
-import { Search, MoreVertical, Plus, Edit2, AlertCircle } from 'lucide-react';
+import { ActionMenu } from '../components/ui/ActionMenu';
+import { Search, SearchX, Plus, Edit2 } from 'lucide-react';
 import { validateName, professorSaveError } from '../lib/validation';
+import { Alert } from '../components/ui/Alert';
 
 export const Professors: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -42,9 +44,6 @@ export const Professors: React.FC = () => {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-
-  // Menú contextual
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
   const fetchProfessors = useCallback(async () => {
     setIsLoading(true);
@@ -89,7 +88,6 @@ export const Professors: React.FC = () => {
     setLegajo(prof.legajo);
     setIsSuperAdmin(Boolean(prof.is_super_admin));
     setModalError(null);
-    setOpenMenuId(null);
     setIsModalOpen(true);
   };
 
@@ -198,17 +196,40 @@ export const Professors: React.FC = () => {
       {isLoading ? (
         <TableSkeleton rows={4} cols={5} />
       ) : professors.length === 0 ? (
-        <EmptyState message="No se encontraron docentes registrados." />
+        searchQuery ? (
+          <EmptyState
+            icon={<SearchX className="w-5 h-5" />}
+            message="Ningún docente coincide con la búsqueda"
+            description="Revise el apellido, nombre o correo."
+            action={
+              <Button variant="outline" size="sm" onClick={() => { setSearchQuery(''); setOffset(0); }}>
+                Limpiar búsqueda
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState message="Todavía no hay docentes registrados" />
+        )
       ) : (
         <>
-          <Table>
+          {/* Anchos fijos por columna: al buscar, la tabla no cambia de forma */}
+          <Table className="table-fixed min-w-[760px]">
+            <colgroup>
+              <col className="w-[34%]" />
+              <col className="w-[34%]" />
+              <col className="w-[12%]" />
+              <col className="w-[20%]" />
+              <col className="w-16" />
+            </colgroup>
             <TableHeader>
               <tr>
                 <TableHead>Apellido y nombre</TableHead>
                 <TableHead>Correo electrónico</TableHead>
                 <TableHead>Legajo</TableHead>
                 <TableHead>Rol</TableHead>
-                <TableHead className="w-20 text-right">Acciones</TableHead>
+                <TableHead>
+                  <span className="sr-only">Acciones</span>
+                </TableHead>
               </tr>
             </TableHeader>
             <tbody>
@@ -220,13 +241,15 @@ export const Professors: React.FC = () => {
                         name={`${prof.last_name} ${prof.first_name}`}
                         size="sm"
                       />
-                      <span className="font-medium text-[#0F1F3D]">
+                      <span className="min-w-0 font-medium text-ink [overflow-wrap:anywhere]">
                         {prof.last_name}, {prof.first_name}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-[#51607A]">{prof.email}</TableCell>
-                  <TableCell className="font-mono text-[#51607A]">
+                  <TableCell className="text-ink-muted">
+                    <span className="block truncate" title={prof.email}>{prof.email}</span>
+                  </TableCell>
+                  <TableCell className="text-ink-muted tabular-nums">
                     {prof.legajo}
                   </TableCell>
                   <TableCell>
@@ -236,32 +259,17 @@ export const Professors: React.FC = () => {
                       <Badge variant="professor">Docente</Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-right relative">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setOpenMenuId(
-                          openMenuId === prof.id_user ? null : prof.id_user
-                        )
-                      }
-                      className="p-1 rounded text-[#51607A] hover:text-[#0F1F3D] hover:bg-[#EFF6FF] cursor-pointer"
-                      aria-label="Abrir menú de opciones"
-                    >
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
-
-                    {openMenuId === prof.id_user && (
-                      <div className="absolute right-4 top-10 w-36 bg-white border border-[#D6E4F7] rounded-lg shadow-lg py-1 z-20 text-left">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEdit(prof)}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#0F1F3D] hover:bg-[#EFF6FF] cursor-pointer"
-                        >
-                          <Edit2 className="w-3.5 h-3.5 text-[#1D4ED8]" />
-                          <span>Modificar</span>
-                        </button>
-                      </div>
-                    )}
+                  <TableCell className="text-right">
+                    <ActionMenu
+                      label={`Acciones de ${prof.first_name} ${prof.last_name}`}
+                      items={[
+                        {
+                          label: 'Modificar',
+                          icon: <Edit2 className="w-3.5 h-3.5 text-primary" />,
+                          onClick: () => handleOpenEdit(prof),
+                        },
+                      ]}
+                    />
                   </TableCell>
                 </TableRow>
               ))}
@@ -284,19 +292,13 @@ export const Professors: React.FC = () => {
         title={editingProf ? 'Modificar docente' : 'Registrar docente'}
       >
         {modalError && (
-          <div
-            role="alert"
-            className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
-          >
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{modalError}</span>
-          </div>
+          <Alert className="mb-4">{modalError}</Alert>
         )}
 
         {emailHasChanged && (
-          <div className="mb-4 p-3 rounded-lg bg-[#FEF3C7] border border-[#FDE68A] text-[#B45309] text-xs">
+          <Alert tone="warning" className="mb-4">
             Al cambiar el correo se cerrará la sesión del docente.
-          </div>
+          </Alert>
         )}
 
         <form onSubmit={handleSave} className="space-y-4">
@@ -350,20 +352,20 @@ export const Professors: React.FC = () => {
                 checked={isSuperAdmin}
                 onChange={(e) => setIsSuperAdmin(e.target.checked)}
                 disabled={isEditingSelf || isSaving}
-                className="w-4 h-4 rounded border-[#D6E4F7] text-[#1D4ED8] focus:ring-[#BAE6FD]"
+                className="w-4 h-4 rounded border-line text-primary focus:ring-accent-light"
               />
-              <span className="text-sm font-medium text-[#0F1F3D]">
+              <span className="text-sm font-medium text-ink">
                 Super administrador
               </span>
             </label>
             {isEditingSelf && (
-              <p className="text-xs text-[#B45309] mt-1 pl-7">
+              <p className="text-xs text-warning mt-1 pl-7">
                 No puede quitarse a sí mismo el rol de super administrador
               </p>
             )}
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-[#D6E4F7]">
+          <div className="flex justify-end gap-3 pt-4 border-t border-line">
             <Button
               type="button"
               variant="outline"

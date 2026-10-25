@@ -3,6 +3,7 @@ import { AlertCircle } from 'lucide-react';
 import { api } from '../lib/api';
 import { Modal } from './ui/Modal';
 import { Input } from './ui/Input';
+import { DateField } from './ui/DateField';
 import { Button } from './ui/Button';
 import { useToast } from './ui/Toast';
 import {
@@ -16,6 +17,7 @@ import {
   minBirthDate,
   digitsOnly,
 } from '../lib/validation';
+import { Alert } from './ui/Alert';
 
 export interface EditableStudent {
   id: number;
@@ -111,20 +113,14 @@ export const EditStudentModal: React.FC<{
   return (
     <Modal isOpen onClose={onClose} title="Modificar estudiante">
       {error && (
-        <div
-          role="alert"
-          className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
-        >
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-          <span>{error}</span>
-        </div>
+        <Alert className="mb-4">{error}</Alert>
       )}
 
       {legajoChanged && (
-        <div className="mb-4 p-3 rounded-lg bg-[#EFF6FF] border border-[#BAE6FD] text-[#1D4ED8] text-xs">
+        <Alert tone="info" className="mb-4">
           El correo de ingreso pasará a ser{' '}
           <span className="font-mono font-semibold">{legajo.value}@sistemas.frc.utn.edu.ar</span>
-        </div>
+        </Alert>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -143,9 +139,8 @@ export const EditStudentModal: React.FC<{
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {birthDateKnown && (
-            <Input
+            <DateField
               label="Fecha de nacimiento"
-              type="date"
               min={minBirthDate()}
               max={maxBirthDate()}
               {...birthDate.inputProps}
@@ -163,7 +158,7 @@ export const EditStudentModal: React.FC<{
           />
         </div>
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-[#D6E4F7]">
+        <div className="flex justify-end gap-3 pt-4 border-t border-line">
           <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
             Cancelar
           </Button>

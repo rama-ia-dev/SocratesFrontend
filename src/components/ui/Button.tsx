@@ -2,7 +2,7 @@ import React from 'react';
 import { Loader2 } from 'lucide-react';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'destructive' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'outline' | 'destructive' | 'ghost' | 'ghostDanger';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
 }
@@ -21,25 +21,28 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const baseStyles =
-      'inline-flex items-center justify-center font-medium transition-colors select-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#BAE6FD] focus-visible:ring-offset-1 disabled:opacity-50 disabled:pointer-events-none cursor-pointer';
+      'inline-flex items-center justify-center font-medium whitespace-nowrap transition-colors duration-150 select-none rounded-lg disabled:opacity-50 disabled:pointer-events-none cursor-pointer';
 
     const sizeStyles = {
-      sm: 'text-xs px-3 py-1.5 h-8 gap-1.5',
-      md: 'text-sm px-4 py-2 h-10 gap-2',
-      lg: 'text-base px-6 py-2.5 h-12 gap-2.5',
+      sm: 'text-[13px] px-3 h-8 gap-1.5',
+      md: 'text-sm px-4 h-10 gap-2',
+      lg: 'text-[15px] px-5 h-11 gap-2',
     }[size];
 
+    // El relleno lleno se reserva para la acción principal y para borrar; el resto va con borde
     const variantStyles = {
       primary:
-        'bg-[#1D4ED8] hover:bg-[#1E40AF] text-white shadow-xs active:bg-[#1E40AF]',
+        'bg-primary hover:bg-primary-hover active:bg-primary-hover text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_1px_2px_rgba(15,31,61,0.12)]',
       secondary:
-        'bg-[#EFF6FF] hover:bg-[#E0F2FE] text-[#1D4ED8] border border-[#D6E4F7]',
+        'bg-tint hover:bg-tint-strong text-primary border border-tint-strong',
       outline:
-        'bg-white hover:bg-[#F5F9FF] text-[#0F1F3D] border border-[#D6E4F7] shadow-2xs',
+        'bg-white hover:bg-canvas active:bg-fill-neutral text-ink border border-line hover:border-line-neutral-strong shadow-[0_1px_2px_rgba(15,31,61,0.04)]',
       destructive:
-        'bg-[#B91C1C] hover:bg-[#991B1B] text-white shadow-xs',
+        'bg-danger hover:bg-danger-hover text-white shadow-[0_1px_2px_rgba(15,31,61,0.12)]',
       ghost:
-        'bg-transparent hover:bg-[#EFF6FF] text-[#51607A] hover:text-[#0F1F3D]',
+        'bg-transparent hover:bg-fill-neutral text-ink-muted hover:text-ink',
+      ghostDanger:
+        'bg-transparent hover:bg-danger-soft text-danger hover:text-ink',
     }[variant];
 
     return (

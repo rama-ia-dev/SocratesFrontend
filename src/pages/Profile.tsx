@@ -4,12 +4,14 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Input } from '../components/ui/Input';
+import { DateField } from '../components/ui/DateField';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
+import { InitialsAvatar } from '../components/ui/Table';
 import { useToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
 import { PasswordCodeForm } from '../components/PasswordCodeForm';
-import { AlertCircle, KeyRound } from 'lucide-react';
+import { KeyRound } from 'lucide-react';
 import {
   useField,
   validateName,
@@ -21,22 +23,34 @@ import {
   digitsOnly,
   showProfessorSaveError,
 } from '../lib/validation';
+import { Alert } from '../components/ui/Alert';
 
 const ReadOnlyField: React.FC<{ label: string; children: React.ReactNode; mono?: boolean }> = ({
   label,
   children,
   mono,
 }) => (
+  // Dato que no se puede cambiar desde acá: se lee como texto, no como un campo deshabilitado
   <div>
-    <label className="block text-sm font-medium text-[#0F1F3D] mb-1.5">{label}</label>
-    <div
-      className={`w-full rounded-lg border border-[#D6E4F7] bg-[#F1F5F9] px-3 py-2 text-sm text-[#51607A] flex items-center gap-2 select-none ${
-        mono ? 'font-mono' : ''
-      }`}
-    >
+    <dt className="text-[13px] text-ink-muted">{label}</dt>
+    <dd className={`mt-0.5 text-sm text-ink flex items-center gap-2 ${mono ? 'tabular-nums' : ''}`}>
       {children}
-    </div>
+    </dd>
   </div>
+);
+
+const Section: React.FC<{ title: string; description?: string; children: React.ReactNode }> = ({
+  title,
+  description,
+  children,
+}) => (
+  <section className="bg-white border border-line rounded-xl">
+    <header className="px-6 pt-5">
+      <h2 className="text-[15px] font-semibold text-ink">{title}</h2>
+      {description && <p className="mt-0.5 text-[13px] text-ink-muted">{description}</p>}
+    </header>
+    <div className="px-6 pt-4 pb-6">{children}</div>
+  </section>
 );
 
 export const Profile: React.FC = () => {
@@ -129,28 +143,41 @@ export const Profile: React.FC = () => {
   const roleText = user.role === 'professor' ? 'Docente' : 'Alumno';
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <PageHeader title="Mi perfil" />
+    <div className="max-w-2xl space-y-5">
+      <PageHeader title="Mi perfil" className="mb-2" />
 
-      <div className="w-full max-w-[640px] bg-white border border-[#D6E4F7] rounded-xl shadow-xs p-8">
+      {/* Quién es: nombre, rol y correo, como en el pie del menú */}
+      <div className="flex items-center gap-4">
+        <InitialsAvatar
+          name={`${user.first_name} ${user.last_name}`}
+          size="lg"
+          colors="bg-navy text-white border-navy"
+        />
+        <div className="min-w-0">
+          <p className="text-lg font-semibold text-ink truncate">
+            {user.first_name} {user.last_name}
+          </p>
+          <p className="text-sm text-ink-muted flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span>{user.is_super_admin ? 'Super administrador' : roleText}</span>
+            <span aria-hidden="true">·</span>
+            <span className="truncate">{user.email}</span>
+          </p>
+        </div>
+      </div>
+
+      <Section title="Datos personales">
         {errorMessage && (
-          <div
-            role="alert"
-            className="mb-6 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2.5"
-          >
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{errorMessage}</span>
-          </div>
+          <Alert className="mb-5">{errorMessage}</Alert>
         )}
 
         {emailChanged && (
-          <div className="mb-6 p-3 rounded-lg bg-[#FEF3C7] border border-[#FDE68A] text-[#B45309] text-xs">
+          <Alert tone="warning" className="mb-5">
             Al cambiar el correo se cerrará su sesión y deberá entrar con el correo nuevo. La
             contraseña no cambia.
-          </div>
+          </Alert>
         )}
 
-        <form onSubmit={handleSave} className="space-y-6" noValidate>
+        <form onSubmit={handleSave} className="space-y-5" noValidate>
           {/* Campos editables */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
@@ -168,10 +195,9 @@ export const Profile: React.FC = () => {
           </div>
 
           <div>
-            <Input
+            <DateField
               label="Fecha de nacimiento"
               optional
-              type="date"
               min={minBirthDate()}
               max={maxBirthDate()}
               {...birthDate.inputProps}
@@ -198,37 +224,32 @@ export const Profile: React.FC = () => {
             </div>
           )}
 
-          <div className="border-t border-[#D6E4F7] pt-5 space-y-4">
-            {/* Campos de solo lectura (fondo #F1F5F9) */}
-            {!canEditAccount && (
-              <>
-                <p className="text-xs text-[#51607A]">
-                  Correo, legajo y rol los modifica un administrador.
-                </p>
-                <ReadOnlyField label="Correo electrónico">{user.email}</ReadOnlyField>
-              </>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Datos de la cuenta que no se editan acá */}
+          <div className="border-t border-line pt-5 space-y-3">
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {!canEditAccount && <ReadOnlyField label="Correo electrónico">{user.email}</ReadOnlyField>}
               {!canEditAccount && (
                 <ReadOnlyField label="Legajo" mono>
                   {user.legajo}
                 </ReadOnlyField>
               )}
-
               {user.role === 'student' && (
                 <ReadOnlyField label="Año de ingreso">{user.enrollment_year ?? '—'}</ReadOnlyField>
               )}
-
               <ReadOnlyField label="Rol">
                 <span>{roleText}</span>
                 {user.is_super_admin && <Badge variant="superadmin">Super administrador</Badge>}
               </ReadOnlyField>
-            </div>
+            </dl>
+            {!canEditAccount && (
+              <p className="text-xs text-ink-muted">
+                Correo, legajo y rol los modifica un administrador.
+              </p>
+            )}
           </div>
 
           {/* Botones de acción */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#D6E4F7]">
+          <div className="flex items-center justify-end gap-3 pt-5 border-t border-line">
             <Button
               type="button"
               variant="outline"
@@ -247,21 +268,21 @@ export const Profile: React.FC = () => {
             </Button>
           </div>
         </form>
-      </div>
+      </Section>
 
-      <div className="w-full max-w-[640px] mt-6 bg-white border border-[#D6E4F7] rounded-xl shadow-xs p-8 flex flex-col sm:flex-row sm:items-center gap-4 sm:justify-between">
+      <section className="bg-white border border-line rounded-xl px-6 py-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:justify-between">
         <div>
-          <h3 className="font-serif font-semibold text-lg text-[#0B2A66]">Contraseña</h3>
-          <p className="text-xs text-[#51607A] mt-1">
+          <h2 className="text-[15px] font-semibold text-ink">Contraseña</h2>
+          <p className="text-[13px] text-ink-muted mt-0.5">
             Se confirma con un código que le llega al correo. Al cambiarla se cierra la sesión en
             todos los dispositivos.
           </p>
         </div>
         <Button type="button" variant="outline" className="shrink-0" onClick={() => setPasswordOpen(true)}>
-          <KeyRound className="w-4 h-4 mr-1.5" />
+          <KeyRound className="w-4 h-4" />
           Cambiar contraseña
         </Button>
-      </div>
+      </section>
 
       <Modal isOpen={passwordOpen} onClose={() => setPasswordOpen(false)} title="Cambiar contraseña">
         <PasswordCodeForm

@@ -6,7 +6,8 @@ import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Select } from '../components/ui/Select';
+import { DateField } from '../components/ui/DateField';
+import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import {
@@ -29,6 +30,7 @@ import {
   AlertCircle,
   UserCheck,
   GraduationCap,
+  SearchX,
 } from 'lucide-react';
 import {
   useField,
@@ -41,6 +43,7 @@ import {
   digitsOnly,
   showProfessorSaveError,
 } from '../lib/validation';
+import { Alert } from '../components/ui/Alert';
 
 export const Users: React.FC = () => {
   const navigate = useNavigate();
@@ -254,15 +257,17 @@ export const Users: React.FC = () => {
                 Registrar estudiantes
               </Button>
             ) : (
-              <div className="flex items-center gap-2">
+              // En celular van uno debajo del otro, a todo el ancho, para que el texto no se corte
+              <div className="flex flex-col-reverse sm:flex-row sm:items-center gap-2 w-full">
                 <Button
                   variant="outline"
+                  className="w-full sm:w-auto"
                   onClick={() => navigate('/estudiantes/nuevo')}
                 >
-                  <GraduationCap className="w-4 h-4 mr-1.5 text-[#1D4ED8]" />
+                  <GraduationCap className="w-4 h-4 mr-1.5 text-primary" />
                   Registrar estudiantes
                 </Button>
-                <Button variant="primary" onClick={handleOpenCreateProf}>
+                <Button variant="primary" className="w-full sm:w-auto" onClick={handleOpenCreateProf}>
                   <UserCheck className="w-4 h-4 mr-1.5" />
                   Registrar docente
                 </Button>
@@ -272,12 +277,13 @@ export const Users: React.FC = () => {
         }
       />
 
-      {/* Barra de herramientas: Buscador y Filtro Rol */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl">
-        <div className="sm:col-span-2">
+      {/* Barra de herramientas: buscador y filtro de rol */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="w-full sm:max-w-sm">
           <Input
             type="text"
             placeholder="Buscar por nombre, legajo o correo"
+            aria-label="Buscar usuarios"
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -286,28 +292,58 @@ export const Users: React.FC = () => {
             leftIcon={<Search className="w-4 h-4" />}
           />
         </div>
-        <div>
-          <Select
-            value={roleFilter}
-            onChange={(e) => {
-              setRoleFilter(e.target.value as any);
-              setOffset(0);
-            }}
-          >
-            <option value="">Todos los roles</option>
-            <option value="student">Alumnos</option>
-            <option value="professor">Docentes</option>
-          </Select>
-        </div>
+        <SegmentedControl
+          label="Filtrar por rol"
+          value={roleFilter}
+          onChange={(v) => {
+            setRoleFilter(v);
+            setOffset(0);
+          }}
+          options={[
+            { value: '', label: 'Todos' },
+            { value: 'student', label: 'Alumnos' },
+            { value: 'professor', label: 'Docentes' },
+          ]}
+        />
       </div>
 
       {isLoading ? (
         <TableSkeleton rows={4} cols={6} />
       ) : users.length === 0 ? (
-        <EmptyState message="No se encontraron usuarios para los filtros seleccionados." />
+        searchQuery || roleFilter ? (
+          <EmptyState
+            icon={<SearchX className="w-5 h-5" />}
+            message="Ningún usuario coincide con la búsqueda"
+            description="Revise el nombre, legajo o correo, o muestre todos los roles."
+            action={
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearchQuery('');
+                  setRoleFilter('');
+                  setOffset(0);
+                }}
+              >
+                Limpiar filtros
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState message="Todavía no hay usuarios registrados" />
+        )
       ) : (
         <>
-          <Table>
+          {/* Anchos fijos por columna: al filtrar, la tabla no cambia de forma */}
+          <Table className="table-fixed min-w-[880px]">
+            <colgroup>
+              <col className="w-[29%]" />
+              <col className="w-[29%]" />
+              <col className="w-[11%]" />
+              <col className="w-[15%]" />
+              <col className="w-[16%]" />
+              <col className="w-16" />
+            </colgroup>
             <TableHeader>
               <tr>
                 <TableHead>Apellido y nombre</TableHead>
@@ -316,26 +352,31 @@ export const Users: React.FC = () => {
                 <TableHead>Rol</TableHead>
                 <TableHead>Año de ingreso</TableHead>
                 {/* Fija a la derecha: con la tabla más ancha que la pantalla, las acciones siguen a la vista */}
-                <TableHead className="w-20 text-right sticky right-0 bg-[#EFF6FF]">Acciones</TableHead>
+                <TableHead className="sticky right-0 bg-canvas">
+                  <span className="sr-only">Acciones</span>
+                </TableHead>
               </tr>
             </TableHeader>
             <tbody>
               {users.map((u) => (
                 <TableRow key={u.id_user}>
                   {/* Un nombre largo baja de línea en vez de ensanchar la tabla */}
-                  <TableCell className="min-w-48 max-w-72">
+                  <TableCell>
                     <div className="flex items-center gap-3">
                       <InitialsAvatar
                         name={`${u.last_name} ${u.first_name}`}
                         size="sm"
                       />
-                      <span className="min-w-0 font-medium text-[#0F1F3D] [overflow-wrap:anywhere]">
+                      <span className="min-w-0 font-medium text-ink [overflow-wrap:anywhere]">
                         {u.last_name}, {u.first_name}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-[#51607A]">{u.email}</TableCell>
-                  <TableCell className="font-mono text-[#51607A]">
+                  {/* El correo largo se corta con puntos suspensivos; completo, al pasar el mouse */}
+                  <TableCell className="text-ink-muted">
+                    <span className="block truncate" title={u.email}>{u.email}</span>
+                  </TableCell>
+                  <TableCell className="text-ink-muted tabular-nums">
                     {u.legajo}
                   </TableCell>
                   <TableCell>
@@ -347,16 +388,16 @@ export const Users: React.FC = () => {
                       <Badge variant="student">Alumno</Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-[#51607A]">
+                  <TableCell className="text-ink-muted tabular-nums">
                     {u.role === 'student' ? u.enrollment_year || '—' : '—'}
                   </TableCell>
-                  <TableCell className="text-right sticky right-0 bg-white border-b border-[#D6E4F7]">
+                  <TableCell className="text-right sticky right-0 bg-white group-hover:bg-canvas transition-colors duration-150">
                     <ActionMenu
                       label={`Acciones de ${u.first_name} ${u.last_name}`}
                       items={[
                         {
                           label: 'Modificar',
-                          icon: <Edit2 className="w-3.5 h-3.5 text-[#1D4ED8]" />,
+                          icon: <Edit2 className="w-3.5 h-3.5 text-primary" />,
                           onClick: () =>
                             u.role === 'professor' ? handleOpenEditProf(u) : handleOpenEditStudent(u),
                         },
@@ -386,13 +427,7 @@ export const Users: React.FC = () => {
         title="Registrar docente"
       >
         {profCreateError && (
-          <div
-            role="alert"
-            className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
-          >
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{profCreateError}</span>
-          </div>
+          <Alert className="mb-4">{profCreateError}</Alert>
         )}
 
         <form onSubmit={handleSaveProfCreate} className="space-y-4" noValidate>
@@ -431,9 +466,8 @@ export const Users: React.FC = () => {
           </div>
 
           <div>
-            <Input
+            <DateField
               label="Fecha de nacimiento"
-              type="date"
               min={minBirthDate()}
               max={maxBirthDate()}
               {...profCreateBirthDate.inputProps}
@@ -448,15 +482,15 @@ export const Users: React.FC = () => {
                 checked={profCreateIsSuperAdmin}
                 onChange={(e) => setProfCreateIsSuperAdmin(e.target.checked)}
                 disabled={isSavingProfCreate}
-                className="w-4 h-4 rounded border-[#D6E4F7] text-[#1D4ED8] focus:ring-[#BAE6FD]"
+                className="w-4 h-4 rounded border-line text-primary focus:ring-accent-light"
               />
-              <span className="text-sm font-medium text-[#0F1F3D]">
+              <span className="text-sm font-medium text-ink">
                 Super administrador
               </span>
             </label>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-[#D6E4F7]">
+          <div className="flex justify-end gap-3 pt-4 border-t border-line">
             <Button
               type="button"
               variant="outline"
@@ -485,19 +519,13 @@ export const Users: React.FC = () => {
         title="Modificar docente"
       >
         {profEditError && (
-          <div
-            role="alert"
-            className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
-          >
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{profEditError}</span>
-          </div>
+          <Alert className="mb-4">{profEditError}</Alert>
         )}
 
         {profEmailChanged && (
-          <div className="mb-4 p-3 rounded-lg bg-[#FEF3C7] border border-[#FDE68A] text-[#B45309] text-xs">
+          <Alert tone="warning" className="mb-4">
             Al cambiar el correo se cerrará la sesión del docente.
-          </div>
+          </Alert>
         )}
 
         <form onSubmit={handleSaveProfEdit} className="space-y-4" noValidate>
@@ -534,9 +562,8 @@ export const Users: React.FC = () => {
           </div>
 
           <div>
-            <Input
+            <DateField
               label="Fecha de nacimiento"
-              type="date"
               min={minBirthDate()}
               max={maxBirthDate()}
               {...profEditBirthDate.inputProps}
@@ -551,20 +578,20 @@ export const Users: React.FC = () => {
                 checked={profEditIsSuperAdmin}
                 onChange={(e) => setProfEditIsSuperAdmin(e.target.checked)}
                 disabled={isEditingSelf || isSavingProfEdit}
-                className="w-4 h-4 rounded border-[#D6E4F7] text-[#1D4ED8] focus:ring-[#BAE6FD]"
+                className="w-4 h-4 rounded border-line text-primary focus:ring-accent-light"
               />
-              <span className="text-sm font-medium text-[#0F1F3D]">
+              <span className="text-sm font-medium text-ink">
                 Super administrador
               </span>
             </label>
             {isEditingSelf && (
-              <p className="text-xs text-[#B45309] mt-1 pl-7">
+              <p className="text-xs text-warning mt-1 pl-7">
                 No puede quitarse a sí mismo el rol de super administrador
               </p>
             )}
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-[#D6E4F7]">
+          <div className="flex justify-end gap-3 pt-4 border-t border-line">
             <Button
               type="button"
               variant="outline"

@@ -2,7 +2,7 @@ import React from 'react';
 
 export interface BadgeProps {
   children: React.ReactNode;
-  variant?: 'superadmin' | 'professor' | 'student' | 'public' | 'protected' | 'private' | 'neutral';
+  variant?: 'superadmin' | 'professor' | 'student' | 'leader' | 'public' | 'protected' | 'private' | 'neutral';
   className?: string;
 }
 
@@ -12,13 +12,15 @@ export const Badge: React.FC<BadgeProps> = ({
   className = '',
 }) => {
   const variantStyles = {
-    superadmin: 'bg-[#EFF6FF] text-[#1D4ED8] border border-[#BAE6FD]',
-    professor: 'bg-[#F1F5F9] text-[#0F1F3D] border border-[#CBD5E1]',
-    student: 'bg-[#F8FAFC] text-[#51607A] border border-[#E2E8F0]',
-    public: 'bg-[#DCFCE7] text-[#15803D] border border-[#86EFAC]',
-    protected: 'bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]',
-    private: 'bg-[#FEE2E2] text-[#B91C1C] border border-[#FCA5A5]',
-    neutral: 'bg-[#F1F5F9] text-[#51607A] border border-[#E2E8F0]',
+    // Los roles se distinguen por tono, de más neutro (alumno) a más institucional (super admin)
+    superadmin: 'bg-navy text-white border border-navy',
+    professor: 'bg-tint text-primary border border-tint-strong',
+    student: 'bg-fill-neutral text-ink-muted border border-line-neutral',
+    leader: 'bg-warning-soft text-warning border border-warning-line',
+    public: 'bg-success-soft text-success border border-success-line',
+    protected: 'bg-warning-soft text-warning border border-warning-line',
+    private: 'bg-danger-soft text-danger border border-danger-line',
+    neutral: 'bg-fill-neutral text-ink-muted border border-line-neutral',
   }[variant];
 
   return (

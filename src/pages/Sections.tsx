@@ -23,13 +23,17 @@ import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { useToast } from '../components/ui/Toast';
 import {
   Search,
-  MoreVertical,
   Plus,
   UserPlus,
   AlertCircle,
   Edit2,
   Trash2,
+  SearchX,
+  Layers,
+  CalendarRange,
 } from 'lucide-react';
+import { Alert } from '../components/ui/Alert';
+import { ActionMenu } from '../components/ui/ActionMenu';
 
 // Fila de la pestaña Cursos lectivos: el backend devuelve el curso lectivo solo; los docentes
 // asignados y la cantidad de grupos se consultan aparte.
@@ -37,13 +41,6 @@ type SectionYearRow = SectionYearPublic & {
   professors: { id_professor: number; first_name: string; last_name: string }[];
   project_count: number;
 };
-
-// Ítem de los menús de acciones. Un <button> centra el texto por defecto: si un ítem se partía en
-// dos líneas quedaba con otra sangría que el resto, por eso va alineado a la izquierda y sin cortes.
-const MENU_ITEM_BASE =
-  'w-full flex items-center gap-2 px-3 py-2 text-sm text-left whitespace-nowrap hover:bg-[#EFF6FF] cursor-pointer';
-const MENU_ITEM_CLASS = `${MENU_ITEM_BASE} text-[#0F1F3D]`;
-const MENU_ITEM_DANGER_CLASS = `${MENU_ITEM_BASE} text-[#B91C1C]`;
 
 export const Sections: React.FC = () => {
   const { success, error: toastError } = useToast();
@@ -127,9 +124,6 @@ export const Sections: React.FC = () => {
   >(null);
   const [deleteModalError, setDeleteModalError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-
-  // Menú contextual abierto
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // Cargar comisiones
   const fetchSections = useCallback(async () => {
@@ -256,7 +250,6 @@ export const Sections: React.FC = () => {
     setEditingSection(sec);
     setSectionNameInput(sec.name);
     setSectionModalError(null);
-    setOpenMenuId(null);
     setIsSectionModalOpen(true);
   };
 
@@ -319,7 +312,6 @@ export const Sections: React.FC = () => {
     setSyFormMax(sy.max_students !== undefined ? String(sy.max_students) : '');
     setSyCupoTouched(false);
     setSyModalError(null);
-    setOpenMenuId(null);
     setIsSYModalOpen(true);
   };
 
@@ -380,7 +372,6 @@ export const Sections: React.FC = () => {
     setCurrentAssignments([]);
     setSelectedProfIds([]);
     setAssignModalError(null);
-    setOpenMenuId(null);
     setIsAssignModalOpen(true);
 
     // Se consultan las asignaciones al abrir, para no depender de la tabla ya cargada
@@ -458,7 +449,6 @@ export const Sections: React.FC = () => {
   ) => {
     setDeleteTarget(target);
     setDeleteModalError(null);
-    setOpenMenuId(null);
   };
 
   const handleConfirmDelete = async () => {
@@ -551,30 +541,29 @@ export const Sections: React.FC = () => {
         }
       />
 
-      {/* Pestañas de Navegación */}
-      <div className="flex items-center gap-1 border-b border-[#D6E4F7] mb-6">
-        <button
-          type="button"
-          onClick={() => setActiveTab('sections')}
-          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
-            activeTab === 'sections'
-              ? 'border-[#1D4ED8] text-[#1D4ED8]'
-              : 'border-transparent text-[#51607A] hover:text-[#0F1F3D]'
-          }`}
-        >
-          Comisiones
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('years')}
-          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
-            activeTab === 'years'
-              ? 'border-[#1D4ED8] text-[#1D4ED8]'
-              : 'border-transparent text-[#51607A] hover:text-[#0F1F3D]'
-          }`}
-        >
-          Cursos lectivos
-        </button>
+      {/* Pestañas: el foco se marca solo al navegar con teclado (estilo global) */}
+      <div role="tablist" aria-label="Secciones de comisiones" className="flex items-center gap-6 border-b border-line mb-6">
+        {(
+          [
+            ['sections', 'Comisiones'],
+            ['years', 'Cursos lectivos'],
+          ] as const
+        ).map(([tab, label]) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            onClick={() => setActiveTab(tab)}
+            className={`-mb-px py-2.5 text-sm border-b-2 transition-colors duration-150 cursor-pointer ${
+              activeTab === tab
+                ? 'border-primary text-ink font-semibold'
+                : 'border-transparent text-ink-muted font-medium hover:text-ink hover:border-line-neutral-strong'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* ========================================================= */}
@@ -600,58 +589,66 @@ export const Sections: React.FC = () => {
           {loadingSections && sections.length === 0 ? (
             <TableSkeleton rows={4} cols={2} />
           ) : sections.length === 0 ? (
-            <EmptyState message="No se encontraron comisiones registradas." />
+            sectionSearch ? (
+              <EmptyState
+                icon={<SearchX className="w-5 h-5" />}
+                message="Ninguna comisión coincide con la búsqueda"
+                action={
+                  <Button variant="outline" size="sm" onClick={() => { setSectionSearch(''); setSectionOffset(0); }}>
+                    Limpiar búsqueda
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={<Layers className="w-5 h-5" />}
+                message="Todavía no hay comisiones registradas"
+                action={
+                  <Button variant="primary" size="sm" onClick={handleOpenCreateSection}>
+                    <Plus className="w-4 h-4" />
+                    Registrar comisión
+                  </Button>
+                }
+              />
+            )
           ) : (
             <>
-              <Table>
+              <Table className="table-fixed">
+                <colgroup>
+                  <col />
+                  <col className="w-16" />
+                </colgroup>
                 <TableHeader>
                   <tr>
                     <TableHead>Nombre</TableHead>
-                    <TableHead className="w-20 text-right">Acciones</TableHead>
+                    <TableHead>
+                      <span className="sr-only">Acciones</span>
+                    </TableHead>
                   </tr>
                 </TableHeader>
                 <tbody>
                   {sections.map((sec) => (
                     <TableRow key={sec.id_section}>
-                      <TableCell className="font-semibold text-[#0B2A66]">
+                      <TableCell className="font-medium text-ink">
                         {sec.name}
                       </TableCell>
-                      <TableCell className="text-right relative">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOpenMenuId(
-                              openMenuId === `sec-${sec.id_section}`
-                                ? null
-                                : `sec-${sec.id_section}`
-                            )
-                          }
-                          className="p-1 rounded text-[#51607A] hover:text-[#0F1F3D] hover:bg-[#EFF6FF] cursor-pointer"
-                          aria-label="Abrir menú de acciones"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-
-                        {openMenuId === `sec-${sec.id_section}` && (
-                          <div className="absolute right-4 top-10 w-36 bg-white border border-[#D6E4F7] rounded-lg shadow-lg py-1 z-20 text-left">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditSection(sec)}
-                              className={MENU_ITEM_CLASS}
-                            >
-                              <Edit2 className="w-3.5 h-3.5 shrink-0 text-[#1D4ED8]" />
-                              <span>Modificar</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenDelete({ kind: 'section', item: sec })}
-                              className={MENU_ITEM_DANGER_CLASS}
-                            >
-                              <Trash2 className="w-3.5 h-3.5 shrink-0" />
-                              <span>Eliminar</span>
-                            </button>
-                          </div>
-                        )}
+                      <TableCell className="text-right">
+                        <ActionMenu
+                          label={`Acciones de la comisión ${sec.name}`}
+                          items={[
+                            {
+                              label: 'Modificar',
+                              icon: <Edit2 className="w-3.5 h-3.5 shrink-0 text-primary" />,
+                              onClick: () => handleOpenEditSection(sec),
+                            },
+                            {
+                              label: 'Eliminar',
+                              icon: <Trash2 className="w-3.5 h-3.5 shrink-0" />,
+                              onClick: () => handleOpenDelete({ kind: 'section', item: sec }),
+                              danger: true,
+                            },
+                          ]}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -717,93 +714,106 @@ export const Sections: React.FC = () => {
           {loadingSY && sectionYears.length === 0 ? (
             <TableSkeleton rows={4} cols={5} />
           ) : sectionYears.length === 0 ? (
-            <EmptyState message="No se encontraron cursos lectivos para los filtros seleccionados." />
+            syYearFilter || sySectionFilter ? (
+              <EmptyState
+                icon={<SearchX className="w-5 h-5" />}
+                message="Ningún curso lectivo coincide con los filtros"
+                action={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { setSyYearFilter(''); setSySectionFilter(''); setSyOffset(0); }}
+                  >
+                    Limpiar filtros
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={<CalendarRange className="w-5 h-5" />}
+                message="Todavía no hay cursos lectivos registrados"
+                action={
+                  <Button variant="primary" size="sm" onClick={handleOpenCreateSY}>
+                    <Plus className="w-4 h-4" />
+                    Registrar curso lectivo
+                  </Button>
+                }
+              />
+            )
           ) : (
             <>
-              <Table>
+              {/* Anchos fijos por columna: al filtrar, la tabla no cambia de forma */}
+              <Table className="table-fixed min-w-[720px]">
+                <colgroup>
+                  <col className="w-[22%]" />
+                  <col className="w-[10%]" />
+                  <col />
+                  <col className="w-24" />
+                  <col className="w-16" />
+                </colgroup>
                 <TableHeader>
                   <tr>
                     <TableHead>Comisión</TableHead>
                     <TableHead>Año</TableHead>
                     <TableHead>Docentes asignados</TableHead>
-                    <TableHead className="w-24 text-center">Grupos</TableHead>
-                    <TableHead className="w-20 text-right">Acciones</TableHead>
+                    <TableHead className="text-right">Grupos</TableHead>
+                    <TableHead>
+                      <span className="sr-only">Acciones</span>
+                    </TableHead>
                   </tr>
                 </TableHeader>
                 <tbody>
                   {sectionYears.map((sy) => (
                     <TableRow key={sy.id_section_year}>
-                      <TableCell className="font-semibold text-[#0B2A66]">
+                      <TableCell className="font-medium text-ink">
                         {sy.section_name}
                       </TableCell>
-                      <TableCell className="font-mono text-sm">
+                      <TableCell className="text-ink-muted tabular-nums">
                         {sy.year}
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex flex-wrap gap-1.5 py-0.5">
                           {sy.professors.length > 0 ? (
                             sy.professors.map((p) => (
                               <span
                                 key={p.id_professor}
-                                className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-[#EFF6FF] text-[#1D4ED8] border border-[#BAE6FD]"
+                                className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-tint text-navy border border-tint-strong"
                               >
                                 {p.first_name} {p.last_name}
                               </span>
                             ))
                           ) : (
-                            <span className="text-xs text-[#94A3B8] italic">
+                            <span className="text-sm text-ink-faint">
                               Sin docentes asignados
                             </span>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-center font-mono text-sm">
+                      <TableCell className="text-right text-ink tabular-nums">
                         {sy.project_count}
                       </TableCell>
-                      <TableCell className="text-right relative">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOpenMenuId(
-                              openMenuId === `sy-${sy.id_section_year}`
-                                ? null
-                                : `sy-${sy.id_section_year}`
-                            )
-                          }
-                          className="p-1 rounded text-[#51607A] hover:text-[#0F1F3D] hover:bg-[#EFF6FF] cursor-pointer"
-                          aria-label="Abrir menú de acciones"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-
-                        {openMenuId === `sy-${sy.id_section_year}` && (
-                          <div className="absolute right-4 top-10 w-52 bg-white border border-[#D6E4F7] rounded-lg shadow-lg py-1 z-20 text-left">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditSY(sy)}
-                              className={MENU_ITEM_CLASS}
-                            >
-                              <Edit2 className="w-3.5 h-3.5 shrink-0 text-[#1D4ED8]" />
-                              <span>Modificar</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenAssignModal(sy)}
-                              className={MENU_ITEM_CLASS}
-                            >
-                              <UserPlus className="w-3.5 h-3.5 shrink-0 text-[#1D4ED8]" />
-                              <span>Docentes asignados</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenDelete({ kind: 'sectionYear', item: sy })}
-                              className={MENU_ITEM_DANGER_CLASS}
-                            >
-                              <Trash2 className="w-3.5 h-3.5 shrink-0" />
-                              <span>Eliminar</span>
-                            </button>
-                          </div>
-                        )}
+                      <TableCell className="text-right">
+                        <ActionMenu
+                          label={`Acciones del curso lectivo ${sy.section_name} ${sy.year}`}
+                          items={[
+                            {
+                              label: 'Modificar',
+                              icon: <Edit2 className="w-3.5 h-3.5 shrink-0 text-primary" />,
+                              onClick: () => handleOpenEditSY(sy),
+                            },
+                            {
+                              label: 'Docentes asignados',
+                              icon: <UserPlus className="w-3.5 h-3.5 shrink-0 text-primary" />,
+                              onClick: () => handleOpenAssignModal(sy),
+                            },
+                            {
+                              label: 'Eliminar',
+                              icon: <Trash2 className="w-3.5 h-3.5 shrink-0" />,
+                              onClick: () => handleOpenDelete({ kind: 'sectionYear', item: sy }),
+                              danger: true,
+                            },
+                          ]}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -830,13 +840,7 @@ export const Sections: React.FC = () => {
         title={editingSection ? 'Modificar comisión' : 'Registrar comisión'}
       >
         {sectionModalError && (
-          <div
-            role="alert"
-            className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
-          >
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{sectionModalError}</span>
-          </div>
+          <Alert className="mb-4">{sectionModalError}</Alert>
         )}
 
         <form onSubmit={handleSaveSection} className="space-y-4">
@@ -853,7 +857,7 @@ export const Sections: React.FC = () => {
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-3 border-t border-[#D6E4F7]">
+          <div className="flex justify-end gap-3 pt-3 border-t border-line">
             <Button
               type="button"
               variant="outline"
@@ -882,13 +886,7 @@ export const Sections: React.FC = () => {
         title={editingSY ? 'Modificar curso lectivo' : 'Registrar curso lectivo'}
       >
         {syModalError && (
-          <div
-            role="alert"
-            className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
-          >
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{syModalError}</span>
-          </div>
+          <Alert className="mb-4">{syModalError}</Alert>
         )}
 
         <form onSubmit={handleSaveSY} className="space-y-4">
@@ -944,11 +942,11 @@ export const Sections: React.FC = () => {
               disabled={savingSY}
             />
           </div>
-          <p className="text-xs text-[#51607A] -mt-2">
+          <p className="text-xs text-ink-muted -mt-2">
             Vale para todos los equipos de este curso lectivo.
           </p>
 
-          <div className="flex justify-end gap-3 pt-3 border-t border-[#D6E4F7]">
+          <div className="flex justify-end gap-3 pt-3 border-t border-line">
             <Button
               type="button"
               variant="outline"
@@ -978,7 +976,7 @@ export const Sections: React.FC = () => {
         maxWidth="lg"
       >
         {targetSYForAssign && (
-          <div className="mb-4 p-3 rounded-lg bg-[#EFF6FF] border border-[#BAE6FD] text-sm flex items-center justify-between text-[#0B2A66]">
+          <div className="mb-4 p-3 rounded-lg bg-tint border border-accent-light text-sm flex items-center justify-between text-navy">
             <div>
               <span className="font-semibold">Comisión: </span>
               <span>{targetSYForAssign.section_name}</span>
@@ -991,24 +989,18 @@ export const Sections: React.FC = () => {
         )}
 
         {assignModalError && (
-          <div
-            role="alert"
-            className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
-          >
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{assignModalError}</span>
-          </div>
+          <Alert className="mb-4">{assignModalError}</Alert>
         )}
 
         <form onSubmit={handleSaveAssign} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[#0F1F3D] mb-2">
+            <label className="block text-sm font-medium text-ink mb-2">
               Docentes
             </label>
             {loadingAssigned ? (
-              <p className="text-sm text-[#51607A] py-4 text-center">Cargando docentes...</p>
+              <p className="text-sm text-ink-muted py-4 text-center">Cargando docentes...</p>
             ) : (
-              <div className="max-h-56 overflow-y-auto border border-[#D6E4F7] rounded-lg divide-y divide-[#D6E4F7] bg-white">
+              <div className="max-h-56 overflow-y-auto border border-line rounded-lg divide-y divide-line bg-white">
                 {allProfessors.map((prof) => {
                   const isAssigned = assignedProfIds.includes(prof.id_user);
                   const isSelected = selectedProfIds.includes(prof.id_user);
@@ -1017,28 +1009,28 @@ export const Sections: React.FC = () => {
                       key={prof.id_user}
                       onClick={() => toggleSelectProfessor(prof.id_user)}
                       className={`flex items-center justify-between px-3.5 py-2.5 text-sm cursor-pointer transition-colors ${
-                        isSelected ? 'bg-[#EFF6FF]' : 'hover:bg-[#F5F9FF]'
+                        isSelected ? 'bg-tint' : 'hover:bg-canvas'
                       }`}
                     >
                       <div>
-                        <span className="font-medium text-[#0F1F3D]">
+                        <span className="font-medium text-ink">
                           {prof.last_name}, {prof.first_name}
                         </span>
-                        <span className="text-xs text-[#51607A] ml-2">
+                        <span className="text-xs text-ink-muted ml-2">
                           Leg. {prof.legajo}
                         </span>
                         {isAssigned && !isSelected && (
-                          <span className="text-xs text-[#B91C1C] italic ml-2">Se quita</span>
+                          <span className="text-xs text-danger italic ml-2">Se quita</span>
                         )}
                         {!isAssigned && isSelected && (
-                          <span className="text-xs text-[#1D4ED8] italic ml-2">Nuevo</span>
+                          <span className="text-xs text-primary italic ml-2">Nuevo</span>
                         )}
                       </div>
                       <input
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => {}} // controlado por el div onClick
-                        className="rounded border-[#D6E4F7] text-[#1D4ED8] focus:ring-[#BAE6FD] pointer-events-none"
+                        className="rounded border-line text-primary focus:ring-accent-light pointer-events-none"
                       />
                     </div>
                   );
@@ -1048,7 +1040,7 @@ export const Sections: React.FC = () => {
           </div>
 
           {assignmentsToRemove.length > 0 && (
-            <p className="text-sm text-[#B91C1C]">
+            <p className="text-sm text-danger">
               Se quitará a:{' '}
               {assignmentsToRemove
                 .map((a) => `${a.professor_last_name}, ${a.professor_first_name}`)
@@ -1056,7 +1048,7 @@ export const Sections: React.FC = () => {
             </p>
           )}
 
-          <div className="flex justify-end gap-3 pt-3 border-t border-[#D6E4F7]">
+          <div className="flex justify-end gap-3 pt-3 border-t border-line">
             <Button
               type="button"
               variant="outline"
@@ -1086,17 +1078,11 @@ export const Sections: React.FC = () => {
         title={deleteTarget?.kind === 'section' ? 'Eliminar comisión' : 'Eliminar curso lectivo'}
       >
         {deleteModalError && (
-          <div
-            role="alert"
-            className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
-          >
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{deleteModalError}</span>
-          </div>
+          <Alert className="mb-4">{deleteModalError}</Alert>
         )}
 
         {deleteTarget && (
-          <p className="text-sm text-[#0F1F3D]">
+          <p className="text-sm text-ink">
             {deleteTarget.kind === 'section' ? (
               <>
                 ¿Eliminar la comisión <span className="font-semibold">{deleteTarget.item.name}</span>?
@@ -1114,7 +1100,7 @@ export const Sections: React.FC = () => {
           </p>
         )}
 
-        <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-[#D6E4F7]">
+        <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-line">
           <Button
             type="button"
             variant="outline"
