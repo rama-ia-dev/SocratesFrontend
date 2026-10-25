@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { AlertCircle } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import type { ProjectPublic } from '../types/api';
@@ -7,6 +6,8 @@ import { Modal } from './ui/Modal';
 import { Input } from './ui/Input';
 import { Select } from './ui/Select';
 import { Button } from './ui/Button';
+import { Alert } from './ui/Alert';
+import { digitsOnly } from '../lib/validation';
 
 interface CourseOption {
   id_section_year: number;
@@ -15,8 +16,6 @@ interface CourseOption {
 
 const MAX_QUANTITY = 50; // límite del backend por pedido
 const MAX_GROUP_NUMBER = 9999;
-
-const digitsOnly = (v: string) => v.replace(/\D/g, '');
 
 // Crear equipos de trabajo (SCRUM-102). El backend crea equipos vacíos y sin asegurar en un curso
 // lectivo: uno con número elegido (o el siguiente libre) o varios consecutivos. Puede hacerlo un
@@ -100,30 +99,19 @@ export const CreateTeamsModal: React.FC<{
 
   return (
     <Modal isOpen onClose={() => !isSaving && onClose()} title="Crear equipos de trabajo">
-      {error && (
-        <div
-          role="alert"
-          className="mb-4 p-3 rounded-lg bg-[#FEE2E2] border border-[#FCA5A5] text-[#B91C1C] text-sm flex items-start gap-2"
-        >
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <Alert className="mb-4">{error}</Alert>}
 
       {coursesError ? (
-        <p role="alert" className="text-sm text-[#B91C1C]">
-          No se pudieron cargar sus cursos lectivos. Cierre y vuelva a intentarlo.
-        </p>
+        <Alert>No se pudieron cargar sus cursos lectivos. Cierre y vuelva a intentarlo.</Alert>
       ) : courses && courses.length === 0 ? (
-        <p className="text-sm text-[#51607A]">
+        <Alert tone="info">
           No tiene cursos lectivos asignados. Un super administrador tiene que asignarlo a una comisión
           para que pueda crear equipos.
-        </p>
+        </Alert>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <Select
             label="Curso lectivo"
-            requiredAsterisk
             value={course}
             onChange={(e) => setCourse(e.target.value)}
             disabled={isSaving || !courses}
@@ -136,7 +124,6 @@ export const CreateTeamsModal: React.FC<{
 
           <Input
             label="Cantidad de equipos"
-            requiredAsterisk
             inputMode="numeric"
             maxLength={2}
             value={quantity}
@@ -149,6 +136,7 @@ export const CreateTeamsModal: React.FC<{
           {qty === 1 && (
             <Input
               label="Número de equipo"
+              optional
               inputMode="numeric"
               maxLength={4}
               placeholder="Automático (el siguiente libre)"
@@ -156,16 +144,16 @@ export const CreateTeamsModal: React.FC<{
               onChange={(e) => setGroupNumber(digitsOnly(e.target.value))}
               disabled={isSaving}
               error={touched ? groupNumberError ?? undefined : undefined}
-              helperText="Opcional. Sirve, por ejemplo, para volver a crear un número que se eliminó"
+              helperText="Sirve, por ejemplo, para volver a crear un número que se eliminó"
             />
           )}
 
-          <p className="text-xs text-[#51607A] bg-[#EFF6FF] border border-[#BAE6FD] rounded-lg p-3">
+          <Alert tone="info">
             Los equipos se crean vacíos, sin asegurar y públicos. Los alumnos se suman después y
             completan el nombre y los datos del proyecto.
-          </p>
+          </Alert>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-[#D6E4F7]">
+          <div className="flex justify-end gap-3 pt-4 border-t border-line">
             <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
               Cancelar
             </Button>
