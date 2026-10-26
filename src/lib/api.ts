@@ -20,6 +20,7 @@ import {
   ProjectBulkCreate,
   ProjectCreate,
   ProjectList,
+  ProjectMemberList,
   ProjectPublic,
   ProjectOverview,
   SectionCreate,
@@ -35,6 +36,7 @@ import {
   StudentPublic,
   StudentUpdate,
   StudentList,
+  StudentProjectPublic,
   UserList,
   UserPublic,
   UserUpdate,
@@ -1619,6 +1621,37 @@ export const api = {
     }
 
     return request<ProjectOverview>(`/projects/${id_project}/overview`, { method: 'GET' });
+  },
+
+  // Integrantes de un equipo según el estado de su membresía (por ejemplo, las solicitudes pendientes)
+  async getProjectMembers(id_project: number, statuses: string[]): Promise<ProjectMemberList> {
+    if (USE_MOCK) {
+      await delay();
+      return { items: [], total: 0, limit: 100, offset: 0 };
+    }
+
+    const query = new URLSearchParams({ limit: '100' });
+    statuses.forEach((s) => query.append('status', s));
+    return request<ProjectMemberList>(`/projects/${id_project}/members?${query.toString()}`);
+  },
+
+  // El jefe del grupo acepta (active) o rechaza (rejected) una solicitud para sumarse
+  async decideMembership(
+    id_project: number,
+    id_student_project: number,
+    status: 'active' | 'rejected'
+  ): Promise<StudentProjectPublic> {
+    if (USE_MOCK) {
+      await delay();
+      const err: any = new Error('Membership not found');
+      err.status = 404;
+      throw err;
+    }
+
+    return request<StudentProjectPublic>(`/projects/${id_project}/members/${id_student_project}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
   },
 
   async createProject(payload: ProjectCreate): Promise<ProjectPublic> {
