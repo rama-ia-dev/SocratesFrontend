@@ -1614,8 +1614,8 @@ export const api = {
         throw err;
       }
 
-      const min_members = payload.min_members || 3;
-      const max_members = payload.max_members || 5;
+      const min_members = 3;
+      const max_members = 5;
 
       const newProj: ProjectPublic = {
         id_project: Date.now(),
@@ -1624,7 +1624,7 @@ export const api = {
         id_section: sy.id_section,
         section_name: sy.section_name,
         group_number,
-        privacy: 'private',
+        privacy: 'public',
         name: null,
         description: null,
         objective: null,
@@ -1659,8 +1659,8 @@ export const api = {
         throw err;
       }
 
-      const min_members = payload.min_members || 3;
-      const max_members = payload.max_members || 5;
+      const min_members = 3;
+      const max_members = 5;
 
       const existingInSY = mockDB.projects.filter(
         (p) => p.id_section_year === payload.id_section_year
@@ -1676,7 +1676,7 @@ export const api = {
           id_section: sy.id_section,
           section_name: sy.section_name,
           group_number: maxNum + i,
-          privacy: 'private',
+          privacy: 'public',
           name: null,
           description: null,
           objective: null,

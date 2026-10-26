@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CloudOff, Eye, FolderKanban, RefreshCw, SearchX } from 'lucide-react';
+import { CloudOff, Eye, FolderKanban, Plus, RefreshCw, SearchX } from 'lucide-react';
 import { api } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import type { ProjectPrivacy, ProjectPublic, SectionYearPublic } from '../types/api';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Select } from '../components/ui/Select';
@@ -10,9 +11,10 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Table, TableHeader, TableRow, TableHead, TableCell } from '../components/ui/Table';
 import { Pagination } from '../components/ui/Pagination';
+import { useToast } from '../components/ui/Toast';
+import { CreateTeamsModal } from '../components/CreateTeamsModal';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { PRIVACY_LABEL, STATUS_VARIANT, teamLabel } from '../lib/projects';
-import { useAuth } from '../context/AuthContext';
 
 const PAGE_SIZE = 10;
 
@@ -40,18 +42,21 @@ const byYearSectionNumber = (a: ProjectPublic, b: ProjectPublic) =>
 export const Projects: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { success } = useToast();
+  const isProfessor = user?.role === 'professor';
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   // El docente ve también equipos de cursos ajenos (los públicos); puede quedarse solo con los suyos
-  const isProfessor = user?.role === 'professor' && !user.is_super_admin;
+  const canFilterMine = isProfessor && !user?.is_super_admin;
   const [scope, setScope] = useState<Scope>('all');
   const [mySectionYears, setMySectionYears] = useState<number[] | null>(null);
 
   useEffect(() => {
-    if (!isProfessor || !user) return;
+    if (!canFilterMine || !user) return;
     api
       .getProfessorSectionYears({ id_professor: user.id_user, limit: 100 })
       .then((res) => setMySectionYears(res.items.map((a) => a.id_section_year)))
       .catch(() => setMySectionYears([]));
-  }, [isProfessor, user]);
+  }, [canFilterMine, user]);
 
   const [projects, setProjects] = useState<ProjectPublic[]>([]);
   const [total, setTotal] = useState(0);
@@ -128,9 +133,20 @@ export const Projects: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Equipos de trabajo" subtitle="Equipos de cada comisión y su proyecto" />
+      <PageHeader
+        title="Equipos de trabajo"
+        subtitle="Equipos de cada comisión y su proyecto"
+        action={
+          isProfessor ? (
+            <Button variant="primary" onClick={() => setIsCreateOpen(true)}>
+              <Plus className="w-4 h-4 mr-1.5" />
+              Crear equipos de trabajo
+            </Button>
+          ) : undefined
+        }
+      />
 
-      {isProfessor && (
+      {canFilterMine && (
         <SegmentedControl
           label="Qué cursos lectivos mostrar"
           value={scope}
@@ -298,6 +314,23 @@ export const Projects: React.FC = () => {
 
           <Pagination total={total} limit={PAGE_SIZE} offset={offset} onChangeOffset={setOffset} />
         </>
+      )}
+
+      {isCreateOpen && (
+        <CreateTeamsModal
+          onClose={() => setIsCreateOpen(false)}
+          onCreated={(created) => {
+            setIsCreateOpen(false);
+            const first = created[0];
+            const last = created[created.length - 1];
+            success(
+              created.length === 1
+                ? `Se creó el ${teamLabel(first)} de ${first.section_name} (${first.year})`
+                : `Se crearon ${created.length} equipos en ${first.section_name} (${first.year}): del ${first.group_number} al ${last.group_number}`
+            );
+            fetchProjects();
+          }}
+        />
       )}
     </div>
   );
