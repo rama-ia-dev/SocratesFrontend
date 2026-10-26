@@ -286,6 +286,24 @@ export interface ProjectMember {
   status: StatusPublic;
 }
 
+// Membresía de un alumno en un equipo, como la devuelven las acciones sobre integrantes
+export interface StudentProjectPublic {
+  id_student_project: number;
+  id_project: number;
+  id_student: number;
+  is_leader: boolean;
+  enrolled_at: string;
+  status: StatusPublic;
+}
+
+// `GET /projects/{id}/members`: integrantes filtrados por estado de la membresía
+export interface ProjectMemberList {
+  items: ProjectMember[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 // `GET /projects/{id}/overview`: el equipo con sus integrantes activos y finalizados
 export interface ProjectOverview extends Omit<ProjectPublic, 'members'> {
   members: ProjectMember[];

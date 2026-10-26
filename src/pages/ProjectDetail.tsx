@@ -69,6 +69,73 @@ const Members: React.FC<{ members: ProjectMember[]; cupo?: React.ReactNode }> = 
   );
 };
 
+// Error del backend al aceptar o rechazar una solicitud, en palabras del usuario
+const decideError = (err: any): string => {
+  const detail = String(err.message || '');
+  if (err.status === 409) {
+    if (detail.includes('already belongs')) return 'El alumno ya forma parte de otro equipo';
+    if (detail.includes('cannot change to')) return 'La solicitud ya no está pendiente';
+  }
+  if (err.status === 403) return 'Solo el jefe del grupo puede aceptar o rechazar solicitudes';
+  if (err.status === 404) return 'La solicitud ya no existe';
+  return detail || 'No se pudo responder la solicitud';
+};
+
+// Solicitudes para sumarse (SCRUM-24): las ve y las decide solo el jefe del grupo
+const Requests: React.FC<{
+  requests: ProjectMember[];
+  busyId: number | null;
+  onDecide: (m: ProjectMember, status: 'active' | 'rejected') => void;
+}> = ({ requests, busyId, onDecide }) => (
+  <section className="rounded-xl border border-line bg-white">
+    <div className="px-5 pt-4 sm:px-6">
+      <h2 className="text-[15px] font-semibold text-ink">
+        Solicitudes para sumarse <span className="font-normal text-ink-muted">({requests.length})</span>
+      </h2>
+      <p className="mt-0.5 text-sm text-ink-muted">
+        Si acepta a un alumno, pasa a ser integrante del equipo y se rechazan sus solicitudes a otros equipos.
+      </p>
+    </div>
+    {requests.length === 0 ? (
+      <p className="px-5 sm:px-6 pt-1.5 pb-4 text-sm italic text-ink-subtle">No hay solicitudes pendientes</p>
+    ) : (
+      <ul className="mt-3 divide-y divide-line border-t border-line">
+        {requests.map((r) => (
+          <li
+            key={r.id_student_project}
+            className="px-5 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4"
+          >
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <span className="text-sm font-medium text-ink">
+                {r.last_name}, {r.first_name}
+              </span>
+              <span className="text-xs text-ink-muted tabular-nums">{r.legajo}</span>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <Button
+                size="sm"
+                onClick={() => onDecide(r, 'active')}
+                disabled={busyId !== null}
+                isLoading={busyId === r.id_student_project}
+              >
+                Aceptar
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onDecide(r, 'rejected')}
+                disabled={busyId !== null}
+              >
+                Rechazar
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    )}
+  </section>
+);
+
 // Detalle de un equipo de trabajo (SCRUM-105)
 export const ProjectDetail: React.FC = () => {
   const { id } = useParams();
@@ -77,21 +144,28 @@ export const ProjectDetail: React.FC = () => {
   const [state, setState] = useState<LoadState>('loading');
   const requestId = useRef(0);
   const { user } = useAuth();
-  const { success } = useToast();
+  const { success, error: showError } = useToast();
   // Cupo (SCRUM-19): el backend se lo permite solo al super administrador
   const [isSizeOpen, setIsSizeOpen] = useState(false);
+  // Solicitudes pendientes (SCRUM-24); null mientras no se sabe si el usuario es el jefe
+  const [requests, setRequests] = useState<ProjectMember[] | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
 
-  const load = useCallback(async () => {
+  // `keep`: recarga después de una acción, sin vaciar la pantalla mientras llegan los datos nuevos
+  const load = useCallback(async (keep = false) => {
     const current = ++requestId.current;
     const isCurrent = () => current === requestId.current;
-    setProject(null);
-    setSectionYear(null);
+    if (!keep) {
+      setProject(null);
+      setSectionYear(null);
+      setRequests(null);
+    }
     const idProject = Number(id);
     if (!Number.isInteger(idProject) || idProject <= 0) {
       setState('not-found');
       return;
     }
-    setState('loading');
+    if (!keep) setState('loading');
     try {
       const p = await api.getProjectOverview(idProject);
       if (!isCurrent()) return;
@@ -102,15 +176,45 @@ export const ProjectDetail: React.FC = () => {
         .getSectionYear(p.id_section_year)
         .then((sy) => isCurrent() && setSectionYear(sy))
         .catch(() => undefined);
+      // Solo el jefe del grupo ve las solicitudes, y solo existen mientras el equipo no está asegurado
+      const isLeader = p.members.some(
+        (m) => m.id_student === user?.id_user && m.is_leader && m.status.code === 'active'
+      );
+      if (isLeader && p.status?.code === 'uninsured') {
+        api
+          .getProjectMembers(idProject, ['pending_approval'])
+          .then((r) => isCurrent() && setRequests(r.items))
+          .catch(() => isCurrent() && setRequests([]));
+      } else {
+        setRequests(null);
+      }
     } catch (err: any) {
       if (!isCurrent()) return;
       setState(err.status === 403 ? 'forbidden' : err.status === 404 ? 'not-found' : 'error');
     }
-  }, [id]);
+  }, [id, user?.id_user]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const handleDecide = async (m: ProjectMember, status: 'active' | 'rejected') => {
+    if (!project) return;
+    setBusyId(m.id_student_project);
+    try {
+      await api.decideMembership(project.id_project, m.id_student_project, status);
+      success(
+        status === 'active'
+          ? `${m.first_name} ${m.last_name} se sumó al equipo`
+          : `Se rechazó la solicitud de ${m.first_name} ${m.last_name}`
+      );
+    } catch (err: any) {
+      showError(decideError(err));
+    } finally {
+      setBusyId(null);
+      load(true);
+    }
+  };
 
   const back = (
     <Link
@@ -149,7 +253,7 @@ export const ProjectDetail: React.FC = () => {
             message="No se pudo cargar el equipo de trabajo"
             description="Puede ser un problema de conexión. Pruebe de nuevo en unos segundos."
             action={
-              <Button variant="outline" size="sm" onClick={load}>
+              <Button variant="outline" size="sm" onClick={() => load()}>
                 <RefreshCw className="w-4 h-4 mr-1.5" />
                 Reintentar
               </Button>
@@ -216,6 +320,8 @@ export const ProjectDetail: React.FC = () => {
           )
         }
       />
+
+      {requests && <Requests requests={requests} busyId={busyId} onDecide={handleDecide} />}
 
       {isSizeOpen && sectionYear && (
         <TeamSizeModal
