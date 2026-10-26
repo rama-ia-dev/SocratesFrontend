@@ -193,6 +193,8 @@ const initialMockDB: MockDatabase = {
       year: 2025,
       id_section: 1,
       section_name: '3K1',
+      min_students: 3,
+      max_students: 5,
       assignedProfessorIds: [1, 2],
     },
     {
@@ -200,6 +202,8 @@ const initialMockDB: MockDatabase = {
       year: 2025,
       id_section: 2,
       section_name: '3K2',
+      min_students: 3,
+      max_students: 5,
       assignedProfessorIds: [2, 3],
     },
     {
@@ -207,6 +211,8 @@ const initialMockDB: MockDatabase = {
       year: 2025,
       id_section: 3,
       section_name: '3K3',
+      min_students: 3,
+      max_students: 5,
       assignedProfessorIds: [3],
     },
     {
@@ -214,6 +220,8 @@ const initialMockDB: MockDatabase = {
       year: 2025,
       id_section: 4,
       section_name: '4K1',
+      min_students: 3,
+      max_students: 5,
       assignedProfessorIds: [1, 4],
     },
     {
@@ -221,6 +229,8 @@ const initialMockDB: MockDatabase = {
       year: 2024,
       id_section: 1,
       section_name: '3K1',
+      min_students: 3,
+      max_students: 5,
       assignedProfessorIds: [1],
     },
   ],
@@ -1154,6 +1164,8 @@ export const api = {
             year: sy.year,
             id_section: sy.id_section,
             section_name: sy.section_name,
+            min_students: sy.min_students,
+            max_students: sy.max_students,
             assigned_professors: professors,
           };
         });
@@ -1266,6 +1278,24 @@ export const api = {
       }
       if (payload.min_students) sy.min_students = payload.min_students;
       if (payload.max_students) sy.max_students = payload.max_students;
+
+      const min = payload.min_students ?? sy.min_students ?? 1;
+      const max = payload.max_students ?? sy.max_students ?? 100;
+      if (min < 1 || min > 100 || max < 1 || max > 100 || max < min) {
+        const err: any = new Error('El cupo va de 1 a 100 integrantes y el máximo no puede ser menor al mínimo');
+        err.status = 422;
+        throw err;
+      }
+      if (payload.min_students !== undefined) sy.min_students = payload.min_students;
+      if (payload.max_students !== undefined) sy.max_students = payload.max_students;
+      // El cupo es del curso lectivo: los equipos que ya existen pasan a usar el nuevo
+      mockDB.projects
+        .filter((p) => p.id_section_year === id_section_year)
+        .forEach((p) => {
+          p.min_members = sy.min_students;
+          p.max_members = sy.max_students;
+          p.is_secured = (p.members?.length || 0) >= (p.min_members || 3);
+        });
 
       return {
         id_section_year: sy.id_section_year,
@@ -1614,8 +1644,8 @@ export const api = {
         throw err;
       }
 
-      const min_members = 3;
-      const max_members = 5;
+      const min_members = sy.min_students ?? 3;
+      const max_members = sy.max_students ?? 5;
 
       const newProj: ProjectPublic = {
         id_project: Date.now(),
@@ -1659,8 +1689,8 @@ export const api = {
         throw err;
       }
 
-      const min_members = 3;
-      const max_members = 5;
+      const min_members = sy.min_students ?? 3;
+      const max_members = sy.max_students ?? 5;
 
       const existingInSY = mockDB.projects.filter(
         (p) => p.id_section_year === payload.id_section_year
