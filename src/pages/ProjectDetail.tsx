@@ -103,6 +103,18 @@ const leaderError = (err: any): string => {
   return detail || 'No se pudo pasar la jefatura';
 };
 
+// Error del backend al sacar a un integrante, en palabras del usuario
+const expelError = (err: any): string => {
+  const detail = String(err.message || '');
+  if (err.status === 409) {
+    if (detail.includes('uninsured')) return 'El equipo ya está asegurado: sus integrantes no se pueden cambiar';
+    if (detail.includes('cannot be expelled')) return 'El alumno ya no es integrante activo del equipo';
+  }
+  if (err.status === 403) return 'Solo los docentes del curso lectivo y el super administrador pueden sacar integrantes';
+  if (err.status === 404) return 'El integrante ya no está en el equipo';
+  return detail || 'No se pudo sacar al integrante';
+};
+
 // Solicitudes para sumarse (SCRUM-24): las ve y las decide solo el jefe del grupo
 const Requests: React.FC<{
   requests: ProjectMember[];
@@ -176,6 +188,11 @@ export const ProjectDetail: React.FC = () => {
   const [newLeader, setNewLeader] = useState<ProjectMember | null>(null);
   const [isTransferring, setIsTransferring] = useState(false);
   const [transferError, setTransferError] = useState<string | null>(null);
+  // Sacar a un integrante (SCRUM-21): lo pueden los docentes del curso lectivo y el super administrador
+  const [canManage, setCanManage] = useState(false);
+  const [toExpel, setToExpel] = useState<ProjectMember | null>(null);
+  const [isExpelling, setIsExpelling] = useState(false);
+  const [expelErrorText, setExpelErrorText] = useState<string | null>(null);
 
   // `keep`: recarga después de una acción, sin vaciar la pantalla mientras llegan los datos nuevos
   const load = useCallback(async (keep = false) => {
@@ -185,6 +202,7 @@ export const ProjectDetail: React.FC = () => {
       setProject(null);
       setSectionYear(null);
       setRequests(null);
+      setCanManage(false);
     }
     const idProject = Number(id);
     if (!Number.isInteger(idProject) || idProject <= 0) {
@@ -214,11 +232,19 @@ export const ProjectDetail: React.FC = () => {
       } else {
         setRequests(null);
       }
+      // Docente de este curso lectivo o super administrador
+      if (user?.is_super_admin) setCanManage(true);
+      else if (user?.role === 'professor')
+        api
+          .getProfessorSectionYears({ id_professor: user.id_user, id_section_year: p.id_section_year, limit: 1 })
+          .then((r) => isCurrent() && setCanManage(r.total > 0))
+          .catch(() => isCurrent() && setCanManage(false));
+      else setCanManage(false);
     } catch (err: any) {
       if (!isCurrent()) return;
       setState(err.status === 403 ? 'forbidden' : err.status === 404 ? 'not-found' : 'error');
     }
-  }, [id, user?.id_user]);
+  }, [id, user?.id_user, user?.role, user?.is_super_admin]);
 
   useEffect(() => {
     load();
@@ -255,6 +281,22 @@ export const ProjectDetail: React.FC = () => {
       setTransferError(leaderError(err));
     } finally {
       setIsTransferring(false);
+    }
+  };
+
+  const handleExpel = async () => {
+    if (!project || !toExpel) return;
+    setIsExpelling(true);
+    setExpelErrorText(null);
+    try {
+      await api.expelMember(project.id_project, toExpel.id_student_project);
+      success(`Se sacó a ${toExpel.first_name} ${toExpel.last_name} del equipo`);
+      setToExpel(null);
+      load(true);
+    } catch (err: any) {
+      setExpelErrorText(expelError(err));
+    } finally {
+      setIsExpelling(false);
     }
   };
 
@@ -311,23 +353,45 @@ export const ProjectDetail: React.FC = () => {
     (m) => m.id_student === user?.id_user && m.is_leader && m.status.code === 'active'
   );
   const isFinal = project.status?.code === 'approved' || project.status?.code === 'cancelled';
+  const canTransfer = iAmLeader && !isFinal;
+  // Los docentes del curso y el super administrador sacan integrantes mientras el equipo no está asegurado
+  const canExpel = canManage && project.status?.code === 'uninsured';
   const memberAction =
-    iAmLeader && !isFinal
+    canTransfer || canExpel
       ? (m: ProjectMember) =>
-          !m.is_leader &&
           m.status.code === 'active' && (
-            <button
-              type="button"
-              onClick={() => {
-                setTransferError(null);
-                setNewLeader(m);
-              }}
-              className="text-sm text-primary font-medium hover:underline cursor-pointer"
-            >
-              Pasar la jefatura
-            </button>
+            <>
+              {canTransfer && !m.is_leader && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTransferError(null);
+                    setNewLeader(m);
+                  }}
+                  className="text-sm text-primary font-medium hover:underline cursor-pointer"
+                >
+                  Pasar la jefatura
+                </button>
+              )}
+              {canExpel && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExpelErrorText(null);
+                    setToExpel(m);
+                  }}
+                  className="text-sm text-danger font-medium hover:underline cursor-pointer"
+                >
+                  Sacar del equipo
+                </button>
+              )}
+            </>
           )
       : undefined;
+  // Si sale el jefe, el backend le pasa la jefatura al integrante activo más antiguo
+  const othersActive = toExpel
+    ? project.members.filter((m) => m.status.code === 'active' && m.id_student_project !== toExpel.id_student_project)
+    : [];
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -411,6 +475,41 @@ export const ProjectDetail: React.FC = () => {
           </Button>
           <Button type="button" onClick={handleTransfer} isLoading={isTransferring}>
             Pasar la jefatura
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={toExpel !== null}
+        onClose={() => !isExpelling && setToExpel(null)}
+        title="Sacar del equipo"
+      >
+        {expelErrorText && <Alert className="mb-4">{expelErrorText}</Alert>}
+        {toExpel && (
+          <div className="space-y-2 text-sm text-ink">
+            <p>
+              ¿Sacar a{' '}
+              <span className="font-semibold">
+                {toExpel.first_name} {toExpel.last_name}
+              </span>{' '}
+              del {teamLabel(project)}? Deja de ser integrante y queda libre para sumarse a otro equipo, pero no
+              puede volver a pedir sumarse a este.
+            </p>
+            {toExpel.is_leader && (
+              <p className="text-ink-muted">
+                {othersActive.length > 0
+                  ? 'Es el jefe del grupo: la jefatura pasa al integrante más antiguo del equipo.'
+                  : 'Es el jefe del grupo y el único integrante: el equipo queda sin jefe hasta que se sume otro alumno.'}
+              </p>
+            )}
+          </div>
+        )}
+        <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-line">
+          <Button type="button" variant="outline" onClick={() => setToExpel(null)} disabled={isExpelling}>
+            Cancelar
+          </Button>
+          <Button type="button" variant="destructive" onClick={handleExpel} isLoading={isExpelling}>
+            Sacar del equipo
           </Button>
         </div>
       </Modal>

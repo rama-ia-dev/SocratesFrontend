@@ -1635,6 +1635,21 @@ export const api = {
     return request<ProjectMemberList>(`/projects/${id_project}/members?${query.toString()}`);
   },
 
+  // El docente del curso lectivo o un super administrador saca a un integrante del equipo
+  async expelMember(id_project: number, id_student_project: number): Promise<StudentProjectPublic> {
+    if (USE_MOCK) {
+      await delay();
+      const err: any = new Error('Membership not found');
+      err.status = 404;
+      throw err;
+    }
+
+    return request<StudentProjectPublic>(
+      `/projects/${id_project}/members/${id_student_project}/expel`,
+      { method: 'POST' }
+    );
+  },
+
   // El jefe del grupo le pasa la jefatura a otro integrante activo; él sigue en el equipo
   async transferLeadership(id_project: number, id_student_project: number): Promise<StudentProjectPublic> {
     if (USE_MOCK) {
