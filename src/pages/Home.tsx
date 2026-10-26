@@ -3,12 +3,10 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { EmptyState } from '../components/ui/EmptyState';
+import { ChairDashboard } from './ChairDashboard';
 import {
-  Layers,
   GraduationCap,
-  Users,
   ChevronRight,
-  BarChart3,
   Compass,
   FolderKanban,
 } from 'lucide-react';
@@ -25,35 +23,6 @@ export const Home: React.FC = () => {
 
   const getAvailableModules = () => {
     if (!user) return [];
-
-    if (user.is_super_admin) {
-      return [
-        {
-          title: 'Comisiones',
-          desc: 'Comisiones y cursos lectivos de cada año, con sus docentes.',
-          path: '/comisiones',
-          icon: Layers,
-        },
-        {
-          title: 'Estado de la cátedra',
-          desc: 'Docentes, grupos por etapa y aprobados de cada curso lectivo.',
-          path: '/catedra',
-          icon: BarChart3,
-        },
-        {
-          title: 'Usuarios',
-          desc: 'Docentes, super administradores y estudiantes: altas y modificaciones.',
-          path: '/usuarios',
-          icon: Users,
-        },
-        {
-          title: 'Equipos de trabajo',
-          desc: 'Equipos de cada comisión y el proyecto de cada uno.',
-          path: '/equipos',
-          icon: FolderKanban,
-        },
-      ];
-    }
 
     if (user.role === 'professor') {
       return [
@@ -82,6 +51,11 @@ export const Home: React.FC = () => {
       },
     ];
   };
+
+  // El super administrador entra directo al dashboard de la cátedra
+  if (user?.is_super_admin) {
+    return <ChairDashboard subtitle={`${greeting()}, ${user.first_name}`} />;
+  }
 
   const modules = getAvailableModules();
 

@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Shield,
   BarChart3,
+  LayoutDashboard,
 } from 'lucide-react';
 
 interface NavItem {
@@ -71,6 +72,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
     if (user.is_super_admin) {
       return [
+        { label: 'Dashboard de la cátedra', path: '/', icon: LayoutDashboard },
         { label: 'Comisiones', path: '/comisiones', icon: Layers },
         { label: 'Estado de la cátedra', path: '/catedra', icon: BarChart3 },
         // Las pantallas de estudiantes y docentes se abren desde Usuarios
@@ -109,6 +111,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
           <NavLink
             key={item.path}
             to={item.path}
+            end={item.path === '/'}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 ${
                 isActive || item.also?.some((p) => location.pathname.startsWith(p))
