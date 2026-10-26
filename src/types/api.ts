@@ -228,6 +228,16 @@ export interface ProfessorSectionYearList {
 
 export type ProjectPrivacy = 'public' | 'private' | 'protected';
 
+// Estado de un equipo (ámbito `project`) o de la membresía de un alumno (`student_project`).
+// Los define el backend (`GET /statuses`); el código es el identificador y el nombre, el texto a mostrar.
+export interface StatusPublic {
+  id_status: number;
+  ambito: string;
+  code: string;
+  name: string;
+  description?: string | null;
+}
+
 export interface ProjectCreate {
   id_section_year: number;
   group_number?: number | null;
@@ -250,6 +260,8 @@ export interface ProjectPublic {
   section_name: string;
   group_number: number;
   privacy: ProjectPrivacy;
+  // Siempre viene del backend; opcional solo porque los datos simulados no lo tienen.
+  status?: StatusPublic;
   restricted?: boolean;
   name?: string | null;
   description?: string | null;
@@ -264,6 +276,24 @@ export interface ProjectPublic {
     first_name: string;
     last_name: string;
   }[];
+}
+
+// Integrante de un equipo, como lo devuelve `GET /projects/{id}/overview`
+export interface ProjectMember {
+  id_student_project: number;
+  id_student: number;
+  first_name: string;
+  last_name: string;
+  legajo: number;
+  is_leader: boolean;
+  enrolled_at: string;
+  status: StatusPublic;
+}
+
+// `GET /projects/{id}/overview`: el equipo con sus integrantes activos y finalizados
+export interface ProjectOverview extends Omit<ProjectPublic, 'members'> {
+  members: ProjectMember[];
+  responsible: ProjectMember | null;
 }
 
 export interface ProjectList {

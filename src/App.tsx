@@ -15,6 +15,8 @@ import { Professors } from './pages/Professors';
 import { Students } from './pages/Students';
 import { RegisterStudents } from './pages/RegisterStudents';
 import { Users } from './pages/Users';
+import { Projects } from './pages/Projects';
+import { ProjectDetail } from './pages/ProjectDetail';
 
 // Guardia de autenticación y rol
 const ProtectedRoute: React.FC<{
@@ -174,6 +176,24 @@ export default function App() {
               element={
                 <ProtectedRoute allowedRoles={['superadmin']}>
                   <Users />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Equipos de trabajo (todos los roles; el backend filtra por privacidad) */}
+            <Route
+              path="/equipos"
+              element={
+                <ProtectedRoute>
+                  <Projects />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/equipos/:id"
+              element={
+                <ProtectedRoute>
+                  <ProjectDetail />
                 </ProtectedRoute>
               }
             />

@@ -21,6 +21,7 @@ import {
   ProjectCreate,
   ProjectList,
   ProjectPublic,
+  ProjectOverview,
   SectionCreate,
   SectionList,
   SectionPublic,
@@ -1174,6 +1175,21 @@ export const api = {
     return request<SectionYearList>(`/section-years?${query.toString()}`);
   },
 
+  async getSectionYear(id_section_year: number): Promise<SectionYearPublic> {
+    if (USE_MOCK) {
+      await delay();
+      const sy = mockDB.sectionYears.find((x) => x.id_section_year === id_section_year);
+      if (!sy) {
+        const err: any = new Error('No existe el curso lectivo');
+        err.status = 404;
+        throw err;
+      }
+      return sy;
+    }
+
+    return request<SectionYearPublic>(`/section-years/${id_section_year}`);
+  },
+
   async createSectionYear(payload: SectionYearCreate): Promise<SectionYearPublic> {
     if (USE_MOCK) {
       await delay();
@@ -1555,6 +1571,24 @@ export const api = {
     }
 
     return request<ProjectPublic>(`/projects/${id_project}`, { method: 'GET' });
+  },
+
+  // El equipo con sus integrantes (activos y finalizados) y su jefe
+  async getProjectOverview(id_project: number): Promise<ProjectOverview> {
+    if (USE_MOCK) {
+      const { members = [], ...p } = await api.getProject(id_project);
+      const active = { id_status: 8, ambito: 'student_project', code: 'active', name: 'Activo' };
+      const list = members.map((m, i) => ({
+        ...m,
+        id_student_project: m.id_student,
+        is_leader: i === 0,
+        enrolled_at: '2025-03-01T09:00:00Z',
+        status: active,
+      }));
+      return { ...p, members: list, responsible: list[0] ?? null };
+    }
+
+    return request<ProjectOverview>(`/projects/${id_project}/overview`, { method: 'GET' });
   },
 
   async createProject(payload: ProjectCreate): Promise<ProjectPublic> {

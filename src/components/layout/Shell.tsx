@@ -8,6 +8,7 @@ import {
   Layers,
   Users,
   GraduationCap,
+  FolderKanban,
   User,
   LogOut,
   Menu,
@@ -74,17 +75,19 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         { label: 'Estado de la cátedra', path: '/catedra', icon: BarChart3 },
         // Las pantallas de estudiantes y docentes se abren desde Usuarios
         { label: 'Usuarios', path: '/usuarios', icon: Users, also: ['/estudiantes', '/docentes'] },
+        { label: 'Equipos de trabajo', path: '/equipos', icon: FolderKanban },
       ];
     }
 
     if (user.role === 'professor') {
       return [
         { label: 'Estudiantes', path: '/estudiantes', icon: GraduationCap },
+        { label: 'Equipos de trabajo', path: '/equipos', icon: FolderKanban },
       ];
     }
 
     // Alumno
-    return [];
+    return [{ label: 'Equipos de trabajo', path: '/equipos', icon: FolderKanban }];
   };
 
   const navItems = getNavItems();
