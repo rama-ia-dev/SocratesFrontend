@@ -3,9 +3,11 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, CloudOff, Lock, Mail, RefreshCw, SearchX } from 'lucide-react';
 import { api } from '../lib/api';
 import type { ProjectMember, ProjectOverview, SectionYearPublic } from '../types/api';
+import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
+import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
 import { TeamSizeModal } from '../components/TeamSizeModal';
 import { useAuth } from '../context/AuthContext';
@@ -27,7 +29,11 @@ const Field: React.FC<{ label: string; value?: string | null }> = ({ label, valu
 
 // Integrantes con su contacto; el jefe del grupo primero. El cupo va aparte: es del curso lectivo
 // y se exige recién al asegurar el equipo, no es la cantidad que tiene hoy.
-const Members: React.FC<{ members: ProjectMember[]; cupo?: React.ReactNode }> = ({ members, cupo }) => {
+const Members: React.FC<{
+  members: ProjectMember[];
+  cupo?: React.ReactNode;
+  action?: (m: ProjectMember) => React.ReactNode;
+}> = ({ members, cupo, action }) => {
   const sorted = [...members].sort((a, b) => Number(b.is_leader) - Number(a.is_leader));
   return (
     <section className="rounded-xl border border-line bg-white">
@@ -54,13 +60,16 @@ const Members: React.FC<{ members: ProjectMember[]; cupo?: React.ReactNode }> = 
                 {m.is_leader && <Badge variant="leader">Jefe del grupo</Badge>}
                 {m.status.code !== 'active' && <Badge variant="neutral">{m.status.name}</Badge>}
               </div>
-              <a
-                href={`mailto:${studentEmail(m.legajo)}`}
-                className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline break-all"
-              >
-                <Mail className="w-4 h-4 shrink-0" />
-                {studentEmail(m.legajo)}
-              </a>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <a
+                  href={`mailto:${studentEmail(m.legajo)}`}
+                  className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline break-all"
+                >
+                  <Mail className="w-4 h-4 shrink-0" />
+                  {studentEmail(m.legajo)}
+                </a>
+                {action?.(m)}
+              </div>
             </li>
           ))}
         </ul>
@@ -79,6 +88,19 @@ const decideError = (err: any): string => {
   if (err.status === 403) return 'Solo el jefe del grupo puede aceptar o rechazar solicitudes';
   if (err.status === 404) return 'La solicitud ya no existe';
   return detail || 'No se pudo responder la solicitud';
+};
+
+// Error del backend al pasar la jefatura, en palabras del usuario
+const leaderError = (err: any): string => {
+  const detail = String(err.message || '');
+  if (err.status === 409) {
+    if (detail.includes('final state')) return 'El equipo ya está aprobado o cancelado: la jefatura no cambia';
+    if (detail.includes('already the group leader')) return 'Ya es el jefe del grupo';
+    if (detail.includes('active member')) return 'La jefatura solo se le pasa a un integrante activo';
+  }
+  if (err.status === 403) return 'Solo el jefe del grupo puede pasar la jefatura';
+  if (err.status === 404) return 'El integrante ya no está en el equipo';
+  return detail || 'No se pudo pasar la jefatura';
 };
 
 // Solicitudes para sumarse (SCRUM-24): las ve y las decide solo el jefe del grupo
@@ -150,6 +172,10 @@ export const ProjectDetail: React.FC = () => {
   // Solicitudes pendientes (SCRUM-24); null mientras no se sabe si el usuario es el jefe
   const [requests, setRequests] = useState<ProjectMember[] | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  // Pasar la jefatura (SCRUM-22): a quién, si se está guardando y el error del backend
+  const [newLeader, setNewLeader] = useState<ProjectMember | null>(null);
+  const [isTransferring, setIsTransferring] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
 
   // `keep`: recarga después de una acción, sin vaciar la pantalla mientras llegan los datos nuevos
   const load = useCallback(async (keep = false) => {
@@ -216,6 +242,22 @@ export const ProjectDetail: React.FC = () => {
     }
   };
 
+  const handleTransfer = async () => {
+    if (!project || !newLeader) return;
+    setIsTransferring(true);
+    setTransferError(null);
+    try {
+      await api.transferLeadership(project.id_project, newLeader.id_student_project);
+      success(`${newLeader.first_name} ${newLeader.last_name} es el nuevo jefe del grupo`);
+      setNewLeader(null);
+      load(true);
+    } catch (err: any) {
+      setTransferError(leaderError(err));
+    } finally {
+      setIsTransferring(false);
+    }
+  };
+
   const back = (
     <Link
       to="/equipos"
@@ -264,6 +306,29 @@ export const ProjectDetail: React.FC = () => {
     );
   }
 
+  // El jefe le pasa la jefatura a otro integrante activo mientras el equipo no esté aprobado ni cancelado
+  const iAmLeader = project.members.some(
+    (m) => m.id_student === user?.id_user && m.is_leader && m.status.code === 'active'
+  );
+  const isFinal = project.status?.code === 'approved' || project.status?.code === 'cancelled';
+  const memberAction =
+    iAmLeader && !isFinal
+      ? (m: ProjectMember) =>
+          !m.is_leader &&
+          m.status.code === 'active' && (
+            <button
+              type="button"
+              onClick={() => {
+                setTransferError(null);
+                setNewLeader(m);
+              }}
+              className="text-sm text-primary font-medium hover:underline cursor-pointer"
+            >
+              Pasar la jefatura
+            </button>
+          )
+      : undefined;
+
   return (
     <div className="max-w-4xl space-y-6">
       {back}
@@ -299,6 +364,7 @@ export const ProjectDetail: React.FC = () => {
 
       <Members
         members={project.members}
+        action={memberAction}
         cupo={
           sectionYear?.min_students !== undefined &&
           sectionYear.max_students !== undefined && (
@@ -322,6 +388,32 @@ export const ProjectDetail: React.FC = () => {
       />
 
       {requests && <Requests requests={requests} busyId={busyId} onDecide={handleDecide} />}
+
+      <Modal
+        isOpen={newLeader !== null}
+        onClose={() => !isTransferring && setNewLeader(null)}
+        title="Pasar la jefatura"
+      >
+        {transferError && <Alert className="mb-4">{transferError}</Alert>}
+        {newLeader && (
+          <p className="text-sm text-ink">
+            ¿Pasarle la jefatura del grupo a{' '}
+            <span className="font-semibold">
+              {newLeader.first_name} {newLeader.last_name}
+            </span>
+            ? Usted sigue en el equipo como integrante, y desde ese momento las solicitudes para sumarse
+            las decide el nuevo jefe.
+          </p>
+        )}
+        <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-line">
+          <Button type="button" variant="outline" onClick={() => setNewLeader(null)} disabled={isTransferring}>
+            Cancelar
+          </Button>
+          <Button type="button" onClick={handleTransfer} isLoading={isTransferring}>
+            Pasar la jefatura
+          </Button>
+        </div>
+      </Modal>
 
       {isSizeOpen && sectionYear && (
         <TeamSizeModal
