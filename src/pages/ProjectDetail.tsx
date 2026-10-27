@@ -507,7 +507,9 @@ export const ProjectDetail: React.FC = () => {
         members={project.members}
         action={memberAction}
         teamAction={insureAction}
+        // El cupo solo cuenta para asegurar: asegurado ya no aplica
         cupo={
+          project.status?.code === 'uninsured' &&
           sectionYear?.min_students !== undefined &&
           sectionYear.max_students !== undefined && (
             <>
