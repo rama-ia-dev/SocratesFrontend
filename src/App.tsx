@@ -17,6 +17,7 @@ import { RegisterStudents } from './pages/RegisterStudents';
 import { Users } from './pages/Users';
 import { Projects } from './pages/Projects';
 import { ProjectDetail } from './pages/ProjectDetail';
+import { MyTeam } from './pages/MyTeam';
 
 // Guardia de autenticación y rol
 const ProtectedRoute: React.FC<{
@@ -194,6 +195,16 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <ProjectDetail />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Mi equipo (Solo alumnos) */}
+            <Route
+              path="/mi-equipo"
+              element={
+                <ProtectedRoute allowedRoles={['student']}>
+                  <MyTeam />
                 </ProtectedRoute>
               }
             />

@@ -206,9 +206,11 @@ const Requests: React.FC<{
   </section>
 );
 
-// Detalle de un equipo de trabajo (SCRUM-105)
-export const ProjectDetail: React.FC = () => {
-  const { id } = useParams();
+// Detalle de un equipo de trabajo (SCRUM-105). Con `projectId` lo muestra Mi equipo (SCRUM-585),
+// sin el enlace para volver a la lista
+export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) => {
+  const params = useParams();
+  const id = projectId ?? params.id;
   const [project, setProject] = useState<ProjectOverview | null>(null);
   const [sectionYear, setSectionYear] = useState<SectionYearPublic | null>(null);
   const [state, setState] = useState<LoadState>('loading');
@@ -350,7 +352,7 @@ export const ProjectDetail: React.FC = () => {
     }
   };
 
-  const back = (
+  const back = projectId === undefined && (
     <Link
       to="/equipos"
       className="inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-primary transition-colors duration-150"

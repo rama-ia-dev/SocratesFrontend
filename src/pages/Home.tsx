@@ -75,6 +75,12 @@ export const Home: React.FC = () => {
     // Alumno
     return [
       {
+        title: 'Mi equipo',
+        desc: 'Su equipo de trabajo o, mientras no integre uno, sus solicitudes para sumarse.',
+        path: '/mi-equipo',
+        icon: Users,
+      },
+      {
         title: 'Equipos de trabajo',
         desc: 'Equipos de trabajo de la cátedra y sus proyectos.',
         path: '/equipos',

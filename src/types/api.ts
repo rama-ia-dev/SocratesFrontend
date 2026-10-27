@@ -335,10 +335,27 @@ export interface ProjectMemberList {
   offset: number;
 }
 
-// `GET /projects/{id}/overview`: el equipo con sus integrantes activos y finalizados
+// Docente del curso lectivo que hace el seguimiento de un equipo (sin correo)
+export interface ProfessorResponsible {
+  id_professor: number;
+  first_name: string;
+  last_name: string;
+  legajo: number;
+}
+
+// `GET /projects/{id}/overview`: el equipo con sus integrantes activos y finalizados, los docentes
+// de su curso lectivo y el jefe del grupo
 export interface ProjectOverview extends Omit<ProjectPublic, 'members'> {
   members: ProjectMember[];
-  responsible: ProjectMember | null;
+  responsible: ProfessorResponsible[];
+  leader: ProjectMember | null;
+}
+
+// `GET /me/project`: el equipo del alumno (null si no integra ninguno) y sus solicitudes para
+// sumarse, pendientes y rechazadas
+export interface MyProject {
+  project: ProjectOverview | null;
+  requests: StudentGroup[];
 }
 
 export interface ProjectList {

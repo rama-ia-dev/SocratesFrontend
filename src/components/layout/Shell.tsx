@@ -87,7 +87,10 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     }
 
     // Alumno
-    return [{ label: 'Equipos de trabajo', path: '/equipos', icon: FolderKanban }];
+    return [
+      { label: 'Mi equipo', path: '/mi-equipo', icon: Users },
+      { label: 'Equipos de trabajo', path: '/equipos', icon: FolderKanban },
+    ];
   };
 
   const navItems = getNavItems();
