@@ -1,10 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Input } from '../components/ui/Input';
 import { DateField } from '../components/ui/DateField';
+import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 import { useToast } from '../components/ui/Toast';
 import {
@@ -59,12 +60,39 @@ export const RegisterStudents: React.FC = () => {
   const navigate = useNavigate();
   const { success } = useToast();
   const { user } = useAuth();
-  // El super administrador ve a los alumnos en Usuarios. El listado del docente común muestra solo
-  // alumnos que ya están en un equipo de sus cursos, donde el recién registrado todavía no aparece:
-  // después de registrar sigue en el formulario.
+  // El super administrador ve a los alumnos en Usuarios; el docente, en Estudiantes, donde el
+  // alumno aparece apenas queda inscripto en su curso lectivo
   const listPath = user?.is_super_admin ? '/usuarios' : '/estudiantes';
 
   const [activeTab, setActiveTab] = useState<'manual' | 'excel'>('manual');
+
+  // Curso lectivo en el que quedan inscriptos (obligatorio): el docente elige entre los suyos y el
+  // super administrador entre todos
+  const [courses, setCourses] = useState<{ id: number; label: string }[] | null>(null);
+  const [course, setCourse] = useState('');
+  const [courseError, setCourseError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    const load = user.is_super_admin
+      ? api.getSectionYears({ limit: 100 }).then((r) => r.items)
+      : api.getProfessorSectionYears({ id_professor: user.id_user, limit: 100 }).then((r) => r.items);
+    load
+      .then((items) =>
+        setCourses(
+          items
+            .map((c) => ({ id: c.id_section_year, label: `${c.section_name} (${c.year})`, year: c.year, name: c.section_name }))
+            .sort((a, b) => b.year - a.year || a.name.localeCompare(b.name, 'es'))
+            .map(({ id, label }) => ({ id, label }))
+        )
+      )
+      .catch(() => setCourses([]));
+  }, [user]);
+  // Se revisa antes de registrar: sin curso lectivo el alumno quedaría sin cursada
+  const checkCourse = () => {
+    if (course) return true;
+    setCourseError('Elija el curso lectivo en el que se inscriben');
+    return false;
+  };
 
   // ==========================================
   // Formulario Manual
@@ -102,7 +130,7 @@ export const RegisterStudents: React.FC = () => {
 
     // Se revisan todos (no se corta en el primero) para marcar cada campo con error a la vez
     const checks = [legajo, firstName, lastName, birthDate, enrollmentYear].map((f) => f.check());
-    if (checks.includes(false)) return;
+    if (!checkCourse() || checks.includes(false)) return;
 
     setIsSubmittingManual(true);
     try {
@@ -112,10 +140,10 @@ export const RegisterStudents: React.FC = () => {
         last_name: lastName.value.trim(),
         birth_date: birthDate.value,
         enrollment_year: Number(enrollmentYear.value),
+        id_section_year: Number(course),
       });
       success('Estudiante registrado. Recibirá un correo de bienvenida');
-      if (user?.is_super_admin) navigate(listPath);
-      else [legajo, firstName, lastName, birthDate, enrollmentYear].forEach((f) => f.reset());
+      navigate(listPath);
     } catch (err: any) {
       // POST /students responde el legajo repetido como 422 con la lista de filas ({row, legajo, detail})
       const rows = Array.isArray(err.detail) ? err.detail : err.errors;
@@ -183,19 +211,18 @@ export const RegisterStudents: React.FC = () => {
   };
 
   const handleSubmitExcel = async () => {
-    if (previewRows.some((r) => !r.student)) return;
+    if (previewRows.some((r) => !r.student) || !checkCourse()) return;
     setExcelErrorMsg(null);
     setIsSubmittingExcel(true);
     try {
-      const students = previewRows.map((r) => r.student!);
+      const students = previewRows.map((r) => ({ ...r.student!, id_section_year: Number(course) }));
       await api.createStudentsBulk({ students });
       success(
         students.length === 1
           ? '1 estudiante registrado. Recibirá un correo de bienvenida'
           : `${students.length} estudiantes registrados. Recibirán un correo de bienvenida`
       );
-      if (user?.is_super_admin) navigate(listPath);
-      else handleRemoveFile();
+      navigate(listPath);
     } catch (err: any) {
       // Errores por fila (legajo ya registrado): la fila del backend es la posición en el lote.
       // Se marcan en la tabla como los demás; el aviso de "todo o nada" ya explica que no se
@@ -225,6 +252,30 @@ export const RegisterStudents: React.FC = () => {
         title="Registrar estudiantes"
         subtitle="Incorpore nuevos alumnos individualmente o mediante plantilla Excel"
       />
+
+      {/* El curso lectivo vale para las dos formas de registro */}
+      <div className="max-w-md">
+        {courses !== null && courses.length === 0 ? (
+          <Alert>No tiene cursos lectivos asignados: los alumnos se registran inscriptos en uno.</Alert>
+        ) : (
+          <Select
+            id="register-course"
+            label="Curso lectivo"
+            value={course}
+            onChange={(e) => {
+              setCourse(e.target.value);
+              setCourseError(null);
+            }}
+            disabled={courses === null || isSubmittingManual || isSubmittingExcel}
+            error={courseError ?? undefined}
+            helperText="Los alumnos quedan inscriptos en este curso lectivo."
+            options={[
+              { value: '', label: courses === null ? 'Cargando cursos lectivos…' : 'Elija un curso lectivo' },
+              ...(courses ?? []).map((c) => ({ value: c.id, label: c.label })),
+            ]}
+          />
+        )}
+      </div>
 
       {/* Pestañas: el foco se marca solo al navegar con teclado (estilo global) */}
       <div role="tablist" aria-label="Forma de registro" className="flex items-center gap-6 border-b border-line mb-6">
