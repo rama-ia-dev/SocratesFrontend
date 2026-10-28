@@ -296,6 +296,35 @@ export interface StudentProjectPublic {
   status: StatusPublic;
 }
 
+// `PATCH /projects/{id}`: solo los campos que cambian; un texto en null se borra
+export interface ProjectUpdate {
+  name?: string | null;
+  description?: string | null;
+  objective?: string | null;
+  problem?: string | null;
+  privacy?: ProjectPrivacy;
+}
+
+// `GET /student-section-years`: la cursada de un alumno en un curso lectivo
+export interface StudentSectionYearPublic {
+  id_student_section_year: number;
+  id_student: number;
+  student_first_name: string;
+  student_last_name: string;
+  student_legajo: number;
+  id_section_year: number;
+  year: number;
+  id_section: number;
+  section_name: string;
+}
+
+export interface StudentSectionYearList {
+  items: StudentSectionYearPublic[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 // `GET /projects/{id}/members`: integrantes filtrados por estado de la membresía
 export interface ProjectMemberList {
   items: ProjectMember[];
