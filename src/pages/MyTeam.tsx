@@ -68,7 +68,7 @@ export const MyTeam: React.FC = () => {
         <EmptyState
           icon={<FolderKanban className="w-5 h-5" />}
           message="No tiene solicitudes para sumarse a un equipo"
-          description="Los equipos de su comisión están en Equipos de trabajo."
+          description="Desde Equipos de trabajo puede pedir sumarse a uno."
           action={toTeams}
         />
       ) : (
