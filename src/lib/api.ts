@@ -1679,6 +1679,18 @@ export const api = {
     return request<ProjectPublic>(`/projects/${id_project}/insure`, { method: 'POST' });
   },
 
+  // Un docente del curso lectivo o un super administrador desasegura el equipo: vuelve a Desasegurado
+  async uninsureProject(id_project: number): Promise<ProjectPublic> {
+    if (USE_MOCK) {
+      await delay();
+      const err: any = new Error('Project not found');
+      err.status = 404;
+      throw err;
+    }
+
+    return request<ProjectPublic>(`/projects/${id_project}/uninsure`, { method: 'POST' });
+  },
+
   // El jefe del grupo le pasa la jefatura a otro integrante activo; él sigue en el equipo
   async transferLeadership(id_project: number, id_student_project: number): Promise<StudentProjectPublic> {
     if (USE_MOCK) {
