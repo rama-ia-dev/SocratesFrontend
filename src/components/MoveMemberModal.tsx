@@ -25,24 +25,35 @@ export const MoveMemberModal: React.FC<{
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const name = `${member.first_name} ${member.last_name}`;
+  const othersActive = project.members.filter(
+    (m) => m.status.code === 'active' && m.id_student_project !== member.id_student_project
+  ).length;
 
-  // Los equipos sin asegurar del mismo curso lectivo, salvo este
+  // Los equipos sin asegurar del mismo curso lectivo, salvo este y los que no lo aceptarían (ya
+  // estuvo, pidió sumarse o salió de ellos)
+  const [skipped, setSkipped] = useState(0);
   useEffect(() => {
     let alive = true;
-    projectsOfCourse(project.id_section_year)
-      .then((all) => {
-        if (!alive) return;
-        setTargets(
-          all
-            .filter((p) => p.id_project !== project.id_project && p.status?.code === 'uninsured')
-            .sort((a, b) => a.group_number - b.group_number)
+    (async () => {
+      try {
+        const open = (await projectsOfCourse(project.id_section_year)).filter(
+          (p) => p.id_project !== project.id_project && p.status?.code === 'uninsured'
         );
-      })
-      .catch(() => alive && setLoadError(true));
+        const records = await Promise.all(open.map((p) => allMembershipsOf(p.id_project)));
+        const ok = open.filter(
+          (_, i) => !records[i].some((m) => m.id_student === member.id_student && blocksAdding(m))
+        );
+        if (!alive) return;
+        setSkipped(open.length - ok.length);
+        setTargets(ok.sort((a, b) => a.group_number - b.group_number));
+      } catch {
+        if (alive) setLoadError(true);
+      }
+    })();
     return () => {
       alive = false;
     };
-  }, [project.id_project, project.id_section_year]);
+  }, [project.id_project, project.id_section_year, member.id_student]);
 
   const handleMove = async () => {
     const target = targets?.find((p) => String(p.id_project) === selected);
@@ -94,7 +105,8 @@ export const MoveMemberModal: React.FC<{
         <div className="h-10 rounded-lg bg-fill-neutral animate-pulse" aria-busy="true" />
       ) : targets.length === 0 ? (
         <p className="text-sm text-ink">
-          No hay otro equipo sin asegurar en {project.section_name} ({project.year}) al que mover a {name}.
+          No hay otro equipo sin asegurar en {project.section_name} ({project.year}) al que mover a {name}
+          {skipped > 0 && ': en los que quedan ya tuvo un registro (pidió sumarse o salió de ellos)'}.
         </p>
       ) : (
         <div className="space-y-3 text-sm text-ink">
@@ -103,8 +115,10 @@ export const MoveMemberModal: React.FC<{
           </p>
           {member.is_leader && (
             <p className="text-ink-muted">
-              Es el jefe del grupo: aquí la jefatura pasa al integrante más antiguo. Si el otro equipo no tiene
-              integrantes, queda como jefe allá.
+              {othersActive > 0
+                ? 'Es el jefe del grupo: aquí la jefatura pasa al integrante más antiguo.'
+                : `Es el jefe del grupo y el único integrante: el ${teamLabel(project)} queda sin integrantes.`}{' '}
+              Si el otro equipo no tiene integrantes, queda como jefe allá.
             </p>
           )}
           <Select
@@ -120,7 +134,9 @@ export const MoveMemberModal: React.FC<{
               { value: '', label: 'Elija un equipo' },
               ...targets.map((p) => ({ value: p.id_project, label: `${teamLabel(p)}${p.name ? ` · ${p.name}` : ''}` })),
             ]}
-            helperText={`Equipos sin asegurar de ${project.section_name} (${project.year}).`}
+            helperText={`Equipos sin asegurar de ${project.section_name} (${project.year})${
+              skipped > 0 ? `, salvo ${skipped === 1 ? 'uno' : skipped} en ${skipped === 1 ? 'el' : 'los'} que ya tuvo un registro` : ''
+            }.`}
           />
         </div>
       )}
