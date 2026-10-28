@@ -17,6 +17,7 @@ export const AddMemberModal: React.FC<{
   onAdded: (name: string) => void;
 }> = ({ project, onClose, onAdded }) => {
   const [candidates, setCandidates] = useState<StudentSectionYearPublic[] | null>(null);
+  const [enrolledCount, setEnrolledCount] = useState(0);
   const [loadError, setLoadError] = useState(false);
   const [selected, setSelected] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +45,10 @@ export const AddMemberModal: React.FC<{
         const free = enrolled.items
           .filter((e) => !busy.has(e.id_student))
           .sort((a, b) => a.student_last_name.localeCompare(b.student_last_name, 'es'));
-        if (alive) setCandidates(free);
+        if (alive) {
+          setEnrolledCount(enrolled.items.length);
+          setCandidates(free);
+        }
       } catch {
         if (alive) setLoadError(true);
       }
@@ -80,8 +84,9 @@ export const AddMemberModal: React.FC<{
         <div className="h-10 rounded-lg bg-fill-neutral animate-pulse" aria-busy="true" />
       ) : candidates.length === 0 ? (
         <p className="text-sm text-ink">
-          No hay alumnos libres en {project.section_name} ({project.year}): los inscriptos ya están en un equipo de
-          este curso lectivo o pidieron sumarse a este.
+          {enrolledCount === 0
+            ? `Todavía no hay alumnos inscriptos en ${project.section_name} (${project.year}).`
+            : `No hay alumnos para sumar en ${project.section_name} (${project.year}). Cada inscripto en este curso lectivo ya está en un equipo, pidió entrar a uno o ya formó parte de este.`}
         </p>
       ) : (
         <div className="space-y-2">
