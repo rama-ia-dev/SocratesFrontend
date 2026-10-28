@@ -25,7 +25,7 @@ const MENU_WIDTH = 188;
 export const ActionMenu: React.FC<ActionMenuProps> = ({ items, label }) => {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const [position, setPosition] = useState<{ top: number; right: number } | null>(null);
 
   const close = () => setPosition(null);
 
@@ -35,7 +35,8 @@ export const ActionMenu: React.FC<ActionMenuProps> = ({ items, label }) => {
     const menuHeight = items.length * 32 + 10 + (items.some((i) => i.danger) ? 9 : 0);
     // Abre hacia abajo; si no entra en la ventana, hacia arriba.
     const top = rect.bottom + 4 + menuHeight > window.innerHeight ? rect.top - 4 - menuHeight : rect.bottom + 4;
-    setPosition({ top, left: Math.max(8, rect.right - MENU_WIDTH) });
+    // Alineado al borde derecho del botón: si una opción es más larga, el menú crece hacia la izquierda.
+    setPosition({ top, right: Math.max(8, window.innerWidth - rect.right) });
   };
 
   useEffect(() => {
@@ -81,7 +82,7 @@ export const ActionMenu: React.FC<ActionMenuProps> = ({ items, label }) => {
           <div
             ref={menuRef}
             role="menu"
-            style={{ top: position.top, left: position.left, width: MENU_WIDTH }}
+            style={{ top: position.top, right: position.right, minWidth: MENU_WIDTH }}
             className="fixed z-50 bg-white border border-line rounded-xl shadow-[0_8px_24px_-8px_rgba(15,31,61,0.25)] p-1 text-left pop-in"
           >
             {items.map((item, i) => (
@@ -94,7 +95,7 @@ export const ActionMenu: React.FC<ActionMenuProps> = ({ items, label }) => {
                     close();
                     item.onClick();
                   }}
-                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-lg text-sm cursor-pointer ${
+                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-lg text-sm text-left whitespace-nowrap cursor-pointer ${
                     item.danger ? 'text-danger hover:bg-danger-soft' : 'text-ink hover:bg-fill-neutral'
                   }`}
                 >
