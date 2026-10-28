@@ -650,7 +650,7 @@ export const ProjectDetail: React.FC = () => {
             </p>
           )}
           <p className="text-ink-muted">
-            Deja de verse como público: pasa a usar la privacidad que eligió el equipo.
+            Después de asegurarlo, la privacidad se puede cambiar con Modificar datos.
           </p>
         </div>
         <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-line">
