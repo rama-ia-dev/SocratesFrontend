@@ -365,6 +365,14 @@ function delay(ms: number = 180): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Igual que el backend: los primeros números de equipo libres del curso lectivo (con 1, 2 y 6, son 3, 4, 5, 7…)
+function firstFreeGroupNumbers(existing: { group_number: number }[], count: number): number[] {
+  const used = new Set(existing.map((p) => p.group_number));
+  const free: number[] = [];
+  for (let n = 1; free.length < count; n++) if (!used.has(n)) free.push(n);
+  return free;
+}
+
 // El backend rota el refresh token en cada uso: si dos pedidos reciben 401 a la vez y cada uno
 // llamara a /auth/refresh, el segundo llegaría con una cookie ya consumida y expulsaría al usuario.
 // Por eso todos los 401 simultáneos esperan la misma renovación.
@@ -1716,8 +1724,7 @@ export const api = {
       const existingInSY = mockDB.projects.filter(
         (p) => p.id_section_year === payload.id_section_year
       );
-      const maxNum = existingInSY.reduce((m, p) => Math.max(m, p.group_number), 0);
-      const group_number = payload.group_number || maxNum + 1;
+      const group_number = payload.group_number || firstFreeGroupNumbers(existingInSY, 1)[0];
 
       const dup = existingInSY.find((p) => p.group_number === group_number);
       if (dup) {
@@ -1777,7 +1784,7 @@ export const api = {
       const existingInSY = mockDB.projects.filter(
         (p) => p.id_section_year === payload.id_section_year
       );
-      const maxNum = existingInSY.reduce((m, p) => Math.max(m, p.group_number), 0);
+      const numbers = firstFreeGroupNumbers(existingInSY, payload.quantity);
 
       const created: ProjectPublic[] = [];
       for (let i = 1; i <= payload.quantity; i++) {
@@ -1787,7 +1794,7 @@ export const api = {
           year: sy.year,
           id_section: sy.id_section,
           section_name: sy.section_name,
-          group_number: maxNum + i,
+          group_number: numbers[i - 1],
           privacy: 'public',
           name: null,
           description: null,
