@@ -1471,12 +1471,18 @@ export const api = {
     year?: number | null;
     id_section?: number | null;
     privacy?: 'public' | 'private' | 'protected' | null;
+    q?: string | null;
     limit?: number;
     offset?: number;
   } = {}): Promise<ProjectList> {
     if (USE_MOCK) {
       await delay();
       let filtered = [...mockDB.projects];
+
+      if (params.q) {
+        const q = params.q.toLowerCase();
+        filtered = filtered.filter((p) => (p.name ?? '').toLowerCase().includes(q));
+      }
 
       if (params.id_section_year) {
         filtered = filtered.filter((p) => p.id_section_year === params.id_section_year);
@@ -1549,6 +1555,7 @@ export const api = {
     if (params.year) query.set('year', params.year.toString());
     if (params.id_section) query.set('id_section', params.id_section.toString());
     if (params.privacy) query.set('privacy', params.privacy);
+    if (params.q) query.set('q', params.q);
     if (params.limit !== undefined) query.set('limit', params.limit.toString());
     if (params.offset !== undefined) query.set('offset', params.offset.toString());
 
