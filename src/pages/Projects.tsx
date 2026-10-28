@@ -357,11 +357,16 @@ export const Projects: React.FC = () => {
           onCreated={(created) => {
             setIsCreateOpen(false);
             const first = created[0];
-            const last = created[created.length - 1];
+            // Los números libres pueden no ser consecutivos (4 y 6): el rango solo si no hay huecos
+            const numbers = created.map((p) => p.group_number).sort((a, b) => a - b);
+            const consecutive = numbers.every((n, i) => i === 0 || n === numbers[i - 1] + 1);
+            const which = consecutive
+              ? `del ${numbers[0]} al ${numbers[numbers.length - 1]}`
+              : `${numbers.slice(0, -1).join(', ')} y ${numbers[numbers.length - 1]}`;
             success(
               created.length === 1
                 ? `Se creó el ${teamLabel(first)} de ${first.section_name} (${first.year})`
-                : `Se crearon ${created.length} equipos en ${first.section_name} (${first.year}): del ${first.group_number} al ${last.group_number}`
+                : `Se crearon ${created.length} equipos en ${first.section_name} (${first.year}): ${which}`
             );
             fetchProjects();
           }}

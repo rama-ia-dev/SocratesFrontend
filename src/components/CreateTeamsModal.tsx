@@ -18,7 +18,7 @@ const MAX_QUANTITY = 50; // límite del backend por pedido
 const MAX_GROUP_NUMBER = 9999;
 
 // Crear equipos de trabajo (SCRUM-102). El backend crea equipos vacíos y sin asegurar en un curso
-// lectivo: uno con número elegido (o el siguiente libre) o varios consecutivos. Puede hacerlo un
+// lectivo: uno con número elegido (o el primero libre) o varios en los primeros libres. Puede hacerlo un
 // docente del curso lectivo o un super administrador.
 export const CreateTeamsModal: React.FC<{
   onClose: () => void;
@@ -130,7 +130,7 @@ export const CreateTeamsModal: React.FC<{
             onChange={(e) => setQuantity(digitsOnly(e.target.value))}
             disabled={isSaving}
             error={touched ? quantityError ?? undefined : undefined}
-            helperText={`De 1 a ${MAX_QUANTITY}. Se numeran a partir del siguiente número libre`}
+            helperText={`De 1 a ${MAX_QUANTITY}. Toman los primeros números libres del curso lectivo`}
           />
 
           {qty === 1 && (
@@ -139,7 +139,7 @@ export const CreateTeamsModal: React.FC<{
               optional
               inputMode="numeric"
               maxLength={4}
-              placeholder="Automático (el siguiente libre)"
+              placeholder="Automático (el primero libre)"
               value={groupNumber}
               onChange={(e) => setGroupNumber(digitsOnly(e.target.value))}
               disabled={isSaving}
