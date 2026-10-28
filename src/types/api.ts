@@ -63,6 +63,8 @@ export interface StudentCreate {
   legajo: number;
   birth_date: string;
   enrollment_year: number;
+  // Curso lectivo en el que se inscribe (su cursada)
+  id_section_year?: number;
 }
 
 export interface StudentBulkCreate {

@@ -64,7 +64,12 @@ export const validateName = (label: 'nombre' | 'apellido') => (value: string): s
 
 export const validateLegajo = (value: string): string | null => {
   if (!value) return 'Ingrese el legajo';
-  if (!/^\d+$/.test(value) || Number(value) <= 0) return 'El legajo es un número mayor a cero';
+  if (!/^\d+$/.test(value)) return 'El legajo solo puede tener números, sin letras, puntos ni espacios';
+  if (Number(value) <= 0) return 'El legajo es un número mayor a cero';
+  // Se guarda como número: "000123" quedaría como 123, con otro correo de ingreso
+  if (value.startsWith('0')) return 'El legajo no puede empezar con 0';
+  // La base lo guarda como entero de 32 bits (hasta 2.147.483.647)
+  if (value.length > 9) return 'El legajo puede tener hasta 9 dígitos';
   return null;
 };
 

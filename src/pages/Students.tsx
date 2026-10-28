@@ -104,14 +104,11 @@ export const Students: React.FC = () => {
             ? 'Todos los alumnos registrados y sus equipos'
             : 'Alumnos de sus cursos lectivos y el equipo de cada uno'
         }
-        // El docente registra alumnos con su historia (SCRUM-97)
         action={
-          user?.is_super_admin ? (
-            <Button variant="primary" onClick={() => navigate('/estudiantes/nuevo')}>
-              <Plus className="w-4 h-4 mr-1.5" />
-              Registrar estudiantes
-            </Button>
-          ) : undefined
+          <Button variant="primary" onClick={() => navigate('/estudiantes/nuevo')}>
+            <Plus className="w-4 h-4 mr-1.5" />
+            Registrar estudiantes
+          </Button>
         }
       />
 
