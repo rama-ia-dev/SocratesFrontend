@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, CloudOff, Lock, Mail, Pencil, RefreshCw, SearchX, ShieldCheck, ShieldOff, UserPlus } from 'lucide-react';
 import { api } from '../lib/api';
-import type { ProjectMember, ProjectOverview, SectionYearPublic } from '../types/api';
+import type { MyProject, ProjectMember, ProjectOverview, SectionYearPublic } from '../types/api';
 import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -86,6 +86,20 @@ const Members: React.FC<{
       )}
     </section>
   );
+};
+
+// Error del backend al pedir sumarse, en palabras del alumno
+const joinError = (err: any): string => {
+  const detail = String(err.message || '');
+  if (err.status === 409) {
+    if (detail.includes('already requested'))
+      return 'Ya estuvo en este equipo: no puede volver a pedir sumarse';
+    if (detail.includes('already belong')) return 'Ya integra otro equipo de trabajo';
+    if (detail.includes('uninsured')) return 'El equipo ya está asegurado: no se suman integrantes';
+  }
+  if (err.status === 403) return 'Solo los alumnos pueden pedir sumarse a un equipo';
+  if (err.status === 404) return 'El equipo ya no existe';
+  return detail || 'No se pudo enviar la solicitud';
 };
 
 // Error del backend al aceptar o rechazar una solicitud, en palabras del usuario
@@ -245,6 +259,12 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [toMove, setToMove] = useState<ProjectMember | null>(null);
+  // Pedir sumarse (SCRUM-20): el equipo y las solicitudes del alumno logueado (null si no es alumno
+  // o todavía no llegaron)
+  const [myProject, setMyProject] = useState<MyProject | null>(null);
+  const [isJoinOpen, setIsJoinOpen] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
+  const [joinErrorText, setJoinErrorText] = useState<string | null>(null);
 
   // `keep`: recarga después de una acción, sin vaciar la pantalla mientras llegan los datos nuevos
   const load = useCallback(async (keep = false) => {
@@ -255,6 +275,7 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
       setSectionYear(null);
       setRequests(null);
       setCanManage(false);
+      setMyProject(null);
     }
     const idProject = Number(id);
     if (!Number.isInteger(idProject) || idProject <= 0) {
@@ -292,6 +313,12 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
           .then((r) => isCurrent() && setCanManage(r.total > 0))
           .catch(() => isCurrent() && setCanManage(false));
       else setCanManage(false);
+      // El alumno: si ya integra un equipo y qué solicitudes tiene, para saber si puede pedir sumarse
+      if (user?.role === 'student')
+        api
+          .getMyProject()
+          .then((mp) => isCurrent() && setMyProject(mp))
+          .catch(() => isCurrent() && setMyProject(null));
     } catch (err: any) {
       if (!isCurrent()) return;
       setState(err.status === 403 ? 'forbidden' : err.status === 404 ? 'not-found' : 'error');
@@ -372,6 +399,26 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
       .getProjectMembers(project.id_project, ['pending_approval'])
       .then((r) => setPendingCount(r.total))
       .catch(() => setPendingCount(null));
+  };
+
+  const handleJoin = async () => {
+    if (!project) return;
+    setIsJoining(true);
+    setJoinErrorText(null);
+    try {
+      const membership = await api.joinProject(project.id_project);
+      success(
+        membership.status.code === 'active'
+          ? `Se sumó al ${teamLabel(project)} como jefe del grupo`
+          : `Se envió su solicitud al jefe del ${teamLabel(project)}`
+      );
+      setIsJoinOpen(false);
+      load(true);
+    } catch (err: any) {
+      setJoinErrorText(joinError(err));
+    } finally {
+      setIsJoining(false);
+    }
   };
 
   const handleInsure = async () => {
@@ -542,6 +589,38 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
       Desasegurar equipo
     </Button>
   );
+  // Pedir sumarse (SCRUM-20): el alumno, con el equipo sin asegurar, si no integra ningún equipo y no
+  // tiene una solicitud pendiente en este. Una solicitud rechazada se puede volver a enviar
+  const hasLeader = project.members.some((m) => m.is_leader && m.status.code === 'active');
+  const myRequestHere = myProject?.requests.find((r) => r.id_project === project.id_project);
+  const myOtherTeam =
+    myProject?.project && myProject.project.id_project !== project.id_project ? myProject.project : null;
+  const joinAction =
+    user?.role === 'student' &&
+    myProject !== null &&
+    !iAmMember &&
+    project.status?.code === 'uninsured' &&
+    (myOtherTeam ? (
+      <p className="text-sm text-ink-muted sm:text-right">
+        Ya integra el {teamLabel(myOtherTeam)}: un alumno está en un solo equipo.
+      </p>
+    ) : myRequestHere?.status?.code === 'pending_approval' ? (
+      <p className="text-sm text-ink-muted sm:text-right">Su solicitud está pendiente: la decide el jefe del grupo.</p>
+    ) : (
+      <div className="flex flex-col sm:items-end gap-1">
+        <Button
+          size="sm"
+          onClick={() => {
+            setJoinErrorText(null);
+            setIsJoinOpen(true);
+          }}
+        >
+          <UserPlus className="w-4 h-4 mr-1.5" />
+          {myRequestHere ? 'Volver a pedir sumarse' : 'Pedir sumarse'}
+        </Button>
+        {myRequestHere && <p className="text-xs text-ink-muted">El jefe rechazó su solicitud anterior.</p>}
+      </div>
+    ));
   // Si sale el jefe, el backend le pasa la jefatura al integrante activo más antiguo
   const othersActive = toExpel
     ? project.members.filter((m) => m.status.code === 'active' && m.id_student_project !== toExpel.id_student_project)
@@ -589,7 +668,7 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
       <Members
         members={project.members}
         action={memberAction}
-        teamAction={insureAction || uninsureAction}
+        teamAction={insureAction || uninsureAction || joinAction}
         // El cupo solo cuenta para asegurar: asegurado ya no aplica
         cupo={
           project.status?.code === 'uninsured' &&
@@ -732,6 +811,38 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
           </Button>
           <Button type="button" onClick={handleUninsure} isLoading={isUninsuring}>
             Desasegurar equipo
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isJoinOpen}
+        onClose={() => !isJoining && setIsJoinOpen(false)}
+        title={`Sumarse al ${teamLabel(project)}`}
+      >
+        {joinErrorText && <Alert className="mb-4">{joinErrorText}</Alert>}
+        <div className="space-y-2 text-sm text-ink">
+          {hasLeader ? (
+            <>
+              <p>¿Pedir sumarse al {teamLabel(project)}? El jefe del grupo decide si lo acepta.</p>
+              <p className="text-ink-muted">Si lo aceptan, sus solicitudes a otros equipos se rechazan.</p>
+            </>
+          ) : (
+            <>
+              <p>
+                ¿Sumarse al {teamLabel(project)}? Todavía no tiene integrantes: entra directamente como jefe del
+                grupo y decide quién más se suma.
+              </p>
+              <p className="text-ink-muted">Sus solicitudes a otros equipos se rechazan.</p>
+            </>
+          )}
+        </div>
+        <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-line">
+          <Button type="button" variant="outline" onClick={() => setIsJoinOpen(false)} disabled={isJoining}>
+            Cancelar
+          </Button>
+          <Button type="button" onClick={handleJoin} isLoading={isJoining}>
+            {hasLeader ? 'Pedir sumarse' : 'Sumarse como jefe'}
           </Button>
         </div>
       </Modal>

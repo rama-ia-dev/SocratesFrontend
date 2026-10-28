@@ -1915,50 +1915,17 @@ export const api = {
     return request<void>(`/projects/${id_project}`, { method: 'DELETE' });
   },
 
-  async joinProject(id_project: number): Promise<ProjectPublic> {
+  // El alumno logueado pide sumarse a un equipo sin asegurar. Si el equipo no tiene jefe entra
+  // como jefe (activo); si no, la solicitud queda pendiente hasta que el jefe la decida
+  async joinProject(id_project: number): Promise<StudentProjectPublic> {
     if (USE_MOCK) {
-      await delay(150);
-      const targetProj = mockDB.projects.find((p) => p.id_project === id_project);
-      if (!targetProj) {
-        const err: any = new Error('No se encontró el equipo de trabajo');
-        err.status = 404;
-        throw err;
-      }
-
-      const maxLimit = targetProj.max_members || 5;
-      if (targetProj.members && targetProj.members.length >= maxLimit) {
-        const err: any = new Error(`El equipo ha alcanzado el cupo máximo de ${maxLimit} integrantes`);
-        err.status = 400;
-        throw err;
-      }
-
-      // Desvincular de cualquier otro equipo en el que esté actualmente
-      mockDB.projects.forEach((p) => {
-        if (p.members) {
-          p.members = p.members.filter((m) => m.id_student !== mockDB.me.id_user);
-          p.is_secured = p.members.length >= (p.min_members || 3);
-        }
-      });
-
-      if (!targetProj.members) {
-        targetProj.members = [];
-      }
-
-      targetProj.members.push({
-        id_student: mockDB.me.id_user,
-        legajo: mockDB.me.legajo,
-        first_name: mockDB.me.first_name,
-        last_name: mockDB.me.last_name,
-      });
-
-      targetProj.is_secured = targetProj.members.length >= (targetProj.min_members || 3);
-
-      return { ...targetProj };
+      await delay();
+      const err: any = new Error('Project not found');
+      err.status = 404;
+      throw err;
     }
 
-    return request<ProjectPublic>(`/projects/${id_project}/join`, {
-      method: 'POST',
-    });
+    return request<StudentProjectPublic>(`/projects/${id_project}/members`, { method: 'POST' });
   },
 
   async leaveProject(id_project: number): Promise<ProjectPublic> {
