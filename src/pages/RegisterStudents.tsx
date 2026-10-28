@@ -60,8 +60,9 @@ export const RegisterStudents: React.FC = () => {
   const navigate = useNavigate();
   const { success } = useToast();
   const { user } = useAuth();
-  // El super administrador ve a los alumnos en Usuarios; el docente, en Estudiantes, donde el
-  // alumno aparece apenas queda inscripto en su curso lectivo
+  // El super administrador ve a los alumnos en Usuarios. El listado del docente todavía muestra solo
+  // alumnos que ya están en un equipo de sus cursos, donde el recién registrado no aparece: después
+  // de registrar sigue en el formulario.
   const listPath = user?.is_super_admin ? '/usuarios' : '/estudiantes';
 
   const [activeTab, setActiveTab] = useState<'manual' | 'excel'>('manual');
@@ -143,7 +144,8 @@ export const RegisterStudents: React.FC = () => {
         id_section_year: Number(course),
       });
       success('Estudiante registrado. Recibirá un correo de bienvenida');
-      navigate(listPath);
+      if (user?.is_super_admin) navigate(listPath);
+      else [legajo, firstName, lastName, birthDate, enrollmentYear].forEach((f) => f.reset());
     } catch (err: any) {
       // POST /students responde el legajo repetido como 422 con la lista de filas ({row, legajo, detail})
       const rows = Array.isArray(err.detail) ? err.detail : err.errors;
@@ -222,7 +224,8 @@ export const RegisterStudents: React.FC = () => {
           ? '1 estudiante registrado. Recibirá un correo de bienvenida'
           : `${students.length} estudiantes registrados. Recibirán un correo de bienvenida`
       );
-      navigate(listPath);
+      if (user?.is_super_admin) navigate(listPath);
+      else handleRemoveFile();
     } catch (err: any) {
       // Errores por fila (legajo ya registrado): la fila del backend es la posición en el lote.
       // Se marcan en la tabla como los demás; el aviso de "todo o nada" ya explica que no se
