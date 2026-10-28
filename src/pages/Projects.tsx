@@ -38,6 +38,16 @@ const allProjectsOf = async (id_section_year: number, filters: ProjectFilters) =
   }
 };
 
+// Los equipos del curso lectivo actual del usuario, recorriendo las páginas del backend
+const allMyProjects = async () => {
+  const items: ProjectPublic[] = [];
+  for (let offset = 0; ; offset += 100) {
+    const res = await api.getMySectionYearProjects({ limit: 100, offset });
+    items.push(...res.items);
+    if (items.length >= res.total || res.items.length === 0) return items;
+  }
+};
+
 // El mismo orden que usa el backend: año más reciente, comisión y número de equipo
 const byYearSectionNumber = (a: ProjectPublic, b: ProjectPublic) =>
   b.year - a.year || a.section_name.localeCompare(b.section_name, 'es') || a.group_number - b.group_number;
@@ -50,6 +60,8 @@ export const Projects: React.FC = () => {
   const { user } = useAuth();
   const { success } = useToast();
   const isProfessor = user?.role === 'professor';
+  // El alumno ve solo los equipos de su curso lectivo actual
+  const isStudent = user?.role === 'student';
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   // El docente ve también equipos de cursos ajenos (los públicos); arranca por los suyos
   const canFilterMine = isProfessor && !user?.is_super_admin;
@@ -122,7 +134,17 @@ export const Projects: React.FC = () => {
       q: query || null,
     };
     try {
-      if (scope === 'mine') {
+      if (isStudent) {
+        // Un solo curso lectivo: se trae entero y la búsqueda y la privacidad se aplican acá
+        const q = query.toLowerCase();
+        const mine = (await allMyProjects())
+          .filter((p) => !privacy || p.privacy === privacy)
+          .filter((p) => !q || (p.name ?? '').toLowerCase().includes(q))
+          .sort(byYearSectionNumber);
+        if (current !== requestId.current) return;
+        setProjects(mine.slice(offset, offset + PAGE_SIZE));
+        setTotal(mine.length);
+      } else if (scope === 'mine') {
         // El backend filtra por un solo curso lectivo: con varios, se piden todos y se pagina acá
         const lists = await Promise.all((mySectionYears ?? []).map((id) => allProjectsOf(id, filters)));
         if (current !== requestId.current) return;
@@ -141,7 +163,7 @@ export const Projects: React.FC = () => {
     } finally {
       if (current === requestId.current) setIsLoading(false);
     }
-  }, [year, section, privacy, query, offset, scope, mySectionYears]);
+  }, [year, section, privacy, query, offset, scope, mySectionYears, isStudent]);
 
   useEffect(() => {
     fetchProjects();
@@ -160,7 +182,7 @@ export const Projects: React.FC = () => {
     <div className="space-y-6">
       <PageHeader
         title="Equipos de trabajo"
-        subtitle="Equipos de cada comisión y su proyecto"
+        subtitle={isStudent ? 'Equipos de su curso lectivo y su proyecto' : 'Equipos de cada comisión y su proyecto'}
         action={
           isProfessor ? (
             <Button variant="primary" onClick={() => setIsCreateOpen(true)}>
@@ -188,7 +210,9 @@ export const Projects: React.FC = () => {
 
       {/* Años y comisiones pueden ser muchos: desplegables. La privacidad tiene tres: a la vista */}
       <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:w-[660px] shrink-0">
+        <div
+          className={`grid grid-cols-1 gap-3 shrink-0 ${isStudent ? 'sm:w-[320px]' : 'sm:grid-cols-3 lg:w-[660px]'}`}
+        >
           <Input
             type="text"
             aria-label="Buscar por nombre del proyecto"
@@ -201,27 +225,32 @@ export const Projects: React.FC = () => {
             }}
             leftIcon={<Search className="w-4 h-4" />}
           />
-          <Select
-            aria-label="Año"
-            value={year}
-            onChange={changeYear}
-            options={[
-              { value: '', label: 'Todos los años' },
-              ...yearOptions.map((y) => ({ value: y, label: String(y) })),
-            ]}
-          />
-          <Select
-            aria-label="Comisión"
-            value={section}
-            onChange={(e) => {
-              setSection(e.target.value);
-              setOffset(0);
-            }}
-            options={[
-              { value: '', label: 'Todas las comisiones' },
-              ...sectionOptions.map(([id, name]) => ({ value: id, label: name })),
-            ]}
-          />
+          {/* El alumno ve un solo curso lectivo: año y comisión no hacen falta */}
+          {!isStudent && (
+            <>
+              <Select
+                aria-label="Año"
+                value={year}
+                onChange={changeYear}
+                options={[
+                  { value: '', label: 'Todos los años' },
+                  ...yearOptions.map((y) => ({ value: y, label: String(y) })),
+                ]}
+              />
+              <Select
+                aria-label="Comisión"
+                value={section}
+                onChange={(e) => {
+                  setSection(e.target.value);
+                  setOffset(0);
+                }}
+                options={[
+                  { value: '', label: 'Todas las comisiones' },
+                  ...sectionOptions.map(([id, name]) => ({ value: id, label: name })),
+                ]}
+              />
+            </>
+          )}
         </div>
         <SegmentedControl
           label="Filtrar por privacidad"
@@ -260,12 +289,18 @@ export const Projects: React.FC = () => {
           message={
             hasFilters
               ? 'Ningún equipo de trabajo coincide con los filtros'
-              : scope === 'mine'
-                ? 'Todavía no hay equipos de trabajo en sus cursos lectivos'
-                : 'Todavía no hay equipos de trabajo que pueda ver'
+              : isStudent
+                ? 'Todavía no hay equipos de trabajo en su curso lectivo'
+                : scope === 'mine'
+                  ? 'Todavía no hay equipos de trabajo en sus cursos lectivos'
+                  : 'Todavía no hay equipos de trabajo que pueda ver'
           }
           description={
-            hasFilters ? 'Pruebe con otro nombre, otro año, otra comisión u otra privacidad.' : undefined
+            hasFilters
+              ? isStudent
+                ? 'Pruebe con otro nombre u otra privacidad.'
+                : 'Pruebe con otro nombre, otro año, otra comisión u otra privacidad.'
+              : undefined
           }
           action={
             hasFilters ? (
