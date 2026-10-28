@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, CloudOff, Lock, Mail, Pencil, RefreshCw, SearchX, ShieldCheck, UserPlus } from 'lucide-react';
+import { ArrowLeft, CloudOff, Lock, Mail, Pencil, RefreshCw, SearchX, ShieldCheck, ShieldOff, UserPlus } from 'lucide-react';
 import { api } from '../lib/api';
 import type { ProjectMember, ProjectOverview, SectionYearPublic } from '../types/api';
 import { Alert } from '../components/ui/Alert';
@@ -141,6 +141,16 @@ const insureError = (err: any): string => {
   return detail || 'No se pudo asegurar el equipo';
 };
 
+// Error del backend al desasegurar el equipo, en palabras del usuario
+const uninsureError = (err: any): string => {
+  const detail = String(err.message || '');
+  if (err.status === 409) return 'El equipo ya no está asegurado, o está aprobado o cancelado';
+  if (err.status === 403)
+    return 'Solo los docentes del curso lectivo y el super administrador pueden desasegurar el equipo';
+  if (err.status === 404) return 'El equipo ya no existe';
+  return detail || 'No se pudo desasegurar el equipo';
+};
+
 // Solicitudes para sumarse (SCRUM-24): las ve y las decide solo el jefe del grupo
 const Requests: React.FC<{
   requests: ProjectMember[];
@@ -225,6 +235,10 @@ export const ProjectDetail: React.FC = () => {
   const [pendingCount, setPendingCount] = useState<number | null>(null);
   const [isInsuring, setIsInsuring] = useState(false);
   const [insureErrorText, setInsureErrorText] = useState<string | null>(null);
+  // Desasegurar el equipo (SCRUM-25): los docentes del curso lectivo y el super administrador
+  const [isUninsureOpen, setIsUninsureOpen] = useState(false);
+  const [isUninsuring, setIsUninsuring] = useState(false);
+  const [uninsureErrorText, setUninsureErrorText] = useState<string | null>(null);
   // Modificar el equipo (SCRUM-103): sus datos, sumar un alumno o moverlo a otro equipo del curso
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -374,6 +388,22 @@ export const ProjectDetail: React.FC = () => {
     }
   };
 
+  const handleUninsure = async () => {
+    if (!project) return;
+    setIsUninsuring(true);
+    setUninsureErrorText(null);
+    try {
+      await api.uninsureProject(project.id_project);
+      success(`Se desaseguró el ${teamLabel(project)}`);
+      setIsUninsureOpen(false);
+      load(true);
+    } catch (err: any) {
+      setUninsureErrorText(uninsureError(err));
+    } finally {
+      setIsUninsuring(false);
+    }
+  };
+
   if (state !== 'ok' || !project) {
     return (
       <div className="max-w-4xl space-y-6">
@@ -495,6 +525,21 @@ export const ProjectDetail: React.FC = () => {
       {insureBlocked && <p className="text-xs text-ink-muted">{insureBlocked}</p>}
     </div>
   );
+  // Desasegurar (SCRUM-25): asegurado y sin aprobar ni cancelar; el jefe no puede
+  const canUninsure = canManage && !isFinal && !!project.status && project.status.code !== 'uninsured';
+  const uninsureAction = canUninsure && (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={() => {
+        setUninsureErrorText(null);
+        setIsUninsureOpen(true);
+      }}
+    >
+      <ShieldOff className="w-4 h-4 mr-1.5" />
+      Desasegurar equipo
+    </Button>
+  );
   // Si sale el jefe, el backend le pasa la jefatura al integrante activo más antiguo
   const othersActive = toExpel
     ? project.members.filter((m) => m.status.code === 'active' && m.id_student_project !== toExpel.id_student_project)
@@ -542,7 +587,7 @@ export const ProjectDetail: React.FC = () => {
       <Members
         members={project.members}
         action={memberAction}
-        teamAction={insureAction}
+        teamAction={insureAction || uninsureAction}
         // El cupo solo cuenta para asegurar: asegurado ya no aplica
         cupo={
           project.status?.code === 'uninsured' &&
@@ -659,6 +704,32 @@ export const ProjectDetail: React.FC = () => {
           </Button>
           <Button type="button" onClick={handleInsure} isLoading={isInsuring}>
             Asegurar equipo
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isUninsureOpen}
+        onClose={() => !isUninsuring && setIsUninsureOpen(false)}
+        title="Desasegurar el equipo"
+      >
+        {uninsureErrorText && <Alert className="mb-4">{uninsureErrorText}</Alert>}
+        <div className="space-y-2 text-sm text-ink">
+          <p>
+            ¿Desasegurar el {teamLabel(project)}? Vuelve a estar Desasegurado: se pueden sumar, mover y sacar
+            integrantes, y los alumnos pueden pedir sumarse.
+          </p>
+          <p className="text-ink-muted">
+            Mientras esté desasegurado, cualquier usuario ve el detalle del proyecto. Al volver a asegurarlo,
+            retoma el estado {project.status?.name} y su privacidad.
+          </p>
+        </div>
+        <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-line">
+          <Button type="button" variant="outline" onClick={() => setIsUninsureOpen(false)} disabled={isUninsuring}>
+            Cancelar
+          </Button>
+          <Button type="button" onClick={handleUninsure} isLoading={isUninsuring}>
+            Desasegurar equipo
           </Button>
         </div>
       </Modal>
