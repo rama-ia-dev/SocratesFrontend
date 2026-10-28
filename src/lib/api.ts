@@ -23,6 +23,7 @@ import {
   ProjectMemberList,
   ProjectPublic,
   ProjectOverview,
+  ProjectUpdate,
   SectionCreate,
   SectionList,
   SectionPublic,
@@ -37,6 +38,7 @@ import {
   StudentUpdate,
   StudentList,
   StudentProjectPublic,
+  StudentSectionYearList,
   UserList,
   UserPublic,
   UserUpdate,
@@ -1690,6 +1692,43 @@ export const api = {
       `/projects/${id_project}/members/${id_student_project}/leader`,
       { method: 'POST' }
     );
+  },
+
+  // Integrantes, docentes del curso lectivo o super administrador cambian los datos del equipo
+  async updateProject(id_project: number, changes: ProjectUpdate): Promise<ProjectPublic> {
+    if (USE_MOCK) {
+      await delay();
+      const err: any = new Error('Project not found');
+      err.status = 404;
+      throw err;
+    }
+
+    return request<ProjectPublic>(`/projects/${id_project}`, {
+      method: 'PATCH',
+      body: JSON.stringify(changes),
+    });
+  },
+
+  // El docente del curso lectivo o un super administrador suma un alumno a un equipo sin asegurar
+  async addMember(id_project: number, id_student: number): Promise<StudentProjectPublic> {
+    if (USE_MOCK) {
+      await delay();
+      const err: any = new Error('Project not found');
+      err.status = 404;
+      throw err;
+    }
+
+    return request<StudentProjectPublic>(`/projects/${id_project}/members/${id_student}`, { method: 'POST' });
+  },
+
+  // Alumnos inscriptos en un curso lectivo (su cursada)
+  async getStudentSectionYears(id_section_year: number): Promise<StudentSectionYearList> {
+    if (USE_MOCK) {
+      await delay();
+      return { items: [], total: 0, limit: 100, offset: 0 };
+    }
+
+    return request<StudentSectionYearList>(`/student-section-years?id_section_year=${id_section_year}&limit=100`);
   },
 
   // El jefe del grupo acepta (active) o rechaza (rejected) una solicitud para sumarse

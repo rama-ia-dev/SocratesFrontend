@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, CloudOff, Lock, Mail, RefreshCw, SearchX, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, CloudOff, Lock, Mail, Pencil, RefreshCw, SearchX, ShieldCheck, UserPlus } from 'lucide-react';
 import { api } from '../lib/api';
 import type { ProjectMember, ProjectOverview, SectionYearPublic } from '../types/api';
 import { Alert } from '../components/ui/Alert';
@@ -10,6 +10,9 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
 import { TeamSizeModal } from '../components/TeamSizeModal';
+import { EditProjectModal } from '../components/EditProjectModal';
+import { AddMemberModal } from '../components/AddMemberModal';
+import { MoveMemberModal } from '../components/MoveMemberModal';
 import { useAuth } from '../context/AuthContext';
 import { PRIVACY_HELP, PRIVACY_LABEL, STATUS_VARIANT, studentEmail, teamLabel } from '../lib/projects';
 
@@ -222,6 +225,10 @@ export const ProjectDetail: React.FC = () => {
   const [pendingCount, setPendingCount] = useState<number | null>(null);
   const [isInsuring, setIsInsuring] = useState(false);
   const [insureErrorText, setInsureErrorText] = useState<string | null>(null);
+  // Modificar el equipo (SCRUM-103): sus datos, sumar un alumno o moverlo a otro equipo del curso
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [toMove, setToMove] = useState<ProjectMember | null>(null);
 
   // `keep`: recarga después de una acción, sin vaciar la pantalla mientras llegan los datos nuevos
   const load = useCallback(async (keep = false) => {
@@ -411,8 +418,14 @@ export const ProjectDetail: React.FC = () => {
   );
   const isFinal = project.status?.code === 'approved' || project.status?.code === 'cancelled';
   const canTransfer = iAmLeader && !isFinal;
-  // Los docentes del curso y el super administrador sacan integrantes mientras el equipo no está asegurado
+  // Los docentes del curso y el super administrador sacan, suman y mueven integrantes mientras el
+  // equipo no está asegurado
   const canExpel = canManage && project.status?.code === 'uninsured';
+  // Los datos los cambian también sus integrantes (activos o que terminaron), salvo aprobado o cancelado
+  const iAmMember = project.members.some(
+    (m) => m.id_student === user?.id_user && ['active', 'finished'].includes(m.status.code)
+  );
+  const canEdit = (canManage || iAmMember) && !isFinal && !project.restricted;
   const memberAction =
     canTransfer || canExpel
       ? (m: ProjectMember) =>
@@ -428,6 +441,15 @@ export const ProjectDetail: React.FC = () => {
                   className="text-sm text-primary font-medium hover:underline cursor-pointer"
                 >
                   Pasar la jefatura
+                </button>
+              )}
+              {canExpel && (
+                <button
+                  type="button"
+                  onClick={() => setToMove(m)}
+                  className="text-sm text-primary font-medium hover:underline cursor-pointer"
+                >
+                  Mover a otro equipo
                 </button>
               )}
               {canExpel && (
@@ -458,10 +480,18 @@ export const ProjectDetail: React.FC = () => {
       : null;
   const insureAction = canInsure && (
     <div className="flex flex-col sm:items-end gap-1">
-      <Button size="sm" onClick={openInsure} disabled={insureBlocked !== null}>
-        <ShieldCheck className="w-4 h-4 mr-1.5" />
-        Asegurar equipo
-      </Button>
+      <div className="flex flex-wrap gap-2 sm:justify-end">
+        {canExpel && (
+          <Button size="sm" variant="outline" onClick={() => setIsAddOpen(true)}>
+            <UserPlus className="w-4 h-4 mr-1.5" />
+            Sumar alumno
+          </Button>
+        )}
+        <Button size="sm" onClick={openInsure} disabled={insureBlocked !== null}>
+          <ShieldCheck className="w-4 h-4 mr-1.5" />
+          Asegurar equipo
+        </Button>
+      </div>
       {insureBlocked && <p className="text-xs text-ink-muted">{insureBlocked}</p>}
     </div>
   );
@@ -480,6 +510,12 @@ export const ProjectDetail: React.FC = () => {
           <Badge variant={project.privacy}>{PRIVACY_LABEL[project.privacy]}</Badge>
           {project.status && (
             <Badge variant={STATUS_VARIANT[project.status.code] ?? 'neutral'}>{project.status.name}</Badge>
+          )}
+          {canEdit && (
+            <Button size="sm" variant="outline" className="sm:ml-auto" onClick={() => setIsEditOpen(true)}>
+              <Pencil className="w-4 h-4 mr-1.5" />
+              Modificar datos
+            </Button>
           )}
         </div>
         <p className="mt-1.5 text-sm text-ink-muted">
@@ -626,6 +662,44 @@ export const ProjectDetail: React.FC = () => {
           </Button>
         </div>
       </Modal>
+
+      {isEditOpen && (
+        <EditProjectModal
+          project={project}
+          onClose={() => setIsEditOpen(false)}
+          onSaved={() => {
+            setIsEditOpen(false);
+            success(`Se guardaron los datos del ${teamLabel(project)}`);
+            load(true);
+          }}
+        />
+      )}
+
+      {isAddOpen && (
+        <AddMemberModal
+          project={project}
+          onClose={() => setIsAddOpen(false)}
+          onAdded={(name) => {
+            setIsAddOpen(false);
+            success(`${name} se sumó al ${teamLabel(project)}`);
+            load(true);
+          }}
+        />
+      )}
+
+      {toMove && (
+        <MoveMemberModal
+          project={project}
+          member={toMove}
+          onClose={() => setToMove(null)}
+          onChanged={() => load(true)}
+          onMoved={(message) => {
+            setToMove(null);
+            success(message);
+            load(true);
+          }}
+        />
+      )}
 
       {isSizeOpen && sectionYear && (
         <TeamSizeModal
