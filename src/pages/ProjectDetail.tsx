@@ -716,12 +716,12 @@ export const ProjectDetail: React.FC = () => {
         {uninsureErrorText && <Alert className="mb-4">{uninsureErrorText}</Alert>}
         <div className="space-y-2 text-sm text-ink">
           <p>
-            ¿Desasegurar el {teamLabel(project)}? Vuelve a estar Desasegurado: se pueden sumar, mover y sacar
-            integrantes, y los alumnos pueden pedir sumarse.
+            ¿Volver a abrir el {teamLabel(project)}? Se van a poder sumar, mover y sacar integrantes, y los alumnos
+            van a poder pedir sumarse.
           </p>
           <p className="text-ink-muted">
-            Mientras esté desasegurado, cualquier usuario ve el detalle del proyecto. Al volver a asegurarlo,
-            retoma el estado {project.status?.name} y su privacidad.
+            Mientras tanto, cualquier usuario ve el detalle del proyecto. Cuando se asegure de nuevo, retoma el
+            estado {project.status?.name} y su privacidad.
           </p>
         </div>
         <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-line">
