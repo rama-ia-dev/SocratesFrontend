@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, CloudOff, Lock, Mail, RefreshCw, SearchX } from 'lucide-react';
+import { ArrowLeft, CloudOff, Lock, Mail, RefreshCw, SearchX, ShieldCheck } from 'lucide-react';
 import { api } from '../lib/api';
 import type { ProjectMember, ProjectOverview, SectionYearPublic } from '../types/api';
 import { Alert } from '../components/ui/Alert';
@@ -33,7 +33,9 @@ const Members: React.FC<{
   members: ProjectMember[];
   cupo?: React.ReactNode;
   action?: (m: ProjectMember) => React.ReactNode;
-}> = ({ members, cupo, action }) => {
+  /** Acción sobre todo el equipo, debajo del cupo (asegurarlo). */
+  teamAction?: React.ReactNode;
+}> = ({ members, cupo, action, teamAction }) => {
   const sorted = [...members].sort((a, b) => Number(b.is_leader) - Number(a.is_leader));
   return (
     <section className="rounded-xl border border-line bg-white">
@@ -41,7 +43,12 @@ const Members: React.FC<{
         <h2 className="text-[15px] font-semibold text-ink">
           Integrantes <span className="font-normal text-ink-muted">({members.length})</span>
         </h2>
-        {cupo && <p className="text-sm text-ink-muted">{cupo}</p>}
+        {(cupo || teamAction) && (
+          <div className="flex flex-col sm:items-end gap-2">
+            {cupo && <p className="text-sm text-ink-muted">{cupo}</p>}
+            {teamAction}
+          </div>
+        )}
       </div>
       {sorted.length === 0 ? (
         <p className="px-5 sm:px-6 pt-1.5 pb-4 text-sm italic text-ink-subtle">Todavía no se sumó ningún alumno</p>
@@ -113,6 +120,22 @@ const expelError = (err: any): string => {
   if (err.status === 403) return 'Solo los docentes del curso lectivo y el super administrador pueden sacar integrantes';
   if (err.status === 404) return 'El integrante ya no está en el equipo';
   return detail || 'No se pudo sacar al integrante';
+};
+
+// Error del backend al asegurar el equipo, en palabras del usuario
+const insureError = (err: any): string => {
+  const detail = String(err.message || '');
+  if (err.status === 409) {
+    const min = detail.match(/At least (\d+)/);
+    if (min) return `Para asegurar el equipo hacen falta al menos ${min[1]} integrantes activos`;
+    const max = detail.match(/At most (\d+)/);
+    if (max) return `Para asegurar el equipo puede tener como máximo ${max[1]} integrantes activos`;
+    if (detail.includes('uninsured')) return 'El equipo ya está asegurado';
+  }
+  if (err.status === 403)
+    return 'Solo el jefe del grupo, los docentes del curso lectivo y el super administrador pueden asegurar el equipo';
+  if (err.status === 404) return 'El equipo ya no existe';
+  return detail || 'No se pudo asegurar el equipo';
 };
 
 // Solicitudes para sumarse (SCRUM-24): las ve y las decide solo el jefe del grupo
@@ -193,6 +216,12 @@ export const ProjectDetail: React.FC = () => {
   const [toExpel, setToExpel] = useState<ProjectMember | null>(null);
   const [isExpelling, setIsExpelling] = useState(false);
   const [expelErrorText, setExpelErrorText] = useState<string | null>(null);
+  // Asegurar el equipo (SCRUM-23): el jefe, los docentes del curso lectivo y el super administrador.
+  // `pendingCount` es null mientras se cuentan las solicitudes que se van a rechazar
+  const [isInsureOpen, setIsInsureOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState<number | null>(null);
+  const [isInsuring, setIsInsuring] = useState(false);
+  const [insureErrorText, setInsureErrorText] = useState<string | null>(null);
 
   // `keep`: recarga después de una acción, sin vaciar la pantalla mientras llegan los datos nuevos
   const load = useCallback(async (keep = false) => {
@@ -310,6 +339,34 @@ export const ProjectDetail: React.FC = () => {
     </Link>
   );
 
+  // Al abrir la confirmación se cuentan las solicitudes pendientes, que el backend rechaza al asegurar
+  const openInsure = () => {
+    if (!project) return;
+    setInsureErrorText(null);
+    setPendingCount(null);
+    setIsInsureOpen(true);
+    api
+      .getProjectMembers(project.id_project, ['pending_approval'])
+      .then((r) => setPendingCount(r.total))
+      .catch(() => setPendingCount(null));
+  };
+
+  const handleInsure = async () => {
+    if (!project) return;
+    setIsInsuring(true);
+    setInsureErrorText(null);
+    try {
+      await api.insureProject(project.id_project);
+      success(`Se aseguró el ${teamLabel(project)}`);
+      setIsInsureOpen(false);
+      load(true);
+    } catch (err: any) {
+      setInsureErrorText(insureError(err));
+    } finally {
+      setIsInsuring(false);
+    }
+  };
+
   if (state !== 'ok' || !project) {
     return (
       <div className="max-w-4xl space-y-6">
@@ -388,6 +445,26 @@ export const ProjectDetail: React.FC = () => {
             </>
           )
       : undefined;
+  // Asegurar (SCRUM-23): mientras el equipo está sin asegurar; fuera del cupo el botón explica por qué no
+  const canInsure = (iAmLeader || canManage) && project.status?.code === 'uninsured';
+  const activeCount = project.members.filter((m) => m.status.code === 'active').length;
+  const min = sectionYear?.min_students;
+  const max = sectionYear?.max_students;
+  const insureBlocked =
+    min !== undefined && activeCount < min
+      ? `${min - activeCount === 1 ? 'Falta 1 integrante activo' : `Faltan ${min - activeCount} integrantes activos`} para el mínimo de ${min}`
+      : max !== undefined && activeCount > max
+      ? `Tiene ${activeCount - max} ${activeCount - max === 1 ? 'integrante' : 'integrantes'} de más para el máximo de ${max}`
+      : null;
+  const insureAction = canInsure && (
+    <div className="flex flex-col sm:items-end gap-1">
+      <Button size="sm" onClick={openInsure} disabled={insureBlocked !== null}>
+        <ShieldCheck className="w-4 h-4 mr-1.5" />
+        Asegurar equipo
+      </Button>
+      {insureBlocked && <p className="text-xs text-ink-muted">{insureBlocked}</p>}
+    </div>
+  );
   // Si sale el jefe, el backend le pasa la jefatura al integrante activo más antiguo
   const othersActive = toExpel
     ? project.members.filter((m) => m.status.code === 'active' && m.id_student_project !== toExpel.id_student_project)
@@ -429,7 +506,10 @@ export const ProjectDetail: React.FC = () => {
       <Members
         members={project.members}
         action={memberAction}
+        teamAction={insureAction}
+        // El cupo solo cuenta para asegurar: asegurado ya no aplica
         cupo={
+          project.status?.code === 'uninsured' &&
           sectionYear?.min_students !== undefined &&
           sectionYear.max_students !== undefined && (
             <>
@@ -510,6 +590,39 @@ export const ProjectDetail: React.FC = () => {
           </Button>
           <Button type="button" variant="destructive" onClick={handleExpel} isLoading={isExpelling}>
             Sacar del equipo
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isInsureOpen}
+        onClose={() => !isInsuring && setIsInsureOpen(false)}
+        title="Asegurar el equipo"
+      >
+        {insureErrorText && <Alert className="mb-4">{insureErrorText}</Alert>}
+        <div className="space-y-2 text-sm text-ink">
+          <p>
+            ¿Asegurar el {teamLabel(project)} con sus {activeCount}{' '}
+            {activeCount === 1 ? 'integrante' : 'integrantes'}? El equipo queda conformado: no se suma nadie más y no se
+            puede sacar a ningún integrante mientras siga asegurado.
+          </p>
+          {pendingCount !== null && pendingCount > 0 && (
+            <p className="text-ink-muted">
+              {pendingCount === 1
+                ? 'Se rechaza la solicitud pendiente para sumarse.'
+                : `Se rechazan las ${pendingCount} solicitudes pendientes para sumarse.`}
+            </p>
+          )}
+          <p className="text-ink-muted">
+            Deja de verse como público: pasa a usar la privacidad que eligió el equipo.
+          </p>
+        </div>
+        <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-line">
+          <Button type="button" variant="outline" onClick={() => setIsInsureOpen(false)} disabled={isInsuring}>
+            Cancelar
+          </Button>
+          <Button type="button" onClick={handleInsure} isLoading={isInsuring}>
+            Asegurar equipo
           </Button>
         </div>
       </Modal>
