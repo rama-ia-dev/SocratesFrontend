@@ -1694,6 +1694,19 @@ export const api = {
     );
   },
 
+  // Los equipos del curso lectivo actual del usuario (para el alumno, el de su cursada más reciente)
+  async getMySectionYearProjects(params: { limit?: number; offset?: number } = {}): Promise<ProjectList> {
+    if (USE_MOCK) {
+      await delay();
+      return { items: [], total: 0, limit: params.limit ?? 50, offset: params.offset ?? 0 };
+    }
+
+    const query = new URLSearchParams();
+    if (params.limit !== undefined) query.set('limit', params.limit.toString());
+    if (params.offset !== undefined) query.set('offset', params.offset.toString());
+    return request<ProjectList>(`/me/section-year/projects?${query.toString()}`);
+  },
+
   // Integrantes, docentes del curso lectivo o super administrador cambian los datos del equipo
   async updateProject(id_project: number, changes: ProjectUpdate): Promise<ProjectPublic> {
     if (USE_MOCK) {
