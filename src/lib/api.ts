@@ -9,6 +9,7 @@
 import {
   AccessToken,
   LoginRequest,
+  MyProject,
   PasswordConfirm,
   PasswordRequest,
   ProfessorCreate,
@@ -1634,10 +1635,20 @@ export const api = {
         enrolled_at: '2025-03-01T09:00:00Z',
         status: active,
       }));
-      return { ...p, members: list, responsible: list[0] ?? null };
+      return { ...p, members: list, responsible: [], leader: list[0] ?? null };
     }
 
     return request<ProjectOverview>(`/projects/${id_project}/overview`, { method: 'GET' });
+  },
+
+  // El alumno logueado: su equipo (null si no integra ninguno) y sus solicitudes para sumarse
+  async getMyProject(): Promise<MyProject> {
+    if (USE_MOCK) {
+      await delay();
+      return { project: null, requests: [] };
+    }
+
+    return request<MyProject>('/me/project', { method: 'GET' });
   },
 
   // Integrantes de un equipo según el estado de su membresía (por ejemplo, las solicitudes pendientes)
