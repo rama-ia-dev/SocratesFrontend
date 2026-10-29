@@ -30,7 +30,7 @@ interface CourseOption {
 }
 
 // Consultar estudiantes (SCRUM-99): GET /students. El docente común ve los alumnos de sus cursos
-// lectivos, con el equipo al que pertenece cada uno; el super administrador, todos los alumnos.
+// lectivos, con el equipo al que pertenece cada uno; el administrador, todos los alumnos.
 export const Students: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -45,7 +45,7 @@ export const Students: React.FC = () => {
   const [loadError, setLoadError] = useState(false);
   const [editingStudent, setEditingStudent] = useState<StudentListItem | null>(null);
 
-  // Filtro por curso lectivo: los del docente o, para el super administrador, todos
+  // Filtro por curso lectivo: los del docente o, para el administrador, todos
   useEffect(() => {
     if (!user) return;
     const load = user.is_super_admin

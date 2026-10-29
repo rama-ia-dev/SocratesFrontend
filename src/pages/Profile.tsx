@@ -58,7 +58,7 @@ export const Profile: React.FC = () => {
   const navigate = useNavigate();
   const { success } = useToast();
 
-  // Correo y legajo los cambia un super administrador; si es uno, puede cambiar los suyos desde acá.
+  // Correo y legajo los cambia un administrador; si es uno, puede cambiar los suyos desde acá.
   const canEditAccount = Boolean(user?.role === 'professor' && user.is_super_admin);
 
   const firstName = useField('', validateName('nombre'));
@@ -158,7 +158,7 @@ export const Profile: React.FC = () => {
             {user.first_name} {user.last_name}
           </p>
           <p className="text-sm text-ink-muted flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span>{user.is_super_admin ? 'Super administrador' : roleText}</span>
+            <span>{user.is_super_admin ? 'Administrador' : roleText}</span>
             <span aria-hidden="true">·</span>
             <span className="truncate">{user.email}</span>
           </p>
@@ -238,7 +238,7 @@ export const Profile: React.FC = () => {
               )}
               <ReadOnlyField label="Rol">
                 <span>{roleText}</span>
-                {user.is_super_admin && <Badge variant="superadmin">Super administrador</Badge>}
+                {user.is_super_admin && <Badge variant="superadmin">Administrador</Badge>}
               </ReadOnlyField>
             </dl>
             {!canEditAccount && (

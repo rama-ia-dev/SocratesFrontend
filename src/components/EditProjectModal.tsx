@@ -19,13 +19,13 @@ const TEXT_FIELDS: { key: TextField; label: string; placeholder: string }[] = [
 // Error del backend al guardar los datos del equipo, en palabras del usuario
 const saveError = (err: any): string => {
   if (err.status === 409) return 'El equipo ya está aprobado o cancelado: sus datos no se pueden cambiar';
-  if (err.status === 403) return 'Lo modifican sus integrantes, los docentes del curso lectivo y el super administrador';
+  if (err.status === 403) return 'Lo modifican sus integrantes, los docentes del curso lectivo y el administrador';
   if (err.status === 404) return 'El equipo ya no existe: puede que lo hayan eliminado';
   return err.message || 'No se pudieron guardar los datos del equipo';
 };
 
 // Modificar los datos del equipo (SCRUM-103): PATCH /projects/{id} con lo que cambió. Lo pueden
-// los integrantes, los docentes del curso lectivo y el super administrador, salvo con el equipo
+// los integrantes, los docentes del curso lectivo y el administrador, salvo con el equipo
 // aprobado o cancelado.
 export const EditProjectModal: React.FC<{
   project: ProjectOverview;
