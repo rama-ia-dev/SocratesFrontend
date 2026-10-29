@@ -8,6 +8,7 @@
 
 import {
   AccessToken,
+  CalendarWithClasses,
   LoginRequest,
   MyProject,
   PasswordConfirm,
@@ -1728,6 +1729,25 @@ export const api = {
     if (params.limit !== undefined) query.set('limit', params.limit.toString());
     if (params.offset !== undefined) query.set('offset', params.offset.toString());
     return request<ProjectList>(`/me/section-year/projects?${query.toString()}`);
+  },
+
+  // Calendario de un curso lectivo: clases y entregas. `from`/`to` (YYYY-MM-DD) van juntos y abarcan
+  // hasta 366 días. Lo consultan el super admin, los docentes del curso y sus alumnos.
+  async getSectionYearCalendar(
+    id_section_year: number,
+    range: { from: string; to: string } | null = null
+  ): Promise<CalendarWithClasses> {
+    if (USE_MOCK) {
+      await delay();
+      return { id_calendar: id_section_year, id_section_year, timezone: 'America/Argentina/Cordoba', classes: [], activities: [] };
+    }
+
+    const query = new URLSearchParams();
+    if (range) {
+      query.set('from', range.from);
+      query.set('to', range.to);
+    }
+    return request<CalendarWithClasses>(`/section-years/${id_section_year}/calendar?${query.toString()}`);
   },
 
   // Integrantes, docentes del curso lectivo o super administrador cambian los datos del equipo
