@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../lib/api';
 import {
   ProfessorSectionYearPublic,
@@ -97,8 +97,8 @@ export const ChairOverview: React.FC = () => {
   const [yearFilter, setYearFilter] = useState<string>(String(currentYear));
   const [sectionFilter, setSectionFilter] = useState<string>('');
   const [allSections, setAllSections] = useState<SectionPublic[]>([]);
-  // Opciones del filtro de año: los años que tienen cursos lectivos, del más reciente al más viejo
-  const [yearOptions, setYearOptions] = useState<number[]>([]);
+  // Todos los cursos lectivos, para armar las opciones de los filtros
+  const [allSectionYears, setAllSectionYears] = useState<SectionYearPublic[]>([]);
 
   const [rows, setRows] = useState<ChairRow[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -118,13 +118,25 @@ export const ChairOverview: React.FC = () => {
   useEffect(() => {
     fetchAll<SectionYearPublic>((o) => api.getSectionYears({ limit: 100, offset: o }))
       .then((items) => {
-        const years = [...new Set(items.map((sy) => sy.year))].sort((a, b) => b - a);
-        setYearOptions(years);
+        setAllSectionYears(items);
         // Si el año actual todavía no tiene cursos lectivos, se muestran todos los años
-        if (!years.includes(currentYear)) setYearFilter('');
+        if (!items.some((sy) => sy.year === currentYear)) setYearFilter('');
       })
-      .catch(() => setYearOptions([]));
+      .catch(() => setAllSectionYears([]));
   }, []);
+
+  // Opciones del filtro de año: los años que tienen cursos lectivos, del más reciente al más viejo
+  const yearOptions = [...new Set(allSectionYears.map((sy) => sy.year))].sort((a, b) => b - a);
+
+  // Opciones del filtro de comisión: con un año elegido, solo las comisiones con curso lectivo en ese año
+  const sectionsOfYear = (year: string): SectionPublic[] => {
+    if (!year) return allSections;
+    const ids = new Set(
+      allSectionYears.filter((sy) => sy.year === parseInt(year, 10)).map((sy) => sy.id_section)
+    );
+    return allSections.filter((s) => ids.has(s.id_section));
+  };
+  const sectionOptions = sectionsOfYear(yearFilter);
 
   // Se traen todos los cursos lectivos, asignaciones y proyectos del filtro y se agrupan acá:
   // son tres listados en total, sin importar cuántos cursos lectivos haya.
@@ -201,11 +213,19 @@ export const ChairOverview: React.FC = () => {
 
   const pageRows = rows.slice(offset, offset + PAGE_SIZE);
 
-  // La cantidad de alumnos en grupos se consulta solo para la página visible
+  // Cursos lectivos cuyos alumnos ya se contaron (o se están contando) para el listado actual
+  const counted = useRef<{ rows: ChairRow[]; ids: Set<number> }>({ rows: [], ids: new Set() });
+
+  // La cantidad de alumnos en grupos se consulta solo para la página visible. Con cada listado
+  // nuevo se vuelve a contar, pero se sigue mostrando el número anterior hasta que llega el nuevo.
   useEffect(() => {
-    const missing = pageRows.filter((r) => studentCounts[r.id_section_year] === undefined);
+    if (counted.current.rows !== rows) counted.current = { rows, ids: new Set() };
+    const { ids } = counted.current;
+    const missing = pageRows.filter((r) => !ids.has(r.id_section_year));
     if (missing.length === 0) return;
+    missing.forEach((r) => ids.add(r.id_section_year));
     let cancelled = false;
+    let done = false;
     Promise.all(
       missing.map(async (r) => {
         const res = await api.getStudents({ id_section_year: r.id_section_year, limit: 1 });
@@ -214,20 +234,20 @@ export const ChairOverview: React.FC = () => {
     )
       .then((pairs) => {
         if (cancelled) return;
+        done = true;
         setStudentCounts((prev) => ({ ...prev, ...Object.fromEntries(pairs) }));
       })
       .catch(() => {
-        if (!cancelled) toastError('Error al cargar la cantidad de alumnos');
+        if (cancelled) return;
+        missing.forEach((r) => ids.delete(r.id_section_year));
+        toastError('Error al cargar la cantidad de alumnos');
       });
     return () => {
       cancelled = true;
+      // Si se cambió de página o de listado antes de la respuesta, se podrán volver a pedir
+      if (!done) missing.forEach((r) => ids.delete(r.id_section_year));
     };
   }, [rows, offset]);
-
-  // Al cambiar los filtros se vuelven a contar los alumnos
-  useEffect(() => {
-    setStudentCounts({});
-  }, [yearFilter, sectionFilter]);
 
   // Grupos aprobados sobre los grupos que siguen vigentes (sin contar cancelados). Un grupo
   // rechazado sigue vigente: rehace la propuesta hasta aprobar.
@@ -261,7 +281,12 @@ export const ChairOverview: React.FC = () => {
             <Select
               value={yearFilter}
               onChange={(e) => {
-                setYearFilter(e.target.value);
+                const year = e.target.value;
+                setYearFilter(year);
+                // Si la comisión elegida no tiene curso lectivo en el año nuevo, se quita el filtro
+                if (sectionFilter && !sectionsOfYear(year).some((s) => String(s.id_section) === sectionFilter)) {
+                  setSectionFilter('');
+                }
                 setOffset(0);
               }}
               aria-label="Filtrar por año"
@@ -284,7 +309,7 @@ export const ChairOverview: React.FC = () => {
               aria-label="Filtrar por comisión"
             >
               <option value="">Todas las comisiones</option>
-              {allSections.map((s) => (
+              {sectionOptions.map((s) => (
                 <option key={s.id_section} value={s.id_section}>
                   {s.name}
                 </option>
@@ -294,7 +319,7 @@ export const ChairOverview: React.FC = () => {
         </div>
 
         {/* Totales del filtro: una sola franja, no tarjetas sueltas */}
-        {!loading && summary && summary.section_years > 0 && (
+        {summary && summary.section_years > 0 && (
           <dl className="grid grid-cols-2 lg:grid-cols-4 rounded-xl border border-line bg-white divide-line max-lg:[&>div:nth-child(-n+2)]:border-b lg:divide-x max-lg:[&>div:nth-child(odd)]:border-r">
             {[
               { label: 'Cursos lectivos', value: summary.section_years, alert: false },
@@ -320,7 +345,9 @@ export const ChairOverview: React.FC = () => {
           </dl>
         )}
 
-        {loading ? (
+        {/* El esqueleto va solo en la primera carga: al cambiar un filtro se siguen viendo los datos
+            anteriores hasta que llegan los nuevos, sin que la pantalla parpadee */}
+        {loading && rows.length === 0 ? (
           <TableSkeleton rows={4} cols={8} />
         ) : rows.length === 0 ? (
           yearFilter || sectionFilter ? (
