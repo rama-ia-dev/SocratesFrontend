@@ -94,7 +94,7 @@ const joinError = (err: any): string => {
   if (err.status === 409) {
     if (detail.includes('already requested'))
       return 'Ya estuvo en este equipo: no puede volver a pedir sumarse';
-    if (detail.includes('already belong')) return 'Ya integra otro equipo de trabajo';
+    if (detail.includes('already belong')) return 'Ya es parte de otro equipo de trabajo';
     if (detail.includes('uninsured')) return 'El equipo ya está asegurado: no se suman integrantes';
   }
   if (err.status === 403) return 'Solo los alumnos pueden pedir sumarse a un equipo';
@@ -602,7 +602,7 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
     project.status?.code === 'uninsured' &&
     (myOtherTeam ? (
       <p className="text-sm text-ink-muted sm:text-right">
-        Ya integra el {teamLabel(myOtherTeam)}: un alumno está en un solo equipo.
+        Ya es parte del {teamLabel(myOtherTeam)}: un alumno solo puede pertenecer a un equipo.
       </p>
     ) : myRequestHere?.status?.code === 'pending_approval' ? (
       <p className="text-sm text-ink-muted sm:text-right">Su solicitud está pendiente: la decide el jefe del grupo.</p>
