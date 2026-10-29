@@ -48,7 +48,7 @@ export const MyTeam: React.FC = () => {
 
   return (
     <div className="max-w-4xl">
-      <PageHeader title="Mi equipo" subtitle={state === 'ok' ? 'Todavía no integra ningún equipo de trabajo' : undefined} />
+      <PageHeader title="Mi equipo" subtitle={state === 'ok' ? 'Todavía no es parte de ningún equipo de trabajo' : undefined} />
 
       {state === 'loading' ? (
         <div className="h-40 rounded-xl bg-white border border-line animate-pulse" aria-busy="true" />

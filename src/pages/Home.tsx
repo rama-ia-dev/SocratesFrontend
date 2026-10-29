@@ -76,7 +76,7 @@ export const Home: React.FC = () => {
     return [
       {
         title: 'Mi equipo',
-        desc: 'Su equipo de trabajo o, mientras no integre uno, sus solicitudes para sumarse.',
+        desc: 'Su equipo de trabajo o, mientras no sea parte de uno, sus solicitudes para sumarse.',
         path: '/mi-equipo',
         icon: Users,
       },
