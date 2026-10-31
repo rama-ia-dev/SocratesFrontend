@@ -35,11 +35,11 @@ const MIN_ENROLLMENT_YEAR = 1950;
  * Diálogo "Modificar estudiante" (SCRUM-98), compartido por Usuarios y Estudiantes.
  * Se monta con la clave del alumno, así cada apertura arranca con sus datos.
  *
- * Si se conoce la fecha de nacimiento (Usuarios, super administrador), viene cargada y es
+ * Si se conoce la fecha de nacimiento (Usuarios, administrador), viene cargada y es
  * obligatoria: el año de ingreso se valida contra ella y se bloquea si se borra. El backend no
  * le muestra la fecha al docente, así que desde Estudiantes el campo no aparece (no se puede
  * modificar un dato que no se ve) y el año se valida entre 1950 y el actual. La fecha la cambia
- * el alumno desde Mi perfil o el super administrador desde Usuarios.
+ * el alumno desde Mi perfil o el administrador desde Usuarios.
  */
 export const EditStudentModal: React.FC<{
   student: EditableStudent;

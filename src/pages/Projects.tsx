@@ -54,7 +54,7 @@ const byYearSectionNumber = (a: ProjectPublic, b: ProjectPublic) =>
 
 // Equipos de trabajo (SCRUM-105). El backend decide qué equipos ve cada usuario según la
 // privacidad: los privados solo aparecen para sus integrantes, los docentes del curso y los
-// super administradores.
+// administradores.
 export const Projects: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();

@@ -140,7 +140,7 @@ export const Calendar: React.FC = () => {
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
 
-  // Cursos lectivos que puede ver: todos para el super admin; los asignados para el docente
+  // Cursos lectivos que puede ver: todos para el administrador; los asignados para el docente
   const [courses, setCourses] = useState<Course[] | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loadedYear, setLoadedYear] = useState<number | null>(null);

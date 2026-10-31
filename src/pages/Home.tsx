@@ -42,7 +42,7 @@ export const Home: React.FC = () => {
         },
         {
           title: 'Usuarios',
-          desc: 'Docentes, super administradores y estudiantes: altas y modificaciones.',
+          desc: 'Docentes, administradores y estudiantes: altas y modificaciones.',
           path: '/usuarios',
           icon: Users,
         },

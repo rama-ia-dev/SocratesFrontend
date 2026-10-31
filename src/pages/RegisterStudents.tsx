@@ -60,7 +60,7 @@ export const RegisterStudents: React.FC = () => {
   const navigate = useNavigate();
   const { success } = useToast();
   const { user } = useAuth();
-  // El super administrador ve a los alumnos en Usuarios. El listado del docente todavía muestra solo
+  // El administrador ve a los alumnos en Usuarios. El listado del docente todavía muestra solo
   // alumnos que ya están en un equipo de sus cursos, donde el recién registrado no aparece: después
   // de registrar sigue en el formulario.
   const listPath = user?.is_super_admin ? '/usuarios' : '/estudiantes';
@@ -68,7 +68,7 @@ export const RegisterStudents: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'manual' | 'excel'>('manual');
 
   // Curso lectivo en el que quedan inscriptos (obligatorio): el docente elige entre los suyos y el
-  // super administrador entre todos
+  // administrador entre todos
   const [courses, setCourses] = useState<{ id: number; label: string }[] | null>(null);
   const [course, setCourse] = useState('');
   const [courseError, setCourseError] = useState<string | null>(null);

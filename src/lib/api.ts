@@ -622,7 +622,7 @@ export const api = {
   // ==========================================
   // Students: listado para docentes (SCRUM-99)
   // ==========================================
-  // Un docente común ve los alumnos de sus cursos lectivos; el super administrador, todos.
+  // Un docente común ve los alumnos de sus cursos lectivos; el administrador, todos.
   async getStudents(params: {
     id_section_year?: number | null;
     q?: string | null;
@@ -964,7 +964,7 @@ export const api = {
         payload.is_super_admin === false &&
         mockDB.me.is_super_admin
       ) {
-        const err: any = new Error('No puede quitarse a sí mismo el rol de super administrador');
+        const err: any = new Error('No puede quitarse a sí mismo el rol de administrador');
         err.status = 409;
         throw err;
       }
@@ -1664,7 +1664,7 @@ export const api = {
     return request<ProjectMemberList>(`/projects/${id_project}/members?${query.toString()}`);
   },
 
-  // El docente del curso lectivo o un super administrador saca a un integrante del equipo
+  // El docente del curso lectivo o un administrador saca a un integrante del equipo
   async expelMember(id_project: number, id_student_project: number): Promise<StudentProjectPublic> {
     if (USE_MOCK) {
       await delay();
@@ -1679,7 +1679,7 @@ export const api = {
     );
   },
 
-  // El jefe del grupo, un docente del curso lectivo o un super administrador asegura el equipo
+  // El jefe del grupo, un docente del curso lectivo o un administrador asegura el equipo
   async insureProject(id_project: number): Promise<ProjectPublic> {
     if (USE_MOCK) {
       await delay();
@@ -1691,7 +1691,7 @@ export const api = {
     return request<ProjectPublic>(`/projects/${id_project}/insure`, { method: 'POST' });
   },
 
-  // Un docente del curso lectivo o un super administrador desasegura el equipo: vuelve a Desasegurado
+  // Un docente del curso lectivo o un administrador desasegura el equipo: vuelve a Desasegurado
   async uninsureProject(id_project: number): Promise<ProjectPublic> {
     if (USE_MOCK) {
       await delay();
@@ -1732,7 +1732,7 @@ export const api = {
   },
 
   // Calendario de un curso lectivo: clases y entregas. `from`/`to` (YYYY-MM-DD) van juntos y abarcan
-  // hasta 366 días. Lo consultan el super admin, los docentes del curso y sus alumnos.
+  // hasta 366 días. Lo consultan el administrador, los docentes del curso y sus alumnos.
   async getSectionYearCalendar(
     id_section_year: number,
     range: { from: string; to: string } | null = null
@@ -1750,7 +1750,7 @@ export const api = {
     return request<CalendarWithClasses>(`/section-years/${id_section_year}/calendar?${query.toString()}`);
   },
 
-  // Integrantes, docentes del curso lectivo o super administrador cambian los datos del equipo
+  // Integrantes, docentes del curso lectivo o administrador cambian los datos del equipo
   async updateProject(id_project: number, changes: ProjectUpdate): Promise<ProjectPublic> {
     if (USE_MOCK) {
       await delay();
@@ -1765,7 +1765,7 @@ export const api = {
     });
   },
 
-  // El docente del curso lectivo o un super administrador suma un alumno a un equipo sin asegurar
+  // El docente del curso lectivo o un administrador suma un alumno a un equipo sin asegurar
   async addMember(id_project: number, id_student: number): Promise<StudentProjectPublic> {
     if (USE_MOCK) {
       await delay();

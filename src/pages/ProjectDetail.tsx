@@ -134,7 +134,7 @@ const expelError = (err: any): string => {
     if (detail.includes('uninsured')) return 'El equipo ya está asegurado: sus integrantes no se pueden cambiar';
     if (detail.includes('cannot be expelled')) return 'El alumno ya no es integrante activo del equipo';
   }
-  if (err.status === 403) return 'Solo los docentes del curso lectivo y el super administrador pueden sacar integrantes';
+  if (err.status === 403) return 'Solo los docentes del curso lectivo y el administrador pueden sacar integrantes';
   if (err.status === 404) return 'El integrante ya no está en el equipo';
   return detail || 'No se pudo sacar al integrante';
 };
@@ -150,7 +150,7 @@ const insureError = (err: any): string => {
     if (detail.includes('uninsured')) return 'El equipo ya está asegurado';
   }
   if (err.status === 403)
-    return 'Solo el jefe del grupo, los docentes del curso lectivo y el super administrador pueden asegurar el equipo';
+    return 'Solo el jefe del grupo, los docentes del curso lectivo y el administrador pueden asegurar el equipo';
   if (err.status === 404) return 'El equipo ya no existe';
   return detail || 'No se pudo asegurar el equipo';
 };
@@ -160,7 +160,7 @@ const uninsureError = (err: any): string => {
   const detail = String(err.message || '');
   if (err.status === 409) return 'El equipo ya no está asegurado, o está aprobado o cancelado';
   if (err.status === 403)
-    return 'Solo los docentes del curso lectivo y el super administrador pueden desasegurar el equipo';
+    return 'Solo los docentes del curso lectivo y el administrador pueden desasegurar el equipo';
   if (err.status === 404) return 'El equipo ya no existe';
   return detail || 'No se pudo desasegurar el equipo';
 };
@@ -231,7 +231,7 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
   const requestId = useRef(0);
   const { user } = useAuth();
   const { success, error: showError } = useToast();
-  // Cupo (SCRUM-19): el backend se lo permite solo al super administrador
+  // Cupo (SCRUM-19): el backend se lo permite solo al administrador
   const [isSizeOpen, setIsSizeOpen] = useState(false);
   // Solicitudes pendientes (SCRUM-24); null mientras no se sabe si el usuario es el jefe
   const [requests, setRequests] = useState<ProjectMember[] | null>(null);
@@ -240,18 +240,18 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
   const [newLeader, setNewLeader] = useState<ProjectMember | null>(null);
   const [isTransferring, setIsTransferring] = useState(false);
   const [transferError, setTransferError] = useState<string | null>(null);
-  // Sacar a un integrante (SCRUM-21): lo pueden los docentes del curso lectivo y el super administrador
+  // Sacar a un integrante (SCRUM-21): lo pueden los docentes del curso lectivo y el administrador
   const [canManage, setCanManage] = useState(false);
   const [toExpel, setToExpel] = useState<ProjectMember | null>(null);
   const [isExpelling, setIsExpelling] = useState(false);
   const [expelErrorText, setExpelErrorText] = useState<string | null>(null);
-  // Asegurar el equipo (SCRUM-23): el jefe, los docentes del curso lectivo y el super administrador.
+  // Asegurar el equipo (SCRUM-23): el jefe, los docentes del curso lectivo y el administrador.
   // `pendingCount` es null mientras se cuentan las solicitudes que se van a rechazar
   const [isInsureOpen, setIsInsureOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number | null>(null);
   const [isInsuring, setIsInsuring] = useState(false);
   const [insureErrorText, setInsureErrorText] = useState<string | null>(null);
-  // Desasegurar el equipo (SCRUM-25): los docentes del curso lectivo y el super administrador
+  // Desasegurar el equipo (SCRUM-25): los docentes del curso lectivo y el administrador
   const [isUninsureOpen, setIsUninsureOpen] = useState(false);
   const [isUninsuring, setIsUninsuring] = useState(false);
   const [uninsureErrorText, setUninsureErrorText] = useState<string | null>(null);
@@ -305,7 +305,7 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
       } else {
         setRequests(null);
       }
-      // Docente de este curso lectivo o super administrador
+      // Docente de este curso lectivo o administrador
       if (user?.is_super_admin) setCanManage(true);
       else if (user?.role === 'professor')
         api
@@ -466,7 +466,7 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
           <EmptyState
             icon={<Lock className="w-5 h-5" />}
             message="Este equipo es privado"
-            description="Solo lo ven sus integrantes, los docentes del curso y los super administradores."
+            description="Solo lo ven sus integrantes, los docentes del curso y los administradores."
           />
         ) : state === 'not-found' ? (
           <EmptyState
@@ -497,7 +497,7 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
   );
   const isFinal = project.status?.code === 'approved' || project.status?.code === 'cancelled';
   const canTransfer = iAmLeader && !isFinal;
-  // Los docentes del curso y el super administrador sacan, suman y mueven integrantes mientras el
+  // Los docentes del curso y el administrador sacan, suman y mueven integrantes mientras el
   // equipo no está asegurado
   const canExpel = canManage && project.status?.code === 'uninsured';
   // Los datos los cambian también sus integrantes (activos o que terminaron), salvo aprobado o cancelado
