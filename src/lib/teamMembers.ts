@@ -18,16 +18,17 @@ export const projectsOfCourse = async (id_section_year: number): Promise<Project
 export const allMembershipsOf = async (id_project: number): Promise<ProjectMember[]> =>
   (await api.getProjectMembers(id_project, [])).items;
 
-// Un registro rechazado no impide sumar al alumno a ese equipo: el backend lo reactiva. Cualquier
-// otro (integrante, solicitud pendiente, expulsado, que abandonó) sí lo impide.
-export const blocksAdding = (m: ProjectMember) => m.status.code !== 'rejected';
+// Solo impide sumar al alumno a ese equipo ser parte de él (integrante o finalizado). Con
+// cualquier otro registro (solicitud pendiente o rechazada, que salió, que lo sacaron) el backend
+// lo reactiva como integrante.
+export const blocksAdding = (m: ProjectMember) => ['active', 'finished'].includes(m.status.code);
 
 // Error del backend al sumar un alumno a un equipo, en palabras del usuario
 export const addMemberError = (err: any): string => {
   const detail = String(err.message || '');
   if (err.status === 409) {
     if (detail.includes('another project')) return 'El alumno ya forma parte de otro equipo';
-    if (detail.includes('this project')) return 'El alumno ya tiene un registro en ese equipo (una solicitud, o salió de él)';
+    if (detail.includes('this project')) return 'El alumno ya es parte de ese equipo';
     if (detail.includes('uninsured')) return 'El equipo ya está asegurado: no se suman integrantes';
   }
   if (err.status === 403) return 'Solo los docentes del curso lectivo y el administrador pueden sumar alumnos';
