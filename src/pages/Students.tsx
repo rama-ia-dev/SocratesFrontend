@@ -235,7 +235,7 @@ export const Students: React.FC = () => {
                     ) : (
                       <ul className="space-y-0.5">
                         {st.groups.map((g) => (
-                          <li key={g.id_project}>
+                          <li key={g.id_project} className="[overflow-wrap:anywhere]">
                             <span className="text-sm text-ink">Equipo {g.group_number}</span>
                             <span className="text-xs text-ink-muted">
                               {' '}
