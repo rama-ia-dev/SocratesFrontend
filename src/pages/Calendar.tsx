@@ -66,8 +66,29 @@ const DEFAULT_LIST_TO = dateToIso(
 
 const isoToText = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 
-const weekdayOf = (iso: string) =>
-  new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10))).getDay();
+const isoToDate = (iso: string) =>
+  new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
+
+const weekdayOf = (iso: string) => isoToDate(iso).getDay();
+
+const addDays = (iso: string, days: number) => {
+  const date = isoToDate(iso);
+  date.setDate(date.getDate() + days);
+  return dateToIso(date);
+};
+
+// Lunes de la semana de una fecha
+const mondayOf = (iso: string) => addDays(iso, -((weekdayOf(iso) + 6) % 7));
+
+// Encabezado de una semana del listado, relativo a la semana actual
+const weekLabel = (monday: string) => {
+  const weeks = Math.round((isoToDate(monday).getTime() - currentMonday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+  const names: Record<string, string> = { '-1': 'Semana pasada', '0': 'Esta semana', '1': 'Próxima semana' };
+  return names[weeks] ?? 'Semana';
+};
+
+const weekRangeText = (monday: string) =>
+  `del ${isoToText(monday).slice(0, 5)} al ${isoToText(addDays(monday, 6)).slice(0, 5)}`;
 
 // El backend manda las horas como HH:MM:SS
 const hhmm = (time: string | null | undefined) => (time ? time.slice(0, 5) : null);
@@ -126,11 +147,13 @@ export const Calendar: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
+  // Filtros del calendario y del listado. La comisión va por nombre: el listado puede abarcar
+  // cursos lectivos de más de un año
   const [sectionFilter, setSectionFilter] = useState('');
   const [kindFilter, setKindFilter] = useState<EventKind | ''>('');
 
-  // Día abierto en el detalle
-  const [openDay, setOpenDay] = useState<string | null>(null);
+  // Detalle abierto: los eventos de un día del calendario o un evento del listado
+  const [detail, setDetail] = useState<{ date: string; events: CalendarEvent[] } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -177,13 +200,6 @@ export const Calendar: React.FC = () => {
       });
   }, [courses, coursesOfYear, viewYear, reloadKey]);
 
-  // Al cambiar de año, la comisión elegida puede no tener curso lectivo en el año nuevo
-  useEffect(() => {
-    if (sectionFilter && !coursesOfYear.some((c) => String(c.id_section_year) === sectionFilter)) {
-      setSectionFilter('');
-    }
-  }, [coursesOfYear, sectionFilter]);
-
   const yearOptions = useMemo(() => {
     const years = new Set<number>((courses ?? []).map((c) => c.year));
     years.add(viewYear);
@@ -199,7 +215,7 @@ export const Calendar: React.FC = () => {
       loadedYear === viewYear
         ? events.filter(
             (e) =>
-              (!sectionFilter || String(e.id_section_year) === sectionFilter) &&
+              (!sectionFilter || e.section_name === sectionFilter) &&
               (!kindFilter || e.kind === kindFilter)
           )
         : [],
@@ -212,12 +228,9 @@ export const Calendar: React.FC = () => {
     return map;
   }, [filtered]);
 
-  // ===== Listado de eventos: independiente del mes que se ve, con su rango y sus filtros =====
+  // ===== Listado de eventos: independiente del mes que se ve, con su propio rango de fechas =====
   const [listFrom, setListFrom] = useState(DEFAULT_LIST_FROM);
   const [listTo, setListTo] = useState(DEFAULT_LIST_TO);
-  const [listKind, setListKind] = useState<EventKind | ''>('');
-  // Por nombre de comisión: el rango puede abarcar cursos lectivos de más de un año
-  const [listSection, setListSection] = useState('');
   const [listEvents, setListEvents] = useState<CalendarEvent[] | null>(null);
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
@@ -235,14 +248,19 @@ export const Calendar: React.FC = () => {
     return (courses ?? []).filter((c) => c.year >= fromYear && c.year <= toYear);
   }, [courses, listFrom, listTo, rangeError]);
 
-  const listSectionOptions = useMemo(
-    () => [...new Set(listCourses.map((c) => c.section_name))].sort((a, b) => a.localeCompare(b, 'es')),
-    [listCourses]
+  // Comisiones del año que se ve en el calendario y de las fechas del listado
+  const sectionOptions = useMemo(
+    () =>
+      [...new Set([...coursesOfYear, ...listCourses].map((c) => c.section_name))].sort((a, b) =>
+        a.localeCompare(b, 'es')
+      ),
+    [coursesOfYear, listCourses]
   );
 
+  // Al cambiar de año o de fechas, la comisión elegida puede no tener curso lectivo en ellos
   useEffect(() => {
-    if (listSection && !listSectionOptions.includes(listSection)) setListSection('');
-  }, [listSectionOptions, listSection]);
+    if (sectionFilter && !sectionOptions.includes(sectionFilter)) setSectionFilter('');
+  }, [sectionOptions, sectionFilter]);
 
   // Cada curso lectivo se consulta solo dentro de su año (las fechas no salen de él), así ningún
   // pedido supera el máximo de 366 días del backend. Una respuesta vieja se descarta.
@@ -274,17 +292,32 @@ export const Calendar: React.FC = () => {
   const listFiltered = useMemo(
     () =>
       (listEvents ?? []).filter(
-        (e) => (!listKind || e.kind === listKind) && (!listSection || e.section_name === listSection)
+        (e) => (!kindFilter || e.kind === kindFilter) && (!sectionFilter || e.section_name === sectionFilter)
       ),
-    [listEvents, listKind, listSection]
+    [listEvents, kindFilter, sectionFilter]
   );
 
-  const listIsDefault = listFrom === DEFAULT_LIST_FROM && listTo === DEFAULT_LIST_TO && !listKind && !listSection;
-  const resetList = () => {
+  // El listado separado por semana (de lunes a domingo); solo aparecen las semanas con eventos
+  const listWeeks = useMemo(() => {
+    const groups: { monday: string; events: CalendarEvent[] }[] = [];
+    for (const e of listFiltered) {
+      const monday = mondayOf(e.date);
+      if (groups.at(-1)?.monday !== monday) groups.push({ monday, events: [] });
+      groups.at(-1)!.events.push(e);
+    }
+    return groups;
+  }, [listFiltered]);
+
+  const rangeIsDefault = listFrom === DEFAULT_LIST_FROM && listTo === DEFAULT_LIST_TO;
+  const resetRange = () => {
     setListFrom(DEFAULT_LIST_FROM);
     setListTo(DEFAULT_LIST_TO);
-    setListKind('');
-    setListSection('');
+  };
+
+  const hasFilters = Boolean(sectionFilter || kindFilter);
+  const clearFilters = () => {
+    setSectionFilter('');
+    setKindFilter('');
   };
 
   // Semanas del mes, de lunes a domingo; los huecos antes del día 1 y después del último quedan vacíos
@@ -310,7 +343,7 @@ export const Calendar: React.FC = () => {
 
   const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
-  const openDayEvents = openDay ? eventsByDate[openDay] ?? [] : [];
+  const openDay = (iso: string) => setDetail({ date: iso, events: eventsByDate[iso] ?? [] });
 
   return (
     <div>
@@ -336,19 +369,19 @@ export const Calendar: React.FC = () => {
         </Alert>
       )}
 
-      {/* ===================== Filtros ===================== */}
+      {/* ===================== Filtros (calendario y listado) ===================== */}
       <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <Select
           aria-label="Comisión"
           value={sectionFilter}
           onChange={(e) => setSectionFilter(e.target.value)}
-          disabled={coursesOfYear.length === 0}
+          disabled={sectionOptions.length === 0}
         >
-          <option value="">{coursesOfYear.length === 1 ? coursesOfYear[0].section_name : 'Todas las comisiones'}</option>
-          {coursesOfYear.length > 1 &&
-            coursesOfYear.map((c) => (
-              <option key={c.id_section_year} value={c.id_section_year}>
-                {c.section_name}
+          <option value="">{sectionOptions.length === 1 ? sectionOptions[0] : 'Todas las comisiones'}</option>
+          {sectionOptions.length > 1 &&
+            sectionOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
               </option>
             ))}
         </Select>
@@ -445,11 +478,11 @@ export const Calendar: React.FC = () => {
                           ? `${day} de ${MONTHS[viewMonth]}: ${dayEvents.length} ${dayEvents.length === 1 ? 'evento' : 'eventos'}`
                           : undefined
                       }
-                      onClick={() => hasEvents && setOpenDay(iso)}
+                      onClick={() => hasEvents && openDay(iso)}
                       onKeyDown={(e) => {
                         if (hasEvents && (e.key === 'Enter' || e.key === ' ')) {
                           e.preventDefault();
-                          setOpenDay(iso);
+                          openDay(iso);
                         }
                       }}
                       className={`min-h-28 p-1.5 border-r border-line last:border-r-0 flex flex-col gap-1 ${
@@ -512,12 +545,13 @@ export const Calendar: React.FC = () => {
               )}
             </span>
           )}
-          {!listIsDefault && (
-            <Button variant="ghost" size="sm" className="ml-auto" onClick={resetList}>
+          {!rangeIsDefault && (
+            <Button variant="ghost" size="sm" className="ml-auto" onClick={resetRange}>
               Volver a esta semana y la próxima
             </Button>
           )}
         </div>
+        <p className="mt-1 text-xs text-ink-muted">Se aplican también los filtros de comisión y tipo de arriba.</p>
 
         <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <Input
@@ -536,36 +570,6 @@ export const Calendar: React.FC = () => {
             onChange={(e) => setListTo(e.target.value)}
             error={rangeError ?? undefined}
           />
-          <Select
-            id="listado-tipo"
-            label="Tipo de evento"
-            value={listKind}
-            onChange={(e) => setListKind(e.target.value as EventKind | '')}
-          >
-            <option value="">Todos los tipos</option>
-            {EVENT_KINDS.map((k) => (
-              <option key={k.value} value={k.value}>
-                {k.label}
-              </option>
-            ))}
-          </Select>
-          <Select
-            id="listado-comision"
-            label="Comisión"
-            value={listSection}
-            onChange={(e) => setListSection(e.target.value)}
-            disabled={listSectionOptions.length === 0}
-          >
-            <option value="">
-              {listSectionOptions.length === 1 ? listSectionOptions[0] : 'Todas las comisiones'}
-            </option>
-            {listSectionOptions.length > 1 &&
-              listSectionOptions.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-          </Select>
         </div>
 
         {listError && (
@@ -585,12 +589,12 @@ export const Calendar: React.FC = () => {
           {rangeError ? null : listEvents === null ? (
             listError ? null : <TableSkeleton rows={5} cols={6} />
           ) : listFiltered.length === 0 ? (
-            listKind || listSection ? (
+            hasFilters ? (
               <EmptyState
                 icon={<SearchX className="w-5 h-5" />}
                 message="Ningún evento coincide con los filtros"
                 action={
-                  <Button variant="outline" size="sm" onClick={resetList}>
+                  <Button variant="outline" size="sm" onClick={clearFilters}>
                     Limpiar filtros
                   </Button>
                 }
@@ -609,59 +613,119 @@ export const Calendar: React.FC = () => {
               />
             )
           ) : (
-            <Table>
-              <TableHeader>
-                <tr>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Horario</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Título</TableHead>
-                  <TableHead>Comisión</TableHead>
-                  <TableHead>Lugar</TableHead>
-                </tr>
-              </TableHeader>
-              <tbody>
-                {listFiltered.map((ev) => (
-                  <TableRow key={ev.key}>
-                    <TableCell className="whitespace-nowrap">
-                      <span className="tabular-nums text-ink">{isoToText(ev.date)}</span>
-                      <span className="block text-xs text-ink-muted">
-                        {WEEKDAY_NAMES[weekdayOf(ev.date)]}
-                        {ev.date === todayIso && <span className="font-semibold text-primary"> · Hoy</span>}
-                      </span>
-                    </TableCell>
-                    <TableCell className="tabular-nums whitespace-nowrap text-ink-muted">{timeText(ev)}</TableCell>
-                    <TableCell>
-                      <span className="flex items-center gap-2 whitespace-nowrap">
-                        <span className={`w-2.5 h-2.5 rounded-sm ${kindOf(ev.kind).dot}`} aria-hidden />
-                        {kindOf(ev.kind).label}
-                      </span>
-                    </TableCell>
-                    <TableCell className="font-medium text-ink">{ev.title}</TableCell>
-                    <TableCell className="text-ink-muted">{ev.section_name}</TableCell>
-                    <TableCell className="text-ink-muted">
-                      <EventPlace ev={ev} />
-                    </TableCell>
-                  </TableRow>
+            <>
+              {/* Tabla desde tablet; los eventos que ya pasaron se ven más apagados */}
+              <div className="hidden sm:block">
+                <Table>
+                  <TableHeader>
+                    <tr>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Horario</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Título</TableHead>
+                      <TableHead>Comisión</TableHead>
+                      <TableHead>Lugar</TableHead>
+                    </tr>
+                  </TableHeader>
+                  {listWeeks.map((week) => (
+                    <tbody key={week.monday}>
+                      <tr className="bg-canvas border-y border-line">
+                        <th colSpan={6} scope="colgroup" className="px-4 py-2 text-left text-xs font-semibold text-navy">
+                          {weekLabel(week.monday)}{' '}
+                          <span className="font-normal text-ink-muted">{weekRangeText(week.monday)}</span>
+                        </th>
+                      </tr>
+                      {week.events.map((ev) => (
+                        <TableRow
+                          key={ev.key}
+                          className={ev.date < todayIso ? 'opacity-60' : ''}
+                          onClick={() => setDetail({ date: ev.date, events: [ev] })}
+                        >
+                          <TableCell className="whitespace-nowrap">
+                            <span className="tabular-nums text-ink">{isoToText(ev.date)}</span>
+                            <span className="block text-xs text-ink-muted">
+                              {WEEKDAY_NAMES[weekdayOf(ev.date)]}
+                              {ev.date === todayIso && <span className="font-semibold text-primary"> · Hoy</span>}
+                            </span>
+                          </TableCell>
+                          <TableCell className="tabular-nums whitespace-nowrap text-ink-muted">{timeText(ev)}</TableCell>
+                          <TableCell>
+                            <span className="flex items-center gap-2 whitespace-nowrap">
+                              <span className={`w-2.5 h-2.5 rounded-sm ${kindOf(ev.kind).dot}`} aria-hidden />
+                              {kindOf(ev.kind).label}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            {/* El botón da acceso con teclado; el clic en cualquier parte de la fila hace lo mismo */}
+                            <button
+                              type="button"
+                              className="text-left font-medium text-ink hover:text-primary rounded focus-visible:outline-2 focus-visible:outline-primary"
+                            >
+                              {ev.title}
+                            </button>
+                          </TableCell>
+                          <TableCell className="text-ink-muted">{ev.section_name}</TableCell>
+                          <TableCell className="text-ink-muted">
+                            <EventPlace ev={ev} />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </tbody>
+                  ))}
+                </Table>
+              </div>
+
+              {/* Tarjetas en celulares */}
+              <div className="sm:hidden space-y-5">
+                {listWeeks.map((week) => (
+                  <div key={week.monday}>
+                    <h3 className="text-xs font-semibold text-navy">
+                      {weekLabel(week.monday)}{' '}
+                      <span className="font-normal text-ink-muted">{weekRangeText(week.monday)}</span>
+                    </h3>
+                    <ul className="mt-2 space-y-2">
+                      {week.events.map((ev) => (
+                        <li key={ev.key} className={ev.date < todayIso ? 'opacity-60' : ''}>
+                          <button
+                            type="button"
+                            onClick={() => setDetail({ date: ev.date, events: [ev] })}
+                            className={`w-full text-left rounded-lg border border-line border-l-[3px] ${kindOf(ev.kind).chip} bg-white px-3 py-2.5 hover:bg-canvas focus-visible:outline-2 focus-visible:outline-primary`}
+                          >
+                            <span className="flex items-center gap-2 text-xs text-ink-muted">
+                              <span className="tabular-nums">
+                                {WEEKDAY_NAMES[weekdayOf(ev.date)]} {isoToText(ev.date).slice(0, 5)}
+                              </span>
+                              {ev.date === todayIso && <span className="font-semibold text-primary">Hoy</span>}
+                              <span className="ml-auto tabular-nums">{timeText(ev)}</span>
+                            </span>
+                            <span className="mt-1 block font-medium text-ink">{ev.title}</span>
+                            <span className="mt-0.5 block text-xs text-ink-muted">
+                              {kindOf(ev.kind).label} · {ev.section_name}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ))}
-              </tbody>
-            </Table>
+              </div>
+            </>
           )}
         </div>
       </section>
 
       {/* ===================== Detalle del día ===================== */}
       <Modal
-        isOpen={openDay !== null}
-        onClose={() => setOpenDay(null)}
+        isOpen={detail !== null}
+        onClose={() => setDetail(null)}
         title={
-          openDay
-            ? `${WEEKDAY_NAMES[weekdayOf(openDay)]} ${Number(openDay.slice(8, 10))} de ${MONTHS[Number(openDay.slice(5, 7)) - 1].toLowerCase()}`
+          detail
+            ? `${WEEKDAY_NAMES[weekdayOf(detail.date)]} ${Number(detail.date.slice(8, 10))} de ${MONTHS[Number(detail.date.slice(5, 7)) - 1].toLowerCase()}`
             : ''
         }
       >
         <ul className="divide-y divide-line pb-1">
-          {openDayEvents.map((ev) => (
+          {(detail?.events ?? []).map((ev) => (
             <li key={ev.key} className="py-3 first:pt-0">
               <div className="flex items-center gap-2 text-xs text-ink-muted">
                 <span className={`w-2.5 h-2.5 rounded-sm ${kindOf(ev.kind).dot}`} aria-hidden />
@@ -681,7 +745,7 @@ export const Calendar: React.FC = () => {
           ))}
         </ul>
         <div className="flex justify-end pt-2">
-          <Button variant="outline" onClick={() => setOpenDay(null)}>
+          <Button variant="outline" onClick={() => setDetail(null)}>
             Cerrar
           </Button>
         </div>
