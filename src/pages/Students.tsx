@@ -29,8 +29,9 @@ interface CourseOption {
   label: string;
 }
 
-// Consultar estudiantes (SCRUM-99): GET /students. El docente común ve los alumnos de sus cursos
-// lectivos, con el equipo al que pertenece cada uno; el administrador, todos los alumnos.
+// Consultar estudiantes (SCRUM-99): GET /students. El docente común ve los inscriptos en sus
+// cursos lectivos, tengan equipo o no, con el equipo de cada uno; el administrador, todos los
+// alumnos, o los inscriptos en el curso lectivo que elija.
 export const Students: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -75,6 +76,8 @@ export const Students: React.FC = () => {
       const res = await api.getStudents({
         id_section_year: course ? Number(course) : null,
         q: query || null,
+        // Por inscripción: así aparecen también los que todavía no tienen equipo
+        kind: user?.is_super_admin && !course ? null : 'registered',
         limit: PAGE_SIZE,
         offset,
       });
@@ -87,7 +90,7 @@ export const Students: React.FC = () => {
     } finally {
       if (current === requestId.current) setIsLoading(false);
     }
-  }, [query, course, offset]);
+  }, [query, course, offset, user?.is_super_admin]);
 
   useEffect(() => {
     fetchStudents();
@@ -168,7 +171,7 @@ export const Students: React.FC = () => {
               ? 'Revise el nombre, apellido o legajo, o muestre todos los cursos lectivos.'
               : user?.is_super_admin
                 ? undefined
-                : 'Aparecen cuando se suman a un equipo.'
+                : 'Aparecen al registrarlos en uno de sus cursos lectivos.'
           }
           action={
             hasFilters ? (
