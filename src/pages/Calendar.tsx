@@ -11,7 +11,8 @@ import { Modal } from '../components/ui/Modal';
 import { Alert } from '../components/ui/Alert';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { Table, TableHeader, TableRow, TableHead, TableCell } from '../components/ui/Table';
-import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, MapPin, SearchX } from 'lucide-react';
+import { RegisterEventModal } from '../components/RegisterEventModal';
+import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, MapPin, Plus, SearchX } from 'lucide-react';
 
 const MONTHS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -345,6 +346,30 @@ export const Calendar: React.FC = () => {
 
   const openDay = (iso: string) => setDetail({ date: iso, events: eventsByDate[iso] ?? [] });
 
+  // ===== Registrar evento =====
+  // Fecha con la que se abre el formulario; null = cerrado
+  const [registerDate, setRegisterDate] = useState<string | null>(null);
+  // Solo se registran eventos en cursos lectivos del año en curso o posteriores
+  const registrableCourses = useMemo(
+    () => (courses ?? []).filter((c) => c.year >= today.getFullYear()),
+    [courses]
+  );
+  const canRegister = registrableCourses.length > 0;
+  const canRegisterOn = (iso: string) => canRegister && Number(iso.slice(0, 4)) >= today.getFullYear();
+
+  const openRegister = (iso: string) => {
+    setDetail(null);
+    setRegisterDate(iso);
+  };
+
+  // Se sugiere el curso lectivo de la fecha: el de la comisión filtrada o, si hay uno solo ese año, ese
+  const registerCourseId = useMemo(() => {
+    if (!registerDate) return null;
+    const ofYear = registrableCourses.filter((c) => c.year === Number(registerDate.slice(0, 4)));
+    const match = sectionFilter ? ofYear.find((c) => c.section_name === sectionFilter) : undefined;
+    return match?.id_section_year ?? (ofYear.length === 1 ? ofYear[0].id_section_year : null);
+  }, [registerDate, registrableCourses, sectionFilter]);
+
   return (
     <div>
       <PageHeader
@@ -353,6 +378,18 @@ export const Calendar: React.FC = () => {
           isSuperAdmin
             ? 'Clases y entregas de todas las comisiones'
             : 'Clases y entregas de los cursos lectivos que dicta'
+        }
+        action={
+          canRegister && (
+            <Button
+              className="w-full sm:w-auto"
+              // Hoy, o el primer día del mes que se ve si es de un año posterior
+              onClick={() => openRegister(viewYear > today.getFullYear() ? toIso(viewYear, viewMonth, 1) : todayIso)}
+            >
+              <Plus className="w-4 h-4" aria-hidden />
+              Registrar evento
+            </Button>
+          )
         }
       />
 
@@ -468,26 +505,33 @@ export const Calendar: React.FC = () => {
                   const hasEvents = dayEvents.length > 0;
                   const isToday = iso === todayIso;
                   const isWeekend = di >= 5;
+                  // Un día con eventos abre su detalle; uno vacío, el formulario para registrar en esa fecha
+                  const canRegisterDay =
+                    !hasEvents && canRegisterOn(iso) && registrableCourses.some((c) => c.year === viewYear);
+                  const interactive = hasEvents || canRegisterDay;
+                  const activate = () => (hasEvents ? openDay(iso) : canRegisterDay && openRegister(iso));
                   return (
                     <div
                       key={di}
-                      role={hasEvents ? 'button' : undefined}
-                      tabIndex={hasEvents ? 0 : undefined}
+                      role={interactive ? 'button' : undefined}
+                      tabIndex={interactive ? 0 : undefined}
                       aria-label={
                         hasEvents
                           ? `${day} de ${MONTHS[viewMonth]}: ${dayEvents.length} ${dayEvents.length === 1 ? 'evento' : 'eventos'}`
-                          : undefined
+                          : canRegisterDay
+                            ? `${day} de ${MONTHS[viewMonth]}: registrar evento`
+                            : undefined
                       }
-                      onClick={() => hasEvents && openDay(iso)}
+                      onClick={activate}
                       onKeyDown={(e) => {
-                        if (hasEvents && (e.key === 'Enter' || e.key === ' ')) {
+                        if (interactive && (e.key === 'Enter' || e.key === ' ')) {
                           e.preventDefault();
-                          openDay(iso);
+                          activate();
                         }
                       }}
                       className={`min-h-28 p-1.5 border-r border-line last:border-r-0 flex flex-col gap-1 ${
                         isWeekend ? 'bg-tint-soft' : 'bg-white'
-                      } ${hasEvents ? 'cursor-pointer hover:bg-tint focus-visible:outline-2 focus-visible:outline-primary' : ''}`}
+                      } ${interactive ? 'cursor-pointer hover:bg-tint focus-visible:outline-2 focus-visible:outline-primary' : ''}`}
                     >
                       <span
                         className={`w-7 h-7 flex items-center justify-center rounded-full text-sm tabular-nums ${
@@ -529,7 +573,9 @@ export const Calendar: React.FC = () => {
             </span>
           ))}
           <span className="hidden sm:block w-px h-4 bg-line" aria-hidden />
-          <span>Toque un día con eventos para ver el detalle</span>
+          <span>
+            Toque un día con eventos para ver el detalle{canRegister && ', o un día vacío para registrar un evento'}
+          </span>
         </div>
       </section>
 
@@ -744,12 +790,27 @@ export const Calendar: React.FC = () => {
             </li>
           ))}
         </ul>
-        <div className="flex justify-end pt-2">
+        <div className="flex justify-end gap-3 pt-2">
+          {detail && canRegisterOn(detail.date) && (
+            <Button variant="outline" onClick={() => openRegister(detail.date)}>
+              <Plus className="w-4 h-4" aria-hidden />
+              Registrar evento este día
+            </Button>
+          )}
           <Button variant="outline" onClick={() => setDetail(null)}>
             Cerrar
           </Button>
         </div>
       </Modal>
+
+      <RegisterEventModal
+        isOpen={registerDate !== null}
+        onClose={() => setRegisterDate(null)}
+        courses={registrableCourses}
+        defaultCourseId={registerCourseId}
+        defaultDate={registerDate ?? ''}
+        onCreated={retry}
+      />
     </div>
   );
 };

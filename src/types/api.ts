@@ -393,6 +393,33 @@ export interface ActivityPublic {
   due_time?: string | null;
 }
 
+// Alta de una clase puntual. Horas "HH:MM"; la fecha debe caer en el año del curso lectivo.
+export interface CalendarClassCreate {
+  date: string;
+  start_time: string;
+  end_time: string;
+  modality: ClassModality;
+  title?: string | null;
+  location?: string | null;
+  meeting_url?: string | null;
+}
+
+// Alta de clases que se repiten: una por cada fecha de `weekdays` (ISO: 1 = lunes ... 7 = domingo)
+// entre `from_date` y `to_date`. Es todo o nada.
+export interface CalendarClassBulkCreate extends Omit<CalendarClassCreate, 'date'> {
+  weekdays: number[];
+  from_date: string;
+  to_date: string;
+}
+
+// Alta de una actividad (entrega) del curso lectivo
+export interface ActivityCreate {
+  title: string;
+  description?: string | null;
+  due_date: string;
+  due_time?: string | null;
+}
+
 // `GET /section-years/{id}/calendar`: el calendario del curso lectivo con sus clases y actividades
 export interface CalendarWithClasses {
   id_calendar: number;
