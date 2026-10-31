@@ -2,9 +2,10 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { api } from '../lib/api';
 import { fetchAll } from '../lib/pagination';
 import { useAuth } from '../context/AuthContext';
-import { ClassModality, ProfessorSectionYearPublic, SectionYearPublic } from '../types/api';
+import { CalendarWithClasses, ClassModality, ProfessorSectionYearPublic, SectionYearPublic } from '../types/api';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Modal } from '../components/ui/Modal';
 import { Alert } from '../components/ui/Alert';
@@ -51,8 +52,17 @@ type CalendarEvent = {
 const toIso = (year: number, month: number, day: number) =>
   `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
+const dateToIso = (date: Date) => toIso(date.getFullYear(), date.getMonth(), date.getDate());
+
 const today = new Date();
-const todayIso = toIso(today.getFullYear(), today.getMonth(), today.getDate());
+const todayIso = dateToIso(today);
+
+// Rango por defecto del listado: la semana actual y la siguiente (de lunes a domingo)
+const currentMonday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - ((today.getDay() + 6) % 7));
+const DEFAULT_LIST_FROM = dateToIso(currentMonday);
+const DEFAULT_LIST_TO = dateToIso(
+  new Date(currentMonday.getFullYear(), currentMonday.getMonth(), currentMonday.getDate() + 13)
+);
 
 const isoToText = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 
@@ -73,6 +83,34 @@ const compareEvents = (a: CalendarEvent, b: CalendarEvent) =>
   a.key.localeCompare(b.key);
 
 type Course = Pick<SectionYearPublic, 'id_section_year' | 'year' | 'section_name'>;
+
+// Clases y actividades de un curso lectivo como eventos
+const toEvents = (course: Course, cal: CalendarWithClasses): CalendarEvent[] => [
+  ...cal.classes.map((c) => ({
+    key: `class-${c.id_calendar_class}`,
+    kind: 'class' as const,
+    date: c.date,
+    start: hhmm(c.start_time),
+    end: hhmm(c.end_time),
+    title: c.title || 'Clase',
+    id_section_year: course.id_section_year,
+    section_name: course.section_name,
+    modality: c.modality,
+    location: c.location,
+    meeting_url: c.meeting_url,
+  })),
+  ...cal.activities.map((a) => ({
+    key: `activity-${a.id_activity}`,
+    kind: 'delivery' as const,
+    date: a.due_date,
+    start: hhmm(a.due_time),
+    end: null,
+    title: a.title,
+    id_section_year: course.id_section_year,
+    section_name: course.section_name,
+    description: a.description,
+  })),
+];
 
 export const Calendar: React.FC = () => {
   const { user } = useAuth();
@@ -131,39 +169,7 @@ export const Calendar: React.FC = () => {
     Promise.all(coursesOfYear.map((c) => api.getSectionYearCalendar(c.id_section_year, range)))
       .then((calendars) => {
         if (id !== requestId.current) return;
-        const built: CalendarEvent[] = [];
-        calendars.forEach((cal, i) => {
-          const course = coursesOfYear[i];
-          for (const c of cal.classes) {
-            built.push({
-              key: `class-${c.id_calendar_class}`,
-              kind: 'class',
-              date: c.date,
-              start: hhmm(c.start_time),
-              end: hhmm(c.end_time),
-              title: c.title || 'Clase',
-              id_section_year: course.id_section_year,
-              section_name: course.section_name,
-              modality: c.modality,
-              location: c.location,
-              meeting_url: c.meeting_url,
-            });
-          }
-          for (const a of cal.activities) {
-            built.push({
-              key: `activity-${a.id_activity}`,
-              kind: 'delivery',
-              date: a.due_date,
-              start: hhmm(a.due_time),
-              end: null,
-              title: a.title,
-              id_section_year: course.id_section_year,
-              section_name: course.section_name,
-              description: a.description,
-            });
-          }
-        });
-        setEvents(built.sort(compareEvents));
+        setEvents(calendars.flatMap((cal, i) => toEvents(coursesOfYear[i], cal)).sort(compareEvents));
         setLoadedYear(viewYear);
       })
       .catch(() => {
@@ -206,8 +212,80 @@ export const Calendar: React.FC = () => {
     return map;
   }, [filtered]);
 
-  const monthPrefix = toIso(viewYear, viewMonth, 1).slice(0, 7);
-  const monthEvents = filtered.filter((e) => e.date.startsWith(monthPrefix));
+  // ===== Listado de eventos: independiente del mes que se ve, con su rango y sus filtros =====
+  const [listFrom, setListFrom] = useState(DEFAULT_LIST_FROM);
+  const [listTo, setListTo] = useState(DEFAULT_LIST_TO);
+  const [listKind, setListKind] = useState<EventKind | ''>('');
+  // Por nombre de comisión: el rango puede abarcar cursos lectivos de más de un año
+  const [listSection, setListSection] = useState('');
+  const [listEvents, setListEvents] = useState<CalendarEvent[] | null>(null);
+  const [listLoading, setListLoading] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
+
+  const rangeError = !listFrom || !listTo
+    ? 'Elija las dos fechas'
+    : listFrom > listTo
+      ? 'Debe ser igual o posterior a "Desde"'
+      : null;
+
+  const listCourses = useMemo(() => {
+    if (rangeError) return [];
+    const fromYear = Number(listFrom.slice(0, 4));
+    const toYear = Number(listTo.slice(0, 4));
+    return (courses ?? []).filter((c) => c.year >= fromYear && c.year <= toYear);
+  }, [courses, listFrom, listTo, rangeError]);
+
+  const listSectionOptions = useMemo(
+    () => [...new Set(listCourses.map((c) => c.section_name))].sort((a, b) => a.localeCompare(b, 'es')),
+    [listCourses]
+  );
+
+  useEffect(() => {
+    if (listSection && !listSectionOptions.includes(listSection)) setListSection('');
+  }, [listSectionOptions, listSection]);
+
+  // Cada curso lectivo se consulta solo dentro de su año (las fechas no salen de él), así ningún
+  // pedido supera el máximo de 366 días del backend. Una respuesta vieja se descarta.
+  const listRequestId = useRef(0);
+  useEffect(() => {
+    if (courses === null || rangeError) return;
+    const id = ++listRequestId.current;
+    setListLoading(true);
+    setListError(null);
+    Promise.all(
+      listCourses.map((c) => {
+        const from = listFrom > `${c.year}-01-01` ? listFrom : `${c.year}-01-01`;
+        const to = listTo < `${c.year}-12-31` ? listTo : `${c.year}-12-31`;
+        return api.getSectionYearCalendar(c.id_section_year, { from, to });
+      })
+    )
+      .then((calendars) => {
+        if (id !== listRequestId.current) return;
+        setListEvents(calendars.flatMap((cal, i) => toEvents(listCourses[i], cal)).sort(compareEvents));
+      })
+      .catch(() => {
+        if (id === listRequestId.current) setListError('No se pudo cargar el listado de eventos');
+      })
+      .finally(() => {
+        if (id === listRequestId.current) setListLoading(false);
+      });
+  }, [courses, listCourses, listFrom, listTo, rangeError, reloadKey]);
+
+  const listFiltered = useMemo(
+    () =>
+      (listEvents ?? []).filter(
+        (e) => (!listKind || e.kind === listKind) && (!listSection || e.section_name === listSection)
+      ),
+    [listEvents, listKind, listSection]
+  );
+
+  const listIsDefault = listFrom === DEFAULT_LIST_FROM && listTo === DEFAULT_LIST_TO && !listKind && !listSection;
+  const resetList = () => {
+    setListFrom(DEFAULT_LIST_FROM);
+    setListTo(DEFAULT_LIST_TO);
+    setListKind('');
+    setListSection('');
+  };
 
   // Semanas del mes, de lunes a domingo; los huecos antes del día 1 y después del último quedan vacíos
   const weeks = useMemo(() => {
@@ -229,12 +307,6 @@ export const Calendar: React.FC = () => {
     setViewYear(date.getFullYear());
     setViewMonth(date.getMonth());
   };
-
-  const clearFilters = () => {
-    setSectionFilter('');
-    setKindFilter('');
-  };
-  const hasFilters = Boolean(sectionFilter || kindFilter);
 
   const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
@@ -428,21 +500,97 @@ export const Calendar: React.FC = () => {
         </div>
       </section>
 
-      {/* ===================== Eventos del mes ===================== */}
+      {/* ===================== Listado de eventos ===================== */}
       <section className="mt-8">
-        <h2 className="text-lg font-semibold text-ink">
-          Eventos de {MONTHS[viewMonth].toLowerCase()} {viewYear}
-        </h2>
-        <div className="mt-3">
-          {firstLoad || (loadingYear && events.length === 0) ? (
-            <TableSkeleton rows={5} cols={6} />
-          ) : monthEvents.length === 0 ? (
-            hasFilters ? (
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h2 className="text-lg font-semibold text-ink">Listado de eventos</h2>
+          {!rangeError && (
+            <span className="text-sm text-ink-muted">
+              Del {isoToText(listFrom)} al {isoToText(listTo)}
+              {listEvents !== null && !listLoading && (
+                <> · {listFiltered.length} {listFiltered.length === 1 ? 'evento' : 'eventos'}</>
+              )}
+            </span>
+          )}
+          {!listIsDefault && (
+            <Button variant="ghost" size="sm" className="ml-auto" onClick={resetList}>
+              Volver a esta semana y la próxima
+            </Button>
+          )}
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <Input
+            id="listado-desde"
+            label="Desde"
+            type="date"
+            value={listFrom}
+            onChange={(e) => setListFrom(e.target.value)}
+          />
+          <Input
+            id="listado-hasta"
+            label="Hasta"
+            type="date"
+            value={listTo}
+            min={listFrom || undefined}
+            onChange={(e) => setListTo(e.target.value)}
+            error={rangeError ?? undefined}
+          />
+          <Select
+            id="listado-tipo"
+            label="Tipo de evento"
+            value={listKind}
+            onChange={(e) => setListKind(e.target.value as EventKind | '')}
+          >
+            <option value="">Todos los tipos</option>
+            {EVENT_KINDS.map((k) => (
+              <option key={k.value} value={k.value}>
+                {k.label}
+              </option>
+            ))}
+          </Select>
+          <Select
+            id="listado-comision"
+            label="Comisión"
+            value={listSection}
+            onChange={(e) => setListSection(e.target.value)}
+            disabled={listSectionOptions.length === 0}
+          >
+            <option value="">
+              {listSectionOptions.length === 1 ? listSectionOptions[0] : 'Todas las comisiones'}
+            </option>
+            {listSectionOptions.length > 1 &&
+              listSectionOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+          </Select>
+        </div>
+
+        {listError && (
+          <Alert
+            className="mt-3"
+            action={
+              <Button variant="outline" size="sm" onClick={retry}>
+                Reintentar
+              </Button>
+            }
+          >
+            {listError}
+          </Alert>
+        )}
+
+        <div className={`mt-4 transition-opacity ${listLoading && listEvents !== null ? 'opacity-60' : ''}`}>
+          {rangeError ? null : listEvents === null ? (
+            listError ? null : <TableSkeleton rows={5} cols={6} />
+          ) : listFiltered.length === 0 ? (
+            listKind || listSection ? (
               <EmptyState
                 icon={<SearchX className="w-5 h-5" />}
                 message="Ningún evento coincide con los filtros"
                 action={
-                  <Button variant="outline" size="sm" onClick={clearFilters}>
+                  <Button variant="outline" size="sm" onClick={resetList}>
                     Limpiar filtros
                   </Button>
                 }
@@ -450,12 +598,12 @@ export const Calendar: React.FC = () => {
             ) : (
               <EmptyState
                 icon={<CalendarDays className="w-5 h-5" />}
-                message="No hay eventos este mes"
+                message="No hay eventos en estas fechas"
                 description={
-                  coursesOfYear.length === 0
+                  listCourses.length === 0
                     ? isSuperAdmin
-                      ? `No hay cursos lectivos en ${viewYear}.`
-                      : `No tiene cursos lectivos asignados en ${viewYear}.`
+                      ? 'No hay cursos lectivos en esas fechas.'
+                      : 'No tiene cursos lectivos asignados en esas fechas.'
                     : 'Las clases y entregas que carguen los docentes aparecen acá.'
                 }
               />
@@ -473,11 +621,14 @@ export const Calendar: React.FC = () => {
                 </tr>
               </TableHeader>
               <tbody>
-                {monthEvents.map((ev) => (
+                {listFiltered.map((ev) => (
                   <TableRow key={ev.key}>
                     <TableCell className="whitespace-nowrap">
                       <span className="tabular-nums text-ink">{isoToText(ev.date)}</span>
-                      <span className="block text-xs text-ink-muted">{WEEKDAY_NAMES[weekdayOf(ev.date)]}</span>
+                      <span className="block text-xs text-ink-muted">
+                        {WEEKDAY_NAMES[weekdayOf(ev.date)]}
+                        {ev.date === todayIso && <span className="font-semibold text-primary"> · Hoy</span>}
+                      </span>
                     </TableCell>
                     <TableCell className="tabular-nums whitespace-nowrap text-ink-muted">{timeText(ev)}</TableCell>
                     <TableCell>
