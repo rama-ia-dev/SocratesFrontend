@@ -30,6 +30,7 @@ export const addMemberError = (err: any): string => {
     if (detail.includes('another project')) return 'El alumno ya forma parte de otro equipo';
     if (detail.includes('this project')) return 'El alumno ya es parte de ese equipo';
     if (detail.includes('uninsured')) return 'El equipo ya está asegurado: no se suman integrantes';
+    if (detail.includes('current year')) return 'El alumno cursa en otro ciclo lectivo: no se puede sumar a un equipo de este';
   }
   if (err.status === 403) return 'Solo los docentes del curso lectivo y el administrador pueden sumar alumnos';
   if (err.status === 404) return 'El equipo o el alumno ya no existen';
