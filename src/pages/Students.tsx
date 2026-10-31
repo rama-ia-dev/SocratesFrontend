@@ -24,14 +24,24 @@ import { Search, SearchX, Plus, RefreshCw, Edit2, CloudOff, GraduationCap } from
 
 const PAGE_SIZE = 10;
 
+// Todas las páginas de GET /students para esos filtros
+const allStudents = async (params: Parameters<typeof api.getStudents>[0]): Promise<StudentListItem[]> => {
+  const items: StudentListItem[] = [];
+  for (let offset = 0; ; offset += 100) {
+    const res = await api.getStudents({ ...params, limit: 100, offset });
+    items.push(...res.items);
+    if (items.length >= res.total || res.items.length === 0) return items;
+  }
+};
+
 interface CourseOption {
   id_section_year: number;
   label: string;
 }
 
-// Consultar estudiantes (SCRUM-99): GET /students. El docente común ve los inscriptos en sus
-// cursos lectivos, tengan equipo o no, con el equipo de cada uno; el administrador, todos los
-// alumnos, o los inscriptos en el curso lectivo que elija.
+// Consultar estudiantes (SCRUM-99): GET /students. El docente común ve a los alumnos de sus
+// cursos lectivos (inscriptos, tengan equipo o no, y los que están en un equipo de esos cursos),
+// con el equipo de cada uno; el administrador, todos los alumnos, o los del curso que elija.
 export const Students: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -72,18 +82,33 @@ export const Students: React.FC = () => {
     const current = ++requestId.current;
     setIsLoading(true);
     setLoadError(false);
+    const filters = { id_section_year: course ? Number(course) : null, q: query || null };
     try {
-      const res = await api.getStudents({
-        id_section_year: course ? Number(course) : null,
-        q: query || null,
-        // Por inscripción: así aparecen también los que todavía no tienen equipo
-        kind: user?.is_super_admin && !course ? null : 'registered',
-        limit: PAGE_SIZE,
-        offset,
-      });
+      if (user?.is_super_admin && !course) {
+        // El administrador sin curso elegido ve a todos los alumnos: lo pagina el backend
+        const res = await api.getStudents({ ...filters, limit: PAGE_SIZE, offset });
+        if (current !== requestId.current) return;
+        setStudents(res.items);
+        setTotal(res.total);
+        return;
+      }
+      // Alumnos de un curso: los inscriptos en él (tengan equipo o no) y los que tienen equipo en
+      // él aunque estén inscriptos en otra comisión del mismo año. El backend no los da juntos:
+      // se piden las dos listas completas, se juntan sin repetir y se pagina acá.
+      const [registered, inTeams] = await Promise.all([
+        allStudents({ ...filters, kind: 'registered' }),
+        allStudents(filters),
+      ]);
       if (current !== requestId.current) return;
-      setStudents(res.items);
-      setTotal(res.total);
+      const byId = new Map([...inTeams, ...registered].map((s) => [s.id_student, s]));
+      const merged = [...byId.values()].sort(
+        (a, b) =>
+          a.last_name.localeCompare(b.last_name, 'es') ||
+          a.first_name.localeCompare(b.first_name, 'es') ||
+          a.id_student - b.id_student
+      );
+      setStudents(merged.slice(offset, offset + PAGE_SIZE));
+      setTotal(merged.length);
     } catch {
       if (current !== requestId.current) return;
       setLoadError(true);
