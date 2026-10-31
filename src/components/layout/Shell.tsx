@@ -96,7 +96,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const navItems = getNavItems();
 
   const roleLabel = user?.is_super_admin
-    ? 'Super administrador'
+    ? 'Administrador'
     : user?.role === 'professor'
     ? 'Docente'
     : 'Alumno';
