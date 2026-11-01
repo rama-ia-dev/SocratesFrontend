@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
-import { fetchAll } from '../lib/pagination';
 import {
   ProfessorSectionYearPublic,
   ProjectPublic,
@@ -81,14 +79,23 @@ const PAGE_SIZE = 10;
 // Opciones del filtro de año: del año que viene hacia atrás.
 const currentYear = new Date().getFullYear();
 
+// Trae todas las páginas de un listado (el backend devuelve hasta 100 por consulta)
+async function fetchAll<T>(
+  fetchPage: (offset: number) => Promise<{ items: T[]; total: number }>
+): Promise<T[]> {
+  const items: T[] = [];
+  for (;;) {
+    const page = await fetchPage(items.length);
+    items.push(...page.items);
+    if (page.items.length === 0 || items.length >= page.total) return items;
+  }
+}
+
 export const ChairOverview: React.FC = () => {
   const { error: toastError } = useToast();
 
-  // El dashboard de la cátedra abre esta pantalla con el año y la comisión ya elegidos
-  const [searchParams] = useSearchParams();
-  const yearParam = searchParams.get('anio');
-  const [yearFilter, setYearFilter] = useState<string>(yearParam ?? String(currentYear));
-  const [sectionFilter, setSectionFilter] = useState<string>(searchParams.get('comision') ?? '');
+  const [yearFilter, setYearFilter] = useState<string>(String(currentYear));
+  const [sectionFilter, setSectionFilter] = useState<string>('');
   const [allSections, setAllSections] = useState<SectionPublic[]>([]);
   // Todos los cursos lectivos, para armar las opciones de los filtros
   const [allSectionYears, setAllSectionYears] = useState<SectionYearPublic[]>([]);
@@ -113,7 +120,7 @@ export const ChairOverview: React.FC = () => {
       .then((items) => {
         setAllSectionYears(items);
         // Si el año actual todavía no tiene cursos lectivos, se muestran todos los años
-        if (yearParam === null && !items.some((sy) => sy.year === currentYear)) setYearFilter('');
+        if (!items.some((sy) => sy.year === currentYear)) setYearFilter('');
       })
       .catch(() => setAllSectionYears([]));
   }, []);
