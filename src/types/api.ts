@@ -404,12 +404,17 @@ export interface CalendarClassCreate {
   meeting_url?: string | null;
 }
 
-// Alta de clases que se repiten: una por cada fecha de `weekdays` (ISO: 1 = lunes ... 7 = domingo)
-// entre `from_date` y `to_date`. Es todo o nada.
-export interface CalendarClassBulkCreate extends Omit<CalendarClassCreate, 'date'> {
-  weekdays: number[];
-  from_date: string;
-  to_date: string;
+// Carga en lote del calendario de un curso lectivo: agrega las filas, todo o nada. 409 si alguna clase
+// se superpone con una existente: `detail` = [{kind, row, detail}], con `row` desde 1.
+export interface CalendarBulkLoad {
+  classes?: CalendarClassCreate[];
+  activities?: ActivityCreate[];
+}
+
+export interface CalendarBulkLoadReport {
+  dry_run: boolean;
+  classes_created: number;
+  activities_created: number;
 }
 
 // Alta de una actividad (entrega) del curso lectivo
