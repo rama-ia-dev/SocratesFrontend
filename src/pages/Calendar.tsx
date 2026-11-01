@@ -349,10 +349,12 @@ export const Calendar: React.FC = () => {
   // ===== Registrar evento =====
   // Fecha con la que se abre el formulario; null = cerrado
   const [registerDate, setRegisterDate] = useState<string | null>(null);
-  // Solo se registran eventos en cursos lectivos del año en curso o posteriores
+  // Solo el docente y el administrador registran (y, más adelante, modifican y eliminan) eventos, y
+  // solo en cursos lectivos del año en curso o posteriores. El alumno solo consulta.
+  const canManage = isSuperAdmin || user?.role === 'professor';
   const registrableCourses = useMemo(
-    () => (courses ?? []).filter((c) => c.year >= today.getFullYear()),
-    [courses]
+    () => (canManage ? (courses ?? []).filter((c) => c.year >= today.getFullYear()) : []),
+    [courses, canManage]
   );
   const canRegister = registrableCourses.length > 0;
   const canRegisterOn = (iso: string) => canRegister && Number(iso.slice(0, 4)) >= today.getFullYear();
