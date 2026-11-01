@@ -74,18 +74,22 @@ const listText = (items: string[]) =>
 
 // Error del backend → mensaje para el docente. `sentDates` son las fechas de una carga en lote, cuyos
 // conflictos vienen por número de fila (desde 1).
-const errorMessage = (err: any, course: Course | undefined, sentDates: string[] = []): string => {
+const errorMessage = (err: any, course: Course | undefined, editing: boolean, sentDates: string[] = []): string => {
   if (err?.status === 409 && Array.isArray(err.detail)) {
     const dates: string[] = err.detail
       .map((c: { date?: string; row?: number }) => c.date ?? (c.row ? sentDates[c.row - 1] : undefined))
       .filter(Boolean)
       .map(dayMonth);
     const shown = dates.length > 8 ? [...dates.slice(0, 8), `${dates.length - 8} más`] : dates;
-    return `Estas fechas ya tienen una clase que se superpone con ese horario: ${listText(shown)}. No se registró ninguna clase.`;
+    return `Estas fechas ya tienen una clase que se superpone con ese horario: ${listText(shown)}. No se ${
+      editing ? 'modificó' : 'registró'
+    } ninguna clase.`;
   }
   if (err?.status === 409) return 'Ese día ya hay una clase que se superpone con ese horario.';
-  if (err?.status === 403) return 'Solo un docente del curso lectivo o el administrador puede registrar eventos en él.';
-  if (err?.status === 404) return 'El curso lectivo ya no existe. Recargue la página.';
+  if (err?.status === 403)
+    return `Solo un docente del curso lectivo o el administrador puede ${editing ? 'modificar' : 'registrar'} eventos en él.`;
+  if (err?.status === 404)
+    return editing ? 'El evento ya no existe. Recargue la página.' : 'El curso lectivo ya no existe. Recargue la página.';
   if (err?.status === 422) {
     const text = String(err.message ?? '');
     if (text.includes('section year')) return `La fecha debe ser del año del curso lectivo${course ? ` (${course.year})` : ''}.`;
@@ -94,10 +98,28 @@ const errorMessage = (err: any, course: Course | undefined, sentDates: string[] 
     if (text.includes('meeting_url')) return 'El link debe empezar con http:// o https://.';
     return 'Revise los datos del formulario.';
   }
-  return 'No se pudo registrar el evento. Intente de nuevo.';
+  return `No se pudo ${editing ? 'guardar' : 'registrar'} el evento. Intente de nuevo.`;
 };
 
-export interface RegisterEventModalProps {
+// Error que ya trae el mensaje para mostrar (por ejemplo, al cambiar el tipo de un evento)
+class FormError extends Error {}
+
+/** Evento que se modifica, con sus datos tal como están guardados. */
+export interface EditableEvent {
+  kind: Kind;
+  id: number; // id_calendar_class o id_activity
+  id_section_year: number;
+  date: string;
+  start: string | null; // HH:MM; en una entrega, la hora límite
+  end: string | null;
+  title: string | null;
+  modality?: ClassModality;
+  location?: string | null;
+  meeting_url?: string | null;
+  description?: string | null;
+}
+
+export interface EventFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   /**
@@ -109,18 +131,25 @@ export interface RegisterEventModalProps {
   defaultCourseId: number | null;
   /** Fecha elegida al abrir (por ejemplo, el día tocado en el calendario). */
   defaultDate: string;
-  onCreated: () => void;
+  /** Si viene, el formulario modifica este evento en lugar de registrar uno nuevo. */
+  editing?: EditableEvent | null;
+  /** Clases posteriores de la misma serie semanal (mismo día, horario y título) que la que se modifica. */
+  followingIds?: number[];
+  onSaved: () => void;
 }
 
-export const RegisterEventModal: React.FC<RegisterEventModalProps> = ({
+export const EventFormModal: React.FC<EventFormModalProps> = ({
   isOpen,
   onClose,
   courses,
   defaultCourseId,
   defaultDate,
-  onCreated,
+  editing = null,
+  followingIds = [],
+  onSaved,
 }) => {
   const { success } = useToast();
+  const isEditing = editing !== null;
 
   const [kind, setKind] = useState<Kind>('class');
   const [courseId, setCourseId] = useState('');
@@ -138,31 +167,41 @@ export const RegisterEventModal: React.FC<RegisterEventModalProps> = ({
   // Entrega
   const [dueTime, setDueTime] = useState('');
   const [description, setDescription] = useState('');
+  // Al modificar una clase semanal: solo esa o también las siguientes de la serie
+  const [scope, setScope] = useState<'one' | 'following'>('one');
 
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Cada vez que se abre, el formulario arranca vacío con la fecha y el curso lectivo sugeridos
+  // Cada vez que se abre, el formulario arranca vacío con la fecha y el curso lectivo sugeridos, o con
+  // los datos del evento que se modifica
   useEffect(() => {
     if (!isOpen) return;
-    setKind('class');
-    setCourseId(defaultCourseId ? String(defaultCourseId) : '');
-    setDate(defaultDate);
-    setTitle('');
-    setStartTime('');
-    setEndTime('');
-    setModality('in_person');
-    setLocation('');
-    setMeetingUrl('');
+    const isClass = editing?.kind !== 'delivery';
+    setKind(editing?.kind ?? 'class');
+    setCourseId(editing ? String(editing.id_section_year) : defaultCourseId ? String(defaultCourseId) : '');
+    setDate(editing?.date ?? defaultDate);
+    setTitle(editing?.title ?? '');
+    setStartTime(editing && isClass ? editing.start ?? '' : '');
+    setEndTime(editing && isClass ? editing.end ?? '' : '');
+    setModality(editing?.modality ?? 'in_person');
+    setLocation(editing?.location ?? '');
+    setMeetingUrl(editing?.meeting_url ?? '');
     setRepeat(false);
     setWeekdays([]);
     setUntil('');
-    setDueTime('');
-    setDescription('');
+    setDueTime(editing && !isClass ? editing.start ?? '' : '');
+    setDescription(editing?.description ?? '');
+    setScope('one');
     setSubmitted(false);
     setFormError(null);
-  }, [isOpen, defaultCourseId, defaultDate]);
+  }, [isOpen, defaultCourseId, defaultDate, editing]);
+
+  const typeChanged = isEditing && kind !== editing.kind;
+  const dateChanged = isEditing && date !== editing.date;
+  // "Esta y las siguientes" solo para una clase que sigue siendo clase y no cambia de fecha
+  const canChooseScope = isEditing && editing.kind === 'class' && !typeChanged && followingIds.length > 0;
 
   const courseOptions = useMemo(
     () =>
@@ -194,7 +233,10 @@ export const RegisterEventModal: React.FC<RegisterEventModalProps> = ({
   if (!date) errors.date = 'Ingrese la fecha';
   else if (course && date.slice(0, 4) !== String(course.year))
     errors.date = `Debe ser del año del curso lectivo (${course.year})`;
-  else if (holidays[date]) errors.date = `Es feriado: ${holidays[date]}`;
+  // El domingo y los feriados no son días hábiles. Un evento que ya estaba en esa fecha se puede
+  // modificar sin moverlo.
+  else if (isoWeekday(date) === SUNDAY && (!isEditing || dateChanged)) errors.date = 'Es domingo: elija un día hábil';
+  else if (holidays[date] && (!isEditing || dateChanged)) errors.date = `Es feriado: ${holidays[date]}`;
   if (kind === 'class') {
     if (!startTime) errors.startTime = 'Ingrese la hora';
     if (!endTime) errors.endTime = 'Ingrese la hora';
@@ -234,24 +276,77 @@ export const RegisterEventModal: React.FC<RegisterEventModalProps> = ({
     let sentDates: string[] = [];
     try {
       const id = course.id_section_year;
+      const classFields = {
+        start_time: startTime,
+        end_time: endTime,
+        modality,
+        title: title.trim() || null,
+        // Se manda solo el lugar de la modalidad elegida; el de la otra queda vacío
+        location: modality === 'in_person' ? location.trim() || null : null,
+        meeting_url: modality === 'virtual' ? meetingUrl.trim() || null : null,
+      };
+      const deliveryFields = {
+        title: title.trim(),
+        description: description.trim() || null,
+        due_date: date,
+        due_time: dueTime || null,
+      };
+
+      if (editing && !typeChanged) {
+        if (kind === 'delivery') {
+          await api.updateActivity(editing.id, deliveryFields);
+          success('Entrega modificada');
+        } else if (canChooseScope && scope === 'following' && !dateChanged) {
+          const ids = [editing.id, ...followingIds];
+          await api.updateCalendarClasses(id, { ids, changes: classFields });
+          success(`Se modificaron ${ids.length} clases`);
+        } else {
+          await api.updateCalendarClass(editing.id, { ...classFields, date });
+          success('Clase modificada');
+        }
+        onSaved();
+        onClose();
+        return;
+      }
+
+      if (editing && typeChanged) {
+        // Cambiar el tipo es registrar el evento nuevo y eliminar el anterior. Si no se puede eliminar,
+        // se deshace el alta para no dejar el evento repetido.
+        if (editing.kind === 'class') {
+          const attendance = await api.getClassAttendance(editing.id);
+          if (attendance.items.some((s) => s.present)) {
+            throw new FormError('La clase ya tiene asistencia tomada: no se puede cambiar a entrega.');
+          }
+          const created = await api.createActivity(id, deliveryFields);
+          try {
+            await api.deleteCalendarClass(editing.id);
+          } catch (err) {
+            await api.deleteActivity(created.id_activity).catch(() => undefined);
+            throw err;
+          }
+          success('El evento ahora es una entrega');
+        } else {
+          const created = await api.createCalendarClass(id, { ...classFields, date });
+          try {
+            await api.deleteActivity(editing.id);
+          } catch (err: any) {
+            await api.deleteCalendarClass(created.id_calendar_class).catch(() => undefined);
+            if (err?.status === 409)
+              throw new FormError('Los equipos ya cargaron datos en esta entrega: no se puede cambiar a clase.');
+            throw err;
+          }
+          success('El evento ahora es una clase');
+        }
+        onSaved();
+        onClose();
+        return;
+      }
+
       if (kind === 'delivery') {
-        await api.createActivity(id, {
-          title: title.trim(),
-          description: description.trim() || null,
-          due_date: date,
-          due_time: dueTime || null,
-        });
+        await api.createActivity(id, deliveryFields);
         success('Entrega registrada');
       } else {
-        const fields = {
-          start_time: startTime,
-          end_time: endTime,
-          modality,
-          title: title.trim() || null,
-          // Se manda solo el lugar de la modalidad elegida
-          location: modality === 'in_person' ? location.trim() || null : null,
-          meeting_url: modality === 'virtual' ? meetingUrl.trim() || null : null,
-        };
+        const fields = classFields;
         if (repeat) {
           const dates = repeatPlan?.dates ?? [];
           if (dates.length === 0) {
@@ -267,23 +362,35 @@ export const RegisterEventModal: React.FC<RegisterEventModalProps> = ({
           success('Clase registrada');
         }
       }
-      onCreated();
+      onSaved();
       onClose();
     } catch (err) {
-      setFormError(errorMessage(err, course, sentDates));
+      setFormError(err instanceof FormError ? err.message : errorMessage(err, course, isEditing, sentDates));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={() => !saving && onClose()} title="Registrar evento" maxWidth="lg">
+    <Modal
+      isOpen={isOpen}
+      onClose={() => !saving && onClose()}
+      title={isEditing ? 'Modificar evento' : 'Registrar evento'}
+      maxWidth="lg"
+    >
       {formError && <Alert className="mb-4">{formError}</Alert>}
 
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
         <div>
           <FieldLabel>Tipo de evento</FieldLabel>
           <SegmentedControl label="Tipo de evento" options={KIND_OPTIONS} value={kind} onChange={setKind} />
+          {typeChanged && (
+            <p className="mt-2 rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-xs text-warning">
+              {editing.kind === 'class'
+                ? 'Se va a registrar como entrega y se elimina la clase. Si la clase ya tiene asistencia tomada, no se puede cambiar.'
+                : 'Se va a registrar como clase y se elimina la entrega. Si los equipos ya cargaron datos en la entrega, no se puede cambiar.'}
+            </p>
+          )}
         </div>
 
         <Select
@@ -292,7 +399,8 @@ export const RegisterEventModal: React.FC<RegisterEventModalProps> = ({
           value={courseId}
           onChange={(e) => setCourseId(e.target.value)}
           error={show('course')}
-          disabled={saving}
+          helperText={isEditing ? 'El curso lectivo de un evento no se cambia.' : undefined}
+          disabled={saving || isEditing}
         >
           <option value="" disabled>
             Seleccione un curso lectivo
@@ -384,6 +492,42 @@ export const RegisterEventModal: React.FC<RegisterEventModalProps> = ({
               />
             )}
 
+            {canChooseScope && (
+              <fieldset className="rounded-lg border border-line p-3">
+                <legend className="px-1 text-sm font-medium text-ink">¿Qué clases se modifican?</legend>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm text-ink cursor-pointer">
+                    <input
+                      type="radio"
+                      name="evento-alcance"
+                      className="w-4 h-4 accent-primary"
+                      checked={scope === 'one' || dateChanged}
+                      onChange={() => setScope('one')}
+                      disabled={saving}
+                    />
+                    Solo esta clase
+                  </label>
+                  <label
+                    className={`flex items-center gap-2 text-sm ${dateChanged ? 'text-ink-faint' : 'text-ink cursor-pointer'}`}
+                  >
+                    <input
+                      type="radio"
+                      name="evento-alcance"
+                      className="w-4 h-4 accent-primary"
+                      checked={scope === 'following' && !dateChanged}
+                      onChange={() => setScope('following')}
+                      disabled={saving || dateChanged}
+                    />
+                    Esta y las {followingIds.length} siguientes del mismo día y horario
+                  </label>
+                </div>
+                {dateChanged && (
+                  <p className="mt-2 text-xs text-ink-muted">Al cambiar la fecha se modifica solo esta clase.</p>
+                )}
+              </fieldset>
+            )}
+
+            {!isEditing && (
             <div className="rounded-lg border border-line p-3 space-y-3">
               <label className="flex items-center gap-2 text-sm font-medium text-ink cursor-pointer">
                 <input
@@ -452,6 +596,7 @@ export const RegisterEventModal: React.FC<RegisterEventModalProps> = ({
                 </>
               )}
             </div>
+            )}
           </>
         ) : (
           <>
@@ -498,7 +643,7 @@ export const RegisterEventModal: React.FC<RegisterEventModalProps> = ({
             Cancelar
           </Button>
           <Button type="submit" variant="primary" isLoading={saving}>
-            Registrar
+            {isEditing ? 'Guardar' : 'Registrar'}
           </Button>
         </div>
       </form>

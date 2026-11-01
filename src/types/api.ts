@@ -404,6 +404,22 @@ export interface CalendarClassCreate {
   meeting_url?: string | null;
 }
 
+// Modificación de una clase: solo los campos enviados. `null` en título, aula o link los vacía.
+export type CalendarClassUpdate = Partial<CalendarClassCreate>;
+
+// Modificación de varias clases de un curso lectivo de una vez (la fecha no se cambia en lote). 409 si
+// alguna queda superpuesta: `detail` = [{date, detail}].
+export interface CalendarClassBulkUpdate {
+  ids: number[];
+  changes: Omit<CalendarClassUpdate, 'date'>;
+}
+
+// Asistencia de una clase (docente del curso lectivo o administrador): un ítem por alumno del curso
+export interface ClassAttendance {
+  session: { id_attendance_session: number; open: boolean } | null;
+  items: { id_student: number; present: boolean }[];
+}
+
 // Carga en lote del calendario de un curso lectivo: agrega las filas, todo o nada. 409 si alguna clase
 // se superpone con una existente: `detail` = [{kind, row, detail}], con `row` desde 1.
 export interface CalendarBulkLoad {
@@ -424,6 +440,9 @@ export interface ActivityCreate {
   due_date: string;
   due_time?: string | null;
 }
+
+// Modificación de una entrega: solo los campos enviados. `null` en descripción u hora los vacía.
+export type ActivityUpdate = Partial<ActivityCreate>;
 
 // `GET /section-years/{id}/calendar`: el calendario del curso lectivo con sus clases y actividades
 export interface CalendarWithClasses {

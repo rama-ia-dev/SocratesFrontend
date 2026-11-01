@@ -11,10 +11,10 @@ import { Modal } from '../components/ui/Modal';
 import { Alert } from '../components/ui/Alert';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { Table, TableHeader, TableRow, TableHead, TableCell } from '../components/ui/Table';
-import { RegisterEventModal } from '../components/RegisterEventModal';
+import { EditableEvent, EventFormModal } from '../components/EventFormModal';
 import { RegisterHolidaysModal } from '../components/RegisterHolidaysModal';
 import { SOURCE_TEXT, useHolidays } from '../lib/holidays';
-import { CalendarDays, CalendarX, ChevronLeft, ChevronRight, ExternalLink, MapPin, Plus, SearchX } from 'lucide-react';
+import { CalendarDays, CalendarX, ChevronLeft, ChevronRight, ExternalLink, MapPin, Pencil, Plus, SearchX } from 'lucide-react';
 
 const MONTHS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -42,10 +42,13 @@ const MODALITY_LABELS: Record<ClassModality, string> = {
 type CalendarEvent = {
   key: string;
   kind: EventKind;
+  id: number; // id_calendar_class o id_activity; 0 en los feriados
   date: string; // ISO
   start: string | null; // HH:MM
   end: string | null;
-  title: string;
+  title: string; // para mostrar ("Clase" si la clase no tiene título)
+  rawTitle: string | null; // el guardado
+  weekday?: number; // ISO, en las clases
   id_section_year: number;
   section_name: string;
   modality?: ClassModality;
@@ -119,10 +122,12 @@ const holidayEvents = (holidays: Record<string, string>, from: string, to: strin
     .map(([date, name]) => ({
       key: `holiday-${date}`,
       kind: 'holiday' as const,
+      id: 0,
       date,
       start: null,
       end: null,
       title: name,
+      rawTitle: name,
       id_section_year: 0,
       section_name: '',
     }));
@@ -134,10 +139,13 @@ const toEvents = (course: Course, cal: CalendarWithClasses): CalendarEvent[] => 
   ...cal.classes.map((c) => ({
     key: `class-${c.id_calendar_class}`,
     kind: 'class' as const,
+    id: c.id_calendar_class,
     date: c.date,
     start: hhmm(c.start_time),
     end: hhmm(c.end_time),
     title: c.title || 'Clase',
+    rawTitle: c.title ?? null,
+    weekday: c.weekday,
     id_section_year: course.id_section_year,
     section_name: course.section_name,
     modality: c.modality,
@@ -147,10 +155,12 @@ const toEvents = (course: Course, cal: CalendarWithClasses): CalendarEvent[] => 
   ...cal.activities.map((a) => ({
     key: `activity-${a.id_activity}`,
     kind: 'delivery' as const,
+    id: a.id_activity,
     date: a.due_date,
     start: hhmm(a.due_time),
     end: null,
     title: a.title,
+    rawTitle: a.title,
     id_section_year: course.id_section_year,
     section_name: course.section_name,
     description: a.description,
@@ -398,10 +408,68 @@ export const Calendar: React.FC = () => {
     [courses]
   );
   const canRegister = registrableCourses.length > 0;
-  // En un feriado no se registran eventos
+  // En un domingo o un feriado no se registran eventos: no son días hábiles
   const isHoliday = (iso: string) => Boolean(yearHolidays[iso] ?? listHolidays[iso]);
   const canRegisterOn = (iso: string) =>
-    canRegister && Number(iso.slice(0, 4)) >= today.getFullYear() && !isHoliday(iso);
+    canRegister && Number(iso.slice(0, 4)) >= today.getFullYear() && weekdayOf(iso) !== 0 && !isHoliday(iso);
+  const nextWorkingDay = (iso: string) => {
+    let day = iso;
+    // Un feriado nunca cae más de unos pocos días seguidos: alcanza con mirar dos semanas
+    for (let i = 0; i < 14 && (weekdayOf(day) === 0 || isHoliday(day)); i++) day = addDays(day, 1);
+    return day;
+  };
+
+  // ===== Modificar evento =====
+  // Se modifican las clases y entregas de los cursos lectivos en los que se puede registrar
+  const [editingSource, setEditingSource] = useState<CalendarEvent | null>(null);
+  const canEdit = (ev: CalendarEvent) =>
+    ev.kind !== 'holiday' && registrableCourses.some((c) => c.id_section_year === ev.id_section_year);
+  const openEdit = (ev: CalendarEvent) => {
+    setDetail(null);
+    setEditingSource(ev);
+  };
+  const setEditingEvent = (ev: CalendarEvent | null) => setEditingSource(ev);
+
+  const editingEvent = useMemo<EditableEvent | null>(
+    () =>
+      editingSource && editingSource.kind !== 'holiday'
+        ? {
+            kind: editingSource.kind,
+            id: editingSource.id,
+            id_section_year: editingSource.id_section_year,
+            date: editingSource.date,
+            start: editingSource.start,
+            end: editingSource.end,
+            title: editingSource.rawTitle,
+            modality: editingSource.modality,
+            location: editingSource.location,
+            meeting_url: editingSource.meeting_url,
+            description: editingSource.description,
+          }
+        : null,
+    [editingSource]
+  );
+
+  // Clases posteriores de la misma serie semanal: mismo curso lectivo, día, horario y título. Se buscan
+  // en el año cargado del calendario y en el listado.
+  const followingIds = useMemo(() => {
+    const ev = editingSource;
+    if (!ev || ev.kind !== 'class') return [];
+    const seen = new Map<string, CalendarEvent>();
+    for (const e of [...events, ...(listEvents ?? [])]) seen.set(e.key, e);
+    return [...seen.values()]
+      .filter(
+        (e) =>
+          e.kind === 'class' &&
+          e.id_section_year === ev.id_section_year &&
+          e.date > ev.date &&
+          e.weekday === ev.weekday &&
+          e.start === ev.start &&
+          e.end === ev.end &&
+          e.rawTitle === ev.rawTitle
+      )
+      .map((e) => e.id);
+  }, [editingSource, events, listEvents]);
 
   // Registrar feriados: solo el administrador
   const [holidaysOpen, setHolidaysOpen] = useState(false);
@@ -439,8 +507,10 @@ export const Calendar: React.FC = () => {
               )}
               <Button
                 className="w-full sm:w-auto"
-                // Hoy, o el primer día del mes que se ve si es de un año posterior
-                onClick={() => openRegister(viewYear > today.getFullYear() ? toIso(viewYear, viewMonth, 1) : todayIso)}
+                // Hoy, o el primer día del mes que se ve si es de un año posterior; si no es hábil, el siguiente
+                onClick={() =>
+                  openRegister(nextWorkingDay(viewYear > today.getFullYear() ? toIso(viewYear, viewMonth, 1) : todayIso))
+                }
               >
                 <Plus className="w-4 h-4" aria-hidden />
                 Registrar evento
@@ -853,6 +923,14 @@ export const Calendar: React.FC = () => {
                   <EventPlace ev={ev} />
                 </div>
               )}
+              {canEdit(ev) && (
+                <div className="mt-2">
+                  <Button variant="outline" size="sm" onClick={() => openEdit(ev)}>
+                    <Pencil className="w-3.5 h-3.5" aria-hidden />
+                    Modificar
+                  </Button>
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -869,13 +947,18 @@ export const Calendar: React.FC = () => {
         </div>
       </Modal>
 
-      <RegisterEventModal
-        isOpen={registerDate !== null}
-        onClose={() => setRegisterDate(null)}
+      <EventFormModal
+        isOpen={registerDate !== null || editingEvent !== null}
+        onClose={() => {
+          setRegisterDate(null);
+          setEditingEvent(null);
+        }}
         courses={registrableCourses}
         defaultCourseId={registerCourseId}
         defaultDate={registerDate ?? ''}
-        onCreated={retry}
+        editing={editingEvent}
+        followingIds={followingIds}
+        onSaved={retry}
       />
 
       {isSuperAdmin && (
