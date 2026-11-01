@@ -364,3 +364,40 @@ export interface ProjectList {
   limit: number;
   offset: number;
 }
+
+export type ClassModality = 'in_person' | 'virtual';
+
+// Clase concreta del calendario de un curso lectivo (una fila por fecha). Las horas vienen como
+// "HH:MM:SS", en hora local.
+export interface CalendarClassPublic {
+  id_calendar_class: number;
+  id_calendar: number;
+  date: string;
+  weekday: number; // ISO: 1 = lunes ... 7 = domingo
+  start_time: string;
+  end_time: string;
+  modality: ClassModality;
+  title?: string | null;
+  location?: string | null;
+  meeting_url?: string | null;
+}
+
+// Actividad (entrega) del curso lectivo completo
+export interface ActivityPublic {
+  id_activity: number;
+  id_calendar: number;
+  id_section_year: number;
+  title: string;
+  description?: string | null;
+  due_date: string;
+  due_time?: string | null;
+}
+
+// `GET /section-years/{id}/calendar`: el calendario del curso lectivo con sus clases y actividades
+export interface CalendarWithClasses {
+  id_calendar: number;
+  id_section_year: number;
+  timezone: string;
+  classes: CalendarClassPublic[];
+  activities: ActivityPublic[];
+}

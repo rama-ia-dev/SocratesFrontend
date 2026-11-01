@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Shield,
   BarChart3,
+  CalendarDays,
 } from 'lucide-react';
 
 interface NavItem {
@@ -73,6 +74,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       return [
         { label: 'Comisiones', path: '/comisiones', icon: Layers },
         { label: 'Estado de la cátedra', path: '/catedra', icon: BarChart3 },
+        { label: 'Calendario', path: '/calendario', icon: CalendarDays },
         // Las pantallas de estudiantes y docentes se abren desde Usuarios
         { label: 'Usuarios', path: '/usuarios', icon: Users, also: ['/estudiantes', '/docentes'] },
         { label: 'Equipos de trabajo', path: '/equipos', icon: FolderKanban },
@@ -83,6 +85,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       return [
         { label: 'Estudiantes', path: '/estudiantes', icon: GraduationCap },
         { label: 'Equipos de trabajo', path: '/equipos', icon: FolderKanban },
+        { label: 'Calendario', path: '/calendario', icon: CalendarDays },
       ];
     }
 

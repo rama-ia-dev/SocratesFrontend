@@ -11,6 +11,7 @@ import { Home } from './pages/Home';
 import { Profile } from './pages/Profile';
 import { Sections } from './pages/Sections';
 import { ChairOverview } from './pages/ChairOverview';
+import { Calendar } from './pages/Calendar';
 import { Professors } from './pages/Professors';
 import { Students } from './pages/Students';
 import { RegisterStudents } from './pages/RegisterStudents';
@@ -139,6 +140,16 @@ export default function App() {
               element={
                 <ProtectedRoute allowedRoles={['superadmin']}>
                   <ChairOverview />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Calendario: clases y entregas (Profesor y super admin) */}
+            <Route
+              path="/calendario"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin', 'professor']}>
+                  <Calendar />
                 </ProtectedRoute>
               }
             />
