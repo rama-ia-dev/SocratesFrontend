@@ -402,10 +402,12 @@ export const Calendar: React.FC = () => {
   // ===== Registrar evento =====
   // Fecha con la que se abre el formulario; null = cerrado
   const [registerDate, setRegisterDate] = useState<string | null>(null);
-  // Solo se registran eventos en cursos lectivos del año en curso o posteriores
+  // Solo el docente y el administrador registran (y, más adelante, modifican y eliminan) eventos, y
+  // solo en cursos lectivos del año en curso o posteriores. El alumno solo consulta.
+  const canManage = isSuperAdmin || user?.role === 'professor';
   const registrableCourses = useMemo(
-    () => (courses ?? []).filter((c) => c.year >= today.getFullYear()),
-    [courses]
+    () => (canManage ? (courses ?? []).filter((c) => c.year >= today.getFullYear()) : []),
+    [courses, canManage]
   );
   const canRegister = registrableCourses.length > 0;
   // En un domingo o un feriado no se registran eventos: no son días hábiles
@@ -577,7 +579,8 @@ export const Calendar: React.FC = () => {
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
-          <div className="flex items-center gap-2 ml-auto">
+          {/* En celular, "Hoy" baja de línea en lugar de pasarse del ancho de la pantalla */}
+          <div className="flex flex-wrap items-center gap-2 ml-auto">
             <div className="w-36">
               <Select
                 aria-label="Mes"
