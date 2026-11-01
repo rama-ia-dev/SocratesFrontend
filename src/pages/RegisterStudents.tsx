@@ -144,8 +144,7 @@ export const RegisterStudents: React.FC = () => {
         id_section_year: Number(course),
       });
       success('Estudiante registrado. Recibirá un correo de bienvenida');
-      if (user?.is_super_admin) navigate(listPath);
-      else [legajo, firstName, lastName, birthDate, enrollmentYear].forEach((f) => f.reset());
+      navigate(listPath);
     } catch (err: any) {
       // POST /students responde el legajo repetido como 422 con la lista de filas ({row, legajo, detail})
       const rows = Array.isArray(err.detail) ? err.detail : err.errors;
@@ -224,8 +223,7 @@ export const RegisterStudents: React.FC = () => {
           ? '1 estudiante registrado. Recibirá un correo de bienvenida'
           : `${students.length} estudiantes registrados. Recibirán un correo de bienvenida`
       );
-      if (user?.is_super_admin) navigate(listPath);
-      else handleRemoveFile();
+      navigate(listPath);
     } catch (err: any) {
       // Errores por fila (legajo ya registrado): la fila del backend es la posición en el lote.
       // Se marcan en la tabla como los demás; el aviso de "todo o nada" ya explica que no se
