@@ -18,8 +18,8 @@ const MAX_QUANTITY = 50; // límite del backend por pedido
 const MAX_GROUP_NUMBER = 9999;
 
 // Crear equipos de trabajo (SCRUM-102). El backend crea equipos vacíos y sin asegurar en un curso
-// lectivo: uno con número elegido (o el siguiente libre) o varios consecutivos. Puede hacerlo un
-// docente del curso lectivo o un super administrador.
+// lectivo: uno con número elegido (o el primero libre) o varios en los primeros libres. Puede hacerlo un
+// docente del curso lectivo o un administrador.
 export const CreateTeamsModal: React.FC<{
   onClose: () => void;
   onCreated: (created: ProjectPublic[]) => void;
@@ -35,7 +35,7 @@ export const CreateTeamsModal: React.FC<{
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // El super administrador puede crear en cualquier curso lectivo; el docente, solo en los suyos.
+  // El administrador puede crear en cualquier curso lectivo; el docente, solo en los suyos.
   useEffect(() => {
     if (!user) return;
     const load = user.is_super_admin
@@ -105,7 +105,7 @@ export const CreateTeamsModal: React.FC<{
         <Alert>No se pudieron cargar sus cursos lectivos. Cierre y vuelva a intentarlo.</Alert>
       ) : courses && courses.length === 0 ? (
         <Alert tone="info">
-          No tiene cursos lectivos asignados. Un super administrador tiene que asignarlo a una comisión
+          No tiene cursos lectivos asignados. Un administrador tiene que asignarlo a una comisión
           para que pueda crear equipos.
         </Alert>
       ) : (
@@ -130,7 +130,7 @@ export const CreateTeamsModal: React.FC<{
             onChange={(e) => setQuantity(digitsOnly(e.target.value))}
             disabled={isSaving}
             error={touched ? quantityError ?? undefined : undefined}
-            helperText={`De 1 a ${MAX_QUANTITY}. Se numeran a partir del siguiente número libre`}
+            helperText={`De 1 a ${MAX_QUANTITY}. Toman los primeros números libres del curso lectivo`}
           />
 
           {qty === 1 && (
@@ -139,7 +139,7 @@ export const CreateTeamsModal: React.FC<{
               optional
               inputMode="numeric"
               maxLength={4}
-              placeholder="Automático (el siguiente libre)"
+              placeholder="Automático (el primero libre)"
               value={groupNumber}
               onChange={(e) => setGroupNumber(digitsOnly(e.target.value))}
               disabled={isSaving}

@@ -35,11 +35,12 @@ const MIN_ENROLLMENT_YEAR = 1950;
  * Diálogo "Modificar estudiante" (SCRUM-98), compartido por Usuarios y Estudiantes.
  * Se monta con la clave del alumno, así cada apertura arranca con sus datos.
  *
- * Si se conoce la fecha de nacimiento (Usuarios, super administrador), viene cargada y es
+ * Si se conoce la fecha de nacimiento (Usuarios, administrador), viene cargada y es
  * obligatoria: el año de ingreso se valida contra ella y se bloquea si se borra. El backend no
  * le muestra la fecha al docente, así que desde Estudiantes el campo no aparece (no se puede
- * modificar un dato que no se ve) y el año se valida entre 1950 y el actual. La fecha la cambia
- * el alumno desde Mi perfil o el super administrador desde Usuarios.
+ * modificar un dato que no se ve) y el año se valida entre 1950 y el actual; que el alumno tenga
+ * 18 años en ese año lo controla el backend y el error se muestra en el campo. La fecha la cambia
+ * el alumno desde Mi perfil o el administrador desde Usuarios.
  */
 export const EditStudentModal: React.FC<{
   student: EditableStudent;
@@ -96,8 +97,15 @@ export const EditStudentModal: React.FC<{
       onSaved();
       onClose();
     } catch (err: any) {
+      // El backend controla la mayoría de edad aunque el docente no vea la fecha de nacimiento:
+      // llega como texto o, desde la validación de campos, dentro de la lista
+      const tooYoung = (Array.isArray(err.detail) ? err.detail.map((d: any) => d?.msg).join(' ') : String(err.message || '')).includes(
+        'at least 18'
+      );
       // El único 409 de esta ruta es el legajo repetido: se marca en el campo
       if (err.status === 409) legajo.reject('Ya existe un alumno con ese legajo');
+      else if (err.status === 422 && tooYoung)
+        enrollmentYear.reject('Con ese año de ingreso, el alumno no tendría 18 años al ingresar');
       // Un rechazo de validación llega como lista de campos: no se muestra crudo
       else if (Array.isArray(err.detail)) setError('Error al actualizar estudiante. Revise los datos e intente de nuevo');
       else setError(err.message || 'Error al actualizar estudiante');

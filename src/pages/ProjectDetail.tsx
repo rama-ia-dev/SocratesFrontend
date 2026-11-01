@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, CloudOff, Lock, Mail, RefreshCw, SearchX } from 'lucide-react';
+import { ArrowLeft, CloudOff, Lock, Mail, Pencil, RefreshCw, SearchX, ShieldCheck, ShieldOff, UserPlus } from 'lucide-react';
 import { api } from '../lib/api';
-import type { ProjectMember, ProjectOverview, SectionYearPublic } from '../types/api';
+import type { MyProject, ProjectMember, ProjectOverview, SectionYearPublic } from '../types/api';
 import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -10,6 +10,9 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
 import { TeamSizeModal } from '../components/TeamSizeModal';
+import { EditProjectModal } from '../components/EditProjectModal';
+import { AddMemberModal } from '../components/AddMemberModal';
+import { MoveMemberModal } from '../components/MoveMemberModal';
 import { useAuth } from '../context/AuthContext';
 import { PRIVACY_HELP, PRIVACY_LABEL, STATUS_VARIANT, studentEmail, teamLabel } from '../lib/projects';
 
@@ -33,7 +36,9 @@ const Members: React.FC<{
   members: ProjectMember[];
   cupo?: React.ReactNode;
   action?: (m: ProjectMember) => React.ReactNode;
-}> = ({ members, cupo, action }) => {
+  /** Acción sobre todo el equipo, debajo del cupo (asegurarlo). */
+  teamAction?: React.ReactNode;
+}> = ({ members, cupo, action, teamAction }) => {
   const sorted = [...members].sort((a, b) => Number(b.is_leader) - Number(a.is_leader));
   return (
     <section className="rounded-xl border border-line bg-white">
@@ -41,7 +46,12 @@ const Members: React.FC<{
         <h2 className="text-[15px] font-semibold text-ink">
           Integrantes <span className="font-normal text-ink-muted">({members.length})</span>
         </h2>
-        {cupo && <p className="text-sm text-ink-muted">{cupo}</p>}
+        {(cupo || teamAction) && (
+          <div className="flex flex-col sm:items-end gap-2">
+            {cupo && <p className="text-sm text-ink-muted">{cupo}</p>}
+            {teamAction}
+          </div>
+        )}
       </div>
       {sorted.length === 0 ? (
         <p className="px-5 sm:px-6 pt-1.5 pb-4 text-sm italic text-ink-subtle">Todavía no se sumó ningún alumno</p>
@@ -78,6 +88,20 @@ const Members: React.FC<{
   );
 };
 
+// Error del backend al pedir sumarse, en palabras del alumno
+const joinError = (err: any): string => {
+  const detail = String(err.message || '');
+  if (err.status === 409) {
+    if (detail.includes('already requested'))
+      return 'Ya estuvo en este equipo: no puede volver a pedir sumarse';
+    if (detail.includes('already belong')) return 'Ya es parte de otro equipo de trabajo';
+    if (detail.includes('uninsured')) return 'El equipo ya está asegurado: no se suman integrantes';
+  }
+  if (err.status === 403) return 'Solo los alumnos pueden pedir sumarse a un equipo';
+  if (err.status === 404) return 'El equipo ya no existe';
+  return detail || 'No se pudo enviar la solicitud';
+};
+
 // Error del backend al aceptar o rechazar una solicitud, en palabras del usuario
 const decideError = (err: any): string => {
   const detail = String(err.message || '');
@@ -101,6 +125,44 @@ const leaderError = (err: any): string => {
   if (err.status === 403) return 'Solo el jefe del grupo puede pasar la jefatura';
   if (err.status === 404) return 'El integrante ya no está en el equipo';
   return detail || 'No se pudo pasar la jefatura';
+};
+
+// Error del backend al sacar a un integrante, en palabras del usuario
+const expelError = (err: any): string => {
+  const detail = String(err.message || '');
+  if (err.status === 409) {
+    if (detail.includes('uninsured')) return 'El equipo ya está asegurado: sus integrantes no se pueden cambiar';
+    if (detail.includes('cannot be expelled')) return 'El alumno ya no es integrante activo del equipo';
+  }
+  if (err.status === 403) return 'Solo los docentes del curso lectivo y el administrador pueden sacar integrantes';
+  if (err.status === 404) return 'El integrante ya no está en el equipo';
+  return detail || 'No se pudo sacar al integrante';
+};
+
+// Error del backend al asegurar el equipo, en palabras del usuario
+const insureError = (err: any): string => {
+  const detail = String(err.message || '');
+  if (err.status === 409) {
+    const min = detail.match(/At least (\d+)/);
+    if (min) return `Para asegurar el equipo hacen falta al menos ${min[1]} integrantes activos`;
+    const max = detail.match(/At most (\d+)/);
+    if (max) return `Para asegurar el equipo puede tener como máximo ${max[1]} integrantes activos`;
+    if (detail.includes('uninsured')) return 'El equipo ya está asegurado';
+  }
+  if (err.status === 403)
+    return 'Solo el jefe del grupo, los docentes del curso lectivo y el administrador pueden asegurar el equipo';
+  if (err.status === 404) return 'El equipo ya no existe';
+  return detail || 'No se pudo asegurar el equipo';
+};
+
+// Error del backend al desasegurar el equipo, en palabras del usuario
+const uninsureError = (err: any): string => {
+  const detail = String(err.message || '');
+  if (err.status === 409) return 'El equipo ya no está asegurado, o está aprobado o cancelado';
+  if (err.status === 403)
+    return 'Solo los docentes del curso lectivo y el administrador pueden desasegurar el equipo';
+  if (err.status === 404) return 'El equipo ya no existe';
+  return detail || 'No se pudo desasegurar el equipo';
 };
 
 // Solicitudes para sumarse (SCRUM-24): las ve y las decide solo el jefe del grupo
@@ -158,16 +220,18 @@ const Requests: React.FC<{
   </section>
 );
 
-// Detalle de un equipo de trabajo (SCRUM-105)
-export const ProjectDetail: React.FC = () => {
-  const { id } = useParams();
+// Detalle de un equipo de trabajo (SCRUM-105). Con `projectId` lo muestra Mi equipo (SCRUM-585),
+// sin el enlace para volver a la lista
+export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) => {
+  const params = useParams();
+  const id = projectId ?? params.id;
   const [project, setProject] = useState<ProjectOverview | null>(null);
   const [sectionYear, setSectionYear] = useState<SectionYearPublic | null>(null);
   const [state, setState] = useState<LoadState>('loading');
   const requestId = useRef(0);
   const { user } = useAuth();
   const { success, error: showError } = useToast();
-  // Cupo (SCRUM-19): el backend se lo permite solo al super administrador
+  // Cupo (SCRUM-19): el backend se lo permite solo al administrador
   const [isSizeOpen, setIsSizeOpen] = useState(false);
   // Solicitudes pendientes (SCRUM-24); null mientras no se sabe si el usuario es el jefe
   const [requests, setRequests] = useState<ProjectMember[] | null>(null);
@@ -176,6 +240,31 @@ export const ProjectDetail: React.FC = () => {
   const [newLeader, setNewLeader] = useState<ProjectMember | null>(null);
   const [isTransferring, setIsTransferring] = useState(false);
   const [transferError, setTransferError] = useState<string | null>(null);
+  // Sacar a un integrante (SCRUM-21): lo pueden los docentes del curso lectivo y el administrador
+  const [canManage, setCanManage] = useState(false);
+  const [toExpel, setToExpel] = useState<ProjectMember | null>(null);
+  const [isExpelling, setIsExpelling] = useState(false);
+  const [expelErrorText, setExpelErrorText] = useState<string | null>(null);
+  // Asegurar el equipo (SCRUM-23): el jefe, los docentes del curso lectivo y el administrador.
+  // `pendingCount` es null mientras se cuentan las solicitudes que se van a rechazar
+  const [isInsureOpen, setIsInsureOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState<number | null>(null);
+  const [isInsuring, setIsInsuring] = useState(false);
+  const [insureErrorText, setInsureErrorText] = useState<string | null>(null);
+  // Desasegurar el equipo (SCRUM-25): los docentes del curso lectivo y el administrador
+  const [isUninsureOpen, setIsUninsureOpen] = useState(false);
+  const [isUninsuring, setIsUninsuring] = useState(false);
+  const [uninsureErrorText, setUninsureErrorText] = useState<string | null>(null);
+  // Modificar el equipo (SCRUM-103): sus datos, sumar un alumno o moverlo a otro equipo del curso
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [toMove, setToMove] = useState<ProjectMember | null>(null);
+  // Pedir sumarse (SCRUM-20): el equipo y las solicitudes del alumno logueado (null si no es alumno
+  // o todavía no llegaron)
+  const [myProject, setMyProject] = useState<MyProject | null>(null);
+  const [isJoinOpen, setIsJoinOpen] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
+  const [joinErrorText, setJoinErrorText] = useState<string | null>(null);
 
   // `keep`: recarga después de una acción, sin vaciar la pantalla mientras llegan los datos nuevos
   const load = useCallback(async (keep = false) => {
@@ -185,6 +274,8 @@ export const ProjectDetail: React.FC = () => {
       setProject(null);
       setSectionYear(null);
       setRequests(null);
+      setCanManage(false);
+      setMyProject(null);
     }
     const idProject = Number(id);
     if (!Number.isInteger(idProject) || idProject <= 0) {
@@ -214,11 +305,25 @@ export const ProjectDetail: React.FC = () => {
       } else {
         setRequests(null);
       }
+      // Docente de este curso lectivo o administrador
+      if (user?.is_super_admin) setCanManage(true);
+      else if (user?.role === 'professor')
+        api
+          .getProfessorSectionYears({ id_professor: user.id_user, id_section_year: p.id_section_year, limit: 1 })
+          .then((r) => isCurrent() && setCanManage(r.total > 0))
+          .catch(() => isCurrent() && setCanManage(false));
+      else setCanManage(false);
+      // El alumno: si ya integra un equipo y qué solicitudes tiene, para saber si puede pedir sumarse
+      if (user?.role === 'student')
+        api
+          .getMyProject()
+          .then((mp) => isCurrent() && setMyProject(mp))
+          .catch(() => isCurrent() && setMyProject(null));
     } catch (err: any) {
       if (!isCurrent()) return;
       setState(err.status === 403 ? 'forbidden' : err.status === 404 ? 'not-found' : 'error');
     }
-  }, [id, user?.id_user]);
+  }, [id, user?.id_user, user?.role, user?.is_super_admin]);
 
   useEffect(() => {
     load();
@@ -258,7 +363,23 @@ export const ProjectDetail: React.FC = () => {
     }
   };
 
-  const back = (
+  const handleExpel = async () => {
+    if (!project || !toExpel) return;
+    setIsExpelling(true);
+    setExpelErrorText(null);
+    try {
+      await api.expelMember(project.id_project, toExpel.id_student_project);
+      success(`Se sacó a ${toExpel.first_name} ${toExpel.last_name} del equipo`);
+      setToExpel(null);
+      load(true);
+    } catch (err: any) {
+      setExpelErrorText(expelError(err));
+    } finally {
+      setIsExpelling(false);
+    }
+  };
+
+  const back = projectId === undefined && (
     <Link
       to="/equipos"
       className="inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-primary transition-colors duration-150"
@@ -267,6 +388,70 @@ export const ProjectDetail: React.FC = () => {
       Volver a equipos de trabajo
     </Link>
   );
+
+  // Al abrir la confirmación se cuentan las solicitudes pendientes, que el backend rechaza al asegurar
+  const openInsure = () => {
+    if (!project) return;
+    setInsureErrorText(null);
+    setPendingCount(null);
+    setIsInsureOpen(true);
+    api
+      .getProjectMembers(project.id_project, ['pending_approval'])
+      .then((r) => setPendingCount(r.total))
+      .catch(() => setPendingCount(null));
+  };
+
+  const handleJoin = async () => {
+    if (!project) return;
+    setIsJoining(true);
+    setJoinErrorText(null);
+    try {
+      const membership = await api.joinProject(project.id_project);
+      success(
+        membership.status.code === 'active'
+          ? `Se sumó al ${teamLabel(project)} como jefe del grupo`
+          : `Se envió su solicitud al jefe del ${teamLabel(project)}`
+      );
+      setIsJoinOpen(false);
+      load(true);
+    } catch (err: any) {
+      setJoinErrorText(joinError(err));
+    } finally {
+      setIsJoining(false);
+    }
+  };
+
+  const handleInsure = async () => {
+    if (!project) return;
+    setIsInsuring(true);
+    setInsureErrorText(null);
+    try {
+      await api.insureProject(project.id_project);
+      success(`Se aseguró el ${teamLabel(project)}`);
+      setIsInsureOpen(false);
+      load(true);
+    } catch (err: any) {
+      setInsureErrorText(insureError(err));
+    } finally {
+      setIsInsuring(false);
+    }
+  };
+
+  const handleUninsure = async () => {
+    if (!project) return;
+    setIsUninsuring(true);
+    setUninsureErrorText(null);
+    try {
+      await api.uninsureProject(project.id_project);
+      success(`Se desaseguró el ${teamLabel(project)}`);
+      setIsUninsureOpen(false);
+      load(true);
+    } catch (err: any) {
+      setUninsureErrorText(uninsureError(err));
+    } finally {
+      setIsUninsuring(false);
+    }
+  };
 
   if (state !== 'ok' || !project) {
     return (
@@ -281,7 +466,7 @@ export const ProjectDetail: React.FC = () => {
           <EmptyState
             icon={<Lock className="w-5 h-5" />}
             message="Este equipo es privado"
-            description="Solo lo ven sus integrantes, los docentes del curso y los super administradores."
+            description="Solo lo ven sus integrantes, los docentes del curso y los administradores."
           />
         ) : state === 'not-found' ? (
           <EmptyState
@@ -311,23 +496,135 @@ export const ProjectDetail: React.FC = () => {
     (m) => m.id_student === user?.id_user && m.is_leader && m.status.code === 'active'
   );
   const isFinal = project.status?.code === 'approved' || project.status?.code === 'cancelled';
+  const canTransfer = iAmLeader && !isFinal;
+  // Los docentes del curso y el administrador sacan, suman y mueven integrantes mientras el
+  // equipo no está asegurado
+  const canExpel = canManage && project.status?.code === 'uninsured';
+  // Los datos los cambian también sus integrantes (activos o que terminaron), salvo aprobado o cancelado
+  const iAmMember = project.members.some(
+    (m) => m.id_student === user?.id_user && ['active', 'finished'].includes(m.status.code)
+  );
+  const canEdit = (canManage || iAmMember) && !isFinal && !project.restricted;
   const memberAction =
-    iAmLeader && !isFinal
+    canTransfer || canExpel
       ? (m: ProjectMember) =>
-          !m.is_leader &&
           m.status.code === 'active' && (
-            <button
-              type="button"
-              onClick={() => {
-                setTransferError(null);
-                setNewLeader(m);
-              }}
-              className="text-sm text-primary font-medium hover:underline cursor-pointer"
-            >
-              Pasar la jefatura
-            </button>
+            <>
+              {canTransfer && !m.is_leader && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTransferError(null);
+                    setNewLeader(m);
+                  }}
+                  className="text-sm text-primary font-medium hover:underline cursor-pointer"
+                >
+                  Pasar la jefatura
+                </button>
+              )}
+              {canExpel && (
+                <button
+                  type="button"
+                  onClick={() => setToMove(m)}
+                  className="text-sm text-primary font-medium hover:underline cursor-pointer"
+                >
+                  Mover a otro equipo
+                </button>
+              )}
+              {canExpel && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExpelErrorText(null);
+                    setToExpel(m);
+                  }}
+                  className="text-sm text-danger font-medium hover:underline cursor-pointer"
+                >
+                  Sacar del equipo
+                </button>
+              )}
+            </>
           )
       : undefined;
+  // Asegurar (SCRUM-23): mientras el equipo está sin asegurar; fuera del cupo el botón explica por qué no
+  const canInsure = (iAmLeader || canManage) && project.status?.code === 'uninsured';
+  const activeCount = project.members.filter((m) => m.status.code === 'active').length;
+  const min = sectionYear?.min_students;
+  const max = sectionYear?.max_students;
+  const insureBlocked =
+    min !== undefined && activeCount < min
+      ? `${min - activeCount === 1 ? 'Falta 1 integrante activo' : `Faltan ${min - activeCount} integrantes activos`} para el mínimo de ${min}`
+      : max !== undefined && activeCount > max
+      ? `Tiene ${activeCount - max} ${activeCount - max === 1 ? 'integrante' : 'integrantes'} de más para el máximo de ${max}`
+      : null;
+  const insureAction = canInsure && (
+    <div className="flex flex-col sm:items-end gap-1">
+      <div className="flex flex-wrap gap-2 sm:justify-end">
+        {canExpel && (
+          <Button size="sm" variant="outline" onClick={() => setIsAddOpen(true)}>
+            <UserPlus className="w-4 h-4 mr-1.5" />
+            Sumar alumno
+          </Button>
+        )}
+        <Button size="sm" onClick={openInsure} disabled={insureBlocked !== null}>
+          <ShieldCheck className="w-4 h-4 mr-1.5" />
+          Asegurar equipo
+        </Button>
+      </div>
+      {insureBlocked && <p className="text-xs text-ink-muted">{insureBlocked}</p>}
+    </div>
+  );
+  // Desasegurar (SCRUM-25): asegurado y sin aprobar ni cancelar; el jefe no puede
+  const canUninsure = canManage && !isFinal && !!project.status && project.status.code !== 'uninsured';
+  const uninsureAction = canUninsure && (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={() => {
+        setUninsureErrorText(null);
+        setIsUninsureOpen(true);
+      }}
+    >
+      <ShieldOff className="w-4 h-4 mr-1.5" />
+      Desasegurar equipo
+    </Button>
+  );
+  // Pedir sumarse (SCRUM-20): el alumno, con el equipo sin asegurar, si no integra ningún equipo y no
+  // tiene una solicitud pendiente en este. Una solicitud rechazada se puede volver a enviar
+  const hasLeader = project.members.some((m) => m.is_leader && m.status.code === 'active');
+  const myRequestHere = myProject?.requests.find((r) => r.id_project === project.id_project);
+  const myOtherTeam =
+    myProject?.project && myProject.project.id_project !== project.id_project ? myProject.project : null;
+  const joinAction =
+    user?.role === 'student' &&
+    myProject !== null &&
+    !iAmMember &&
+    project.status?.code === 'uninsured' &&
+    (myOtherTeam ? (
+      <p className="text-sm text-ink-muted sm:text-right">
+        Ya es parte del {teamLabel(myOtherTeam)}: un alumno solo puede pertenecer a un equipo.
+      </p>
+    ) : myRequestHere?.status?.code === 'pending_approval' ? (
+      <p className="text-sm text-ink-muted sm:text-right">Su solicitud está pendiente: la decide el jefe del grupo.</p>
+    ) : (
+      <div className="flex flex-col sm:items-end gap-1">
+        <Button
+          size="sm"
+          onClick={() => {
+            setJoinErrorText(null);
+            setIsJoinOpen(true);
+          }}
+        >
+          <UserPlus className="w-4 h-4 mr-1.5" />
+          {myRequestHere ? 'Volver a pedir sumarse' : 'Pedir sumarse'}
+        </Button>
+        {myRequestHere && <p className="text-xs text-ink-muted">El jefe rechazó su solicitud anterior.</p>}
+      </div>
+    ));
+  // Si sale el jefe, el backend le pasa la jefatura al integrante activo más antiguo
+  const othersActive = toExpel
+    ? project.members.filter((m) => m.status.code === 'active' && m.id_student_project !== toExpel.id_student_project)
+    : [];
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -339,6 +636,12 @@ export const ProjectDetail: React.FC = () => {
           <Badge variant={project.privacy}>{PRIVACY_LABEL[project.privacy]}</Badge>
           {project.status && (
             <Badge variant={STATUS_VARIANT[project.status.code] ?? 'neutral'}>{project.status.name}</Badge>
+          )}
+          {canEdit && (
+            <Button size="sm" variant="outline" className="sm:ml-auto" onClick={() => setIsEditOpen(true)}>
+              <Pencil className="w-4 h-4 mr-1.5" />
+              Modificar datos
+            </Button>
           )}
         </div>
         <p className="mt-1.5 text-sm text-ink-muted">
@@ -365,7 +668,10 @@ export const ProjectDetail: React.FC = () => {
       <Members
         members={project.members}
         action={memberAction}
+        teamAction={insureAction || uninsureAction || joinAction}
+        // El cupo solo cuenta para asegurar: asegurado ya no aplica
         cupo={
+          project.status?.code === 'uninsured' &&
           sectionYear?.min_students !== undefined &&
           sectionYear.max_students !== undefined && (
             <>
@@ -414,6 +720,170 @@ export const ProjectDetail: React.FC = () => {
           </Button>
         </div>
       </Modal>
+
+      <Modal
+        isOpen={toExpel !== null}
+        onClose={() => !isExpelling && setToExpel(null)}
+        title="Sacar del equipo"
+      >
+        {expelErrorText && <Alert className="mb-4">{expelErrorText}</Alert>}
+        {toExpel && (
+          <div className="space-y-2 text-sm text-ink">
+            <p>
+              ¿Sacar a{' '}
+              <span className="font-semibold">
+                {toExpel.first_name} {toExpel.last_name}
+              </span>{' '}
+              del {teamLabel(project)}? Deja de ser integrante y queda libre para sumarse a otro equipo, pero no
+              puede volver a pedir sumarse a este.
+            </p>
+            {toExpel.is_leader && (
+              <p className="text-ink-muted">
+                {othersActive.length > 0
+                  ? 'Es el jefe del grupo: la jefatura pasa al integrante más antiguo del equipo.'
+                  : 'Es el jefe del grupo y el único integrante: el equipo queda sin jefe hasta que se sume otro alumno.'}
+              </p>
+            )}
+          </div>
+        )}
+        <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-line">
+          <Button type="button" variant="outline" onClick={() => setToExpel(null)} disabled={isExpelling}>
+            Cancelar
+          </Button>
+          <Button type="button" variant="destructive" onClick={handleExpel} isLoading={isExpelling}>
+            Sacar del equipo
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isInsureOpen}
+        onClose={() => !isInsuring && setIsInsureOpen(false)}
+        title="Asegurar el equipo"
+      >
+        {insureErrorText && <Alert className="mb-4">{insureErrorText}</Alert>}
+        <div className="space-y-2 text-sm text-ink">
+          <p>
+            ¿Asegurar el {teamLabel(project)} con sus {activeCount}{' '}
+            {activeCount === 1 ? 'integrante' : 'integrantes'}? El equipo queda conformado: no se suma nadie más y no se
+            puede sacar a ningún integrante mientras siga asegurado.
+          </p>
+          {pendingCount !== null && pendingCount > 0 && (
+            <p className="text-ink-muted">
+              {pendingCount === 1
+                ? 'Se rechaza la solicitud pendiente para sumarse.'
+                : `Se rechazan las ${pendingCount} solicitudes pendientes para sumarse.`}
+            </p>
+          )}
+          <p className="text-ink-muted">
+            Después de asegurarlo, la privacidad se puede cambiar con Modificar datos.
+          </p>
+        </div>
+        <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-line">
+          <Button type="button" variant="outline" onClick={() => setIsInsureOpen(false)} disabled={isInsuring}>
+            Cancelar
+          </Button>
+          <Button type="button" onClick={handleInsure} isLoading={isInsuring}>
+            Asegurar equipo
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isUninsureOpen}
+        onClose={() => !isUninsuring && setIsUninsureOpen(false)}
+        title="Desasegurar el equipo"
+      >
+        {uninsureErrorText && <Alert className="mb-4">{uninsureErrorText}</Alert>}
+        <div className="space-y-2 text-sm text-ink">
+          <p>
+            ¿Volver a abrir el {teamLabel(project)}? Se van a poder sumar, mover y sacar integrantes, y los alumnos
+            van a poder pedir sumarse.
+          </p>
+          <p className="text-ink-muted">
+            Mientras tanto, cualquier usuario ve el detalle del proyecto. Cuando se asegure de nuevo, retoma el
+            estado {project.status?.name} y su privacidad.
+          </p>
+        </div>
+        <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-line">
+          <Button type="button" variant="outline" onClick={() => setIsUninsureOpen(false)} disabled={isUninsuring}>
+            Cancelar
+          </Button>
+          <Button type="button" onClick={handleUninsure} isLoading={isUninsuring}>
+            Desasegurar equipo
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isJoinOpen}
+        onClose={() => !isJoining && setIsJoinOpen(false)}
+        title={`Sumarse al ${teamLabel(project)}`}
+      >
+        {joinErrorText && <Alert className="mb-4">{joinErrorText}</Alert>}
+        <div className="space-y-2 text-sm text-ink">
+          {hasLeader ? (
+            <>
+              <p>¿Pedir sumarse al {teamLabel(project)}? El jefe del grupo decide si lo acepta.</p>
+              <p className="text-ink-muted">Si lo aceptan, sus solicitudes a otros equipos se rechazan.</p>
+            </>
+          ) : (
+            <>
+              <p>
+                ¿Sumarse al {teamLabel(project)}? Todavía no tiene integrantes: entra directamente como jefe del
+                grupo y decide quién más se suma.
+              </p>
+              <p className="text-ink-muted">Sus solicitudes a otros equipos se rechazan.</p>
+            </>
+          )}
+        </div>
+        <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-line">
+          <Button type="button" variant="outline" onClick={() => setIsJoinOpen(false)} disabled={isJoining}>
+            Cancelar
+          </Button>
+          <Button type="button" onClick={handleJoin} isLoading={isJoining}>
+            {hasLeader ? 'Pedir sumarse' : 'Sumarse como jefe'}
+          </Button>
+        </div>
+      </Modal>
+
+      {isEditOpen && (
+        <EditProjectModal
+          project={project}
+          onClose={() => setIsEditOpen(false)}
+          onSaved={() => {
+            setIsEditOpen(false);
+            success(`Se guardaron los datos del ${teamLabel(project)}`);
+            load(true);
+          }}
+        />
+      )}
+
+      {isAddOpen && (
+        <AddMemberModal
+          project={project}
+          onClose={() => setIsAddOpen(false)}
+          onAdded={(name) => {
+            setIsAddOpen(false);
+            success(`${name} se sumó al ${teamLabel(project)}`);
+            load(true);
+          }}
+        />
+      )}
+
+      {toMove && (
+        <MoveMemberModal
+          project={project}
+          member={toMove}
+          onClose={() => setToMove(null)}
+          onChanged={() => load(true)}
+          onMoved={(message) => {
+            setToMove(null);
+            success(message);
+            load(true);
+          }}
+        />
+      )}
 
       {isSizeOpen && sectionYear && (
         <TeamSizeModal

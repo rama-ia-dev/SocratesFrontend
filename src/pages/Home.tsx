@@ -6,6 +6,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { ChairDashboard } from './ChairDashboard';
 import {
   GraduationCap,
+  Users,
   ChevronRight,
   Compass,
   FolderKanban,
@@ -44,6 +45,12 @@ export const Home: React.FC = () => {
     // Alumno
     return [
       {
+        title: 'Mi equipo',
+        desc: 'Su equipo de trabajo o, mientras no sea parte de uno, sus solicitudes para sumarse.',
+        path: '/mi-equipo',
+        icon: Users,
+      },
+      {
         title: 'Equipos de trabajo',
         desc: 'Equipos de trabajo de la cátedra y sus proyectos.',
         path: '/equipos',
@@ -52,7 +59,7 @@ export const Home: React.FC = () => {
     ];
   };
 
-  // El super administrador entra directo al dashboard de la cátedra
+  // El administrador entra directo al dashboard de la cátedra
   if (user?.is_super_admin) {
     return <ChairDashboard subtitle={`${greeting()}, ${user.first_name}`} />;
   }

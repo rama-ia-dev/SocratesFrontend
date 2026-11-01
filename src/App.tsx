@@ -11,12 +11,14 @@ import { Home } from './pages/Home';
 import { Profile } from './pages/Profile';
 import { Sections } from './pages/Sections';
 import { ChairOverview } from './pages/ChairOverview';
+import { Calendar } from './pages/Calendar';
 import { Professors } from './pages/Professors';
 import { Students } from './pages/Students';
 import { RegisterStudents } from './pages/RegisterStudents';
 import { Users } from './pages/Users';
 import { Projects } from './pages/Projects';
 import { ProjectDetail } from './pages/ProjectDetail';
+import { MyTeam } from './pages/MyTeam';
 
 // Guardia de autenticación y rol
 const ProtectedRoute: React.FC<{
@@ -142,6 +144,16 @@ export default function App() {
               }
             />
 
+            {/* Calendario: clases y entregas (Profesor y super admin) */}
+            <Route
+              path="/calendario"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin', 'professor']}>
+                  <Calendar />
+                </ProtectedRoute>
+              }
+            />
+
             {/* P6: Docentes (Solo super admin) */}
             <Route
               path="/docentes"
@@ -164,7 +176,7 @@ export default function App() {
             <Route
               path="/estudiantes/nuevo"
               element={
-                <ProtectedRoute allowedRoles={['superadmin']}>
+                <ProtectedRoute allowedRoles={['superadmin', 'professor']}>
                   <RegisterStudents />
                 </ProtectedRoute>
               }
@@ -194,6 +206,16 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <ProjectDetail />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Mi equipo (Solo alumnos) */}
+            <Route
+              path="/mi-equipo"
+              element={
+                <ProtectedRoute allowedRoles={['student']}>
+                  <MyTeam />
                 </ProtectedRoute>
               }
             />

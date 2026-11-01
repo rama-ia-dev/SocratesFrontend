@@ -12,7 +12,7 @@ export const PRIVACY_LABEL: Record<ProjectPrivacy, string> = {
 export const PRIVACY_HELP: Record<ProjectPrivacy, string> = {
   public: 'Cualquier usuario ve el detalle del proyecto',
   protected: 'Fuera del equipo y de sus docentes, solo se ven los datos básicos',
-  private: 'Solo lo ven sus integrantes, los docentes del curso y los super administradores',
+  private: 'Solo lo ven sus integrantes, los docentes del curso y los administradores',
 };
 
 // Color del estado del equipo según su código. Sin asegurar (`uninsured`) y cualquier estado

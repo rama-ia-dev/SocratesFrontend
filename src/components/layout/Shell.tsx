@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Shield,
   BarChart3,
+  CalendarDays,
   LayoutDashboard,
 } from 'lucide-react';
 
@@ -75,6 +76,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         { label: 'Dashboard de la cátedra', path: '/', icon: LayoutDashboard },
         { label: 'Comisiones', path: '/comisiones', icon: Layers },
         { label: 'Estado de la cátedra', path: '/catedra', icon: BarChart3 },
+        { label: 'Calendario', path: '/calendario', icon: CalendarDays },
         // Las pantallas de estudiantes y docentes se abren desde Usuarios
         { label: 'Usuarios', path: '/usuarios', icon: Users, also: ['/estudiantes', '/docentes'] },
         { label: 'Equipos de trabajo', path: '/equipos', icon: FolderKanban },
@@ -85,17 +87,21 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       return [
         { label: 'Estudiantes', path: '/estudiantes', icon: GraduationCap },
         { label: 'Equipos de trabajo', path: '/equipos', icon: FolderKanban },
+        { label: 'Calendario', path: '/calendario', icon: CalendarDays },
       ];
     }
 
     // Alumno
-    return [{ label: 'Equipos de trabajo', path: '/equipos', icon: FolderKanban }];
+    return [
+      { label: 'Mi equipo', path: '/mi-equipo', icon: Users },
+      { label: 'Equipos de trabajo', path: '/equipos', icon: FolderKanban },
+    ];
   };
 
   const navItems = getNavItems();
 
   const roleLabel = user?.is_super_admin
-    ? 'Super administrador'
+    ? 'Administrador'
     : user?.role === 'professor'
     ? 'Docente'
     : 'Alumno';

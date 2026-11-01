@@ -63,6 +63,8 @@ export interface StudentCreate {
   legajo: number;
   birth_date: string;
   enrollment_year: number;
+  // Curso lectivo en el que se inscribe (su cursada)
+  id_section_year?: number;
 }
 
 export interface StudentBulkCreate {
@@ -296,6 +298,35 @@ export interface StudentProjectPublic {
   status: StatusPublic;
 }
 
+// `PATCH /projects/{id}`: solo los campos que cambian; un texto en null se borra
+export interface ProjectUpdate {
+  name?: string | null;
+  description?: string | null;
+  objective?: string | null;
+  problem?: string | null;
+  privacy?: ProjectPrivacy;
+}
+
+// `GET /student-section-years`: la cursada de un alumno en un curso lectivo
+export interface StudentSectionYearPublic {
+  id_student_section_year: number;
+  id_student: number;
+  student_first_name: string;
+  student_last_name: string;
+  student_legajo: number;
+  id_section_year: number;
+  year: number;
+  id_section: number;
+  section_name: string;
+}
+
+export interface StudentSectionYearList {
+  items: StudentSectionYearPublic[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 // `GET /projects/{id}/members`: integrantes filtrados por estado de la membresía
 export interface ProjectMemberList {
   items: ProjectMember[];
@@ -304,10 +335,27 @@ export interface ProjectMemberList {
   offset: number;
 }
 
-// `GET /projects/{id}/overview`: el equipo con sus integrantes activos y finalizados
+// Docente del curso lectivo que hace el seguimiento de un equipo (sin correo)
+export interface ProfessorResponsible {
+  id_professor: number;
+  first_name: string;
+  last_name: string;
+  legajo: number;
+}
+
+// `GET /projects/{id}/overview`: el equipo con sus integrantes activos y finalizados, los docentes
+// de su curso lectivo y el jefe del grupo
 export interface ProjectOverview extends Omit<ProjectPublic, 'members'> {
   members: ProjectMember[];
-  responsible: ProjectMember | null;
+  responsible: ProfessorResponsible[];
+  leader: ProjectMember | null;
+}
+
+// `GET /me/project`: el equipo del alumno (null si no integra ninguno) y sus solicitudes para
+// sumarse, pendientes y rechazadas
+export interface MyProject {
+  project: ProjectOverview | null;
+  requests: StudentGroup[];
 }
 
 export interface ProjectList {
@@ -315,4 +363,41 @@ export interface ProjectList {
   total: number;
   limit: number;
   offset: number;
+}
+
+export type ClassModality = 'in_person' | 'virtual';
+
+// Clase concreta del calendario de un curso lectivo (una fila por fecha). Las horas vienen como
+// "HH:MM:SS", en hora local.
+export interface CalendarClassPublic {
+  id_calendar_class: number;
+  id_calendar: number;
+  date: string;
+  weekday: number; // ISO: 1 = lunes ... 7 = domingo
+  start_time: string;
+  end_time: string;
+  modality: ClassModality;
+  title?: string | null;
+  location?: string | null;
+  meeting_url?: string | null;
+}
+
+// Actividad (entrega) del curso lectivo completo
+export interface ActivityPublic {
+  id_activity: number;
+  id_calendar: number;
+  id_section_year: number;
+  title: string;
+  description?: string | null;
+  due_date: string;
+  due_time?: string | null;
+}
+
+// `GET /section-years/{id}/calendar`: el calendario del curso lectivo con sus clases y actividades
+export interface CalendarWithClasses {
+  id_calendar: number;
+  id_section_year: number;
+  timezone: string;
+  classes: CalendarClassPublic[];
+  activities: ActivityPublic[];
 }

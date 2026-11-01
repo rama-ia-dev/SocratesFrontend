@@ -125,7 +125,7 @@ export const Professors: React.FC = () => {
       !isSuperAdmin &&
       currentUser.is_super_admin
     ) {
-      setModalError('No puede quitarse a sí mismo el rol de super administrador');
+      setModalError('No puede quitarse a sí mismo el rol de administrador');
       return;
     }
 
@@ -254,7 +254,7 @@ export const Professors: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     {prof.is_super_admin ? (
-                      <Badge variant="superadmin">Super administrador</Badge>
+                      <Badge variant="superadmin">Administrador</Badge>
                     ) : (
                       <Badge variant="professor">Docente</Badge>
                     )}
@@ -355,12 +355,12 @@ export const Professors: React.FC = () => {
                 className="w-4 h-4 rounded border-line text-primary focus:ring-accent-light"
               />
               <span className="text-sm font-medium text-ink">
-                Super administrador
+                Administrador
               </span>
             </label>
             {isEditingSelf && (
               <p className="text-xs text-warning mt-1 pl-7">
-                No puede quitarse a sí mismo el rol de super administrador
+                No puede quitarse a sí mismo el rol de administrador
               </p>
             )}
           </div>

@@ -8,7 +8,9 @@
 
 import {
   AccessToken,
+  CalendarWithClasses,
   LoginRequest,
+  MyProject,
   PasswordConfirm,
   PasswordRequest,
   ProfessorCreate,
@@ -23,6 +25,7 @@ import {
   ProjectMemberList,
   ProjectPublic,
   ProjectOverview,
+  ProjectUpdate,
   SectionCreate,
   SectionList,
   SectionPublic,
@@ -37,6 +40,7 @@ import {
   StudentUpdate,
   StudentList,
   StudentProjectPublic,
+  StudentSectionYearList,
   UserList,
   UserPublic,
   UserUpdate,
@@ -365,6 +369,14 @@ function delay(ms: number = 180): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Igual que el backend: los primeros números de equipo libres del curso lectivo (con 1, 2 y 6, son 3, 4, 5, 7…)
+function firstFreeGroupNumbers(existing: { group_number: number }[], count: number): number[] {
+  const used = new Set(existing.map((p) => p.group_number));
+  const free: number[] = [];
+  for (let n = 1; free.length < count; n++) if (!used.has(n)) free.push(n);
+  return free;
+}
+
 // El backend rota el refresh token en cada uso: si dos pedidos reciben 401 a la vez y cada uno
 // llamara a /auth/refresh, el segundo llegaría con una cookie ya consumida y expulsaría al usuario.
 // Por eso todos los 401 simultáneos esperan la misma renovación.
@@ -610,10 +622,14 @@ export const api = {
   // ==========================================
   // Students: listado para docentes (SCRUM-99)
   // ==========================================
-  // Un docente común ve los alumnos de sus cursos lectivos; el super administrador, todos.
+  // Un docente común ve los alumnos de sus cursos lectivos; el administrador, todos.
+  // `kind: 'registered'` lista a los inscriptos en los cursos del alcance aunque no tengan equipo;
+  // sin `kind`, el backend lista solo a los que tienen equipo (salvo el administrador sin filtros,
+  // que ve a todos)
   async getStudents(params: {
     id_section_year?: number | null;
     q?: string | null;
+    kind?: 'registered' | null;
     limit?: number;
     offset?: number;
   } = {}): Promise<StudentList> {
@@ -636,6 +652,7 @@ export const api = {
     const query = new URLSearchParams();
     if (params.id_section_year) query.set('id_section_year', params.id_section_year.toString());
     if (params.q) query.set('q', params.q);
+    if (params.kind) query.set('kind', params.kind);
     if (params.limit !== undefined) query.set('limit', params.limit.toString());
     if (params.offset !== undefined) query.set('offset', params.offset.toString());
 
@@ -952,7 +969,7 @@ export const api = {
         payload.is_super_admin === false &&
         mockDB.me.is_super_admin
       ) {
-        const err: any = new Error('No puede quitarse a sí mismo el rol de super administrador');
+        const err: any = new Error('No puede quitarse a sí mismo el rol de administrador');
         err.status = 409;
         throw err;
       }
@@ -1471,12 +1488,18 @@ export const api = {
     year?: number | null;
     id_section?: number | null;
     privacy?: 'public' | 'private' | 'protected' | null;
+    q?: string | null;
     limit?: number;
     offset?: number;
   } = {}): Promise<ProjectList> {
     if (USE_MOCK) {
       await delay();
       let filtered = [...mockDB.projects];
+
+      if (params.q) {
+        const q = params.q.toLowerCase();
+        filtered = filtered.filter((p) => (p.name ?? '').toLowerCase().includes(q));
+      }
 
       if (params.id_section_year) {
         filtered = filtered.filter((p) => p.id_section_year === params.id_section_year);
@@ -1549,6 +1572,7 @@ export const api = {
     if (params.year) query.set('year', params.year.toString());
     if (params.id_section) query.set('id_section', params.id_section.toString());
     if (params.privacy) query.set('privacy', params.privacy);
+    if (params.q) query.set('q', params.q);
     if (params.limit !== undefined) query.set('limit', params.limit.toString());
     if (params.offset !== undefined) query.set('offset', params.offset.toString());
 
@@ -1617,10 +1641,20 @@ export const api = {
         enrolled_at: '2025-03-01T09:00:00Z',
         status: active,
       }));
-      return { ...p, members: list, responsible: list[0] ?? null };
+      return { ...p, members: list, responsible: [], leader: list[0] ?? null };
     }
 
     return request<ProjectOverview>(`/projects/${id_project}/overview`, { method: 'GET' });
+  },
+
+  // El alumno logueado: su equipo (null si no integra ninguno) y sus solicitudes para sumarse
+  async getMyProject(): Promise<MyProject> {
+    if (USE_MOCK) {
+      await delay();
+      return { project: null, requests: [] };
+    }
+
+    return request<MyProject>('/me/project', { method: 'GET' });
   },
 
   // Integrantes de un equipo según el estado de su membresía (por ejemplo, las solicitudes pendientes)
@@ -1633,6 +1667,45 @@ export const api = {
     const query = new URLSearchParams({ limit: '100' });
     statuses.forEach((s) => query.append('status', s));
     return request<ProjectMemberList>(`/projects/${id_project}/members?${query.toString()}`);
+  },
+
+  // El docente del curso lectivo o un administrador saca a un integrante del equipo
+  async expelMember(id_project: number, id_student_project: number): Promise<StudentProjectPublic> {
+    if (USE_MOCK) {
+      await delay();
+      const err: any = new Error('Membership not found');
+      err.status = 404;
+      throw err;
+    }
+
+    return request<StudentProjectPublic>(
+      `/projects/${id_project}/members/${id_student_project}/expel`,
+      { method: 'POST' }
+    );
+  },
+
+  // El jefe del grupo, un docente del curso lectivo o un administrador asegura el equipo
+  async insureProject(id_project: number): Promise<ProjectPublic> {
+    if (USE_MOCK) {
+      await delay();
+      const err: any = new Error('Project not found');
+      err.status = 404;
+      throw err;
+    }
+
+    return request<ProjectPublic>(`/projects/${id_project}/insure`, { method: 'POST' });
+  },
+
+  // Un docente del curso lectivo o un administrador desasegura el equipo: vuelve a Desasegurado
+  async uninsureProject(id_project: number): Promise<ProjectPublic> {
+    if (USE_MOCK) {
+      await delay();
+      const err: any = new Error('Project not found');
+      err.status = 404;
+      throw err;
+    }
+
+    return request<ProjectPublic>(`/projects/${id_project}/uninsure`, { method: 'POST' });
   },
 
   // El jefe del grupo le pasa la jefatura a otro integrante activo; él sigue en el equipo
@@ -1648,6 +1721,75 @@ export const api = {
       `/projects/${id_project}/members/${id_student_project}/leader`,
       { method: 'POST' }
     );
+  },
+
+  // Los equipos del curso lectivo actual del usuario (para el alumno, el de su cursada más reciente)
+  async getMySectionYearProjects(params: { limit?: number; offset?: number } = {}): Promise<ProjectList> {
+    if (USE_MOCK) {
+      await delay();
+      return { items: [], total: 0, limit: params.limit ?? 50, offset: params.offset ?? 0 };
+    }
+
+    const query = new URLSearchParams();
+    if (params.limit !== undefined) query.set('limit', params.limit.toString());
+    if (params.offset !== undefined) query.set('offset', params.offset.toString());
+    return request<ProjectList>(`/me/section-year/projects?${query.toString()}`);
+  },
+
+  // Calendario de un curso lectivo: clases y entregas. `from`/`to` (YYYY-MM-DD) van juntos y abarcan
+  // hasta 366 días. Lo consultan el administrador, los docentes del curso y sus alumnos.
+  async getSectionYearCalendar(
+    id_section_year: number,
+    range: { from: string; to: string } | null = null
+  ): Promise<CalendarWithClasses> {
+    if (USE_MOCK) {
+      await delay();
+      return { id_calendar: id_section_year, id_section_year, timezone: 'America/Argentina/Cordoba', classes: [], activities: [] };
+    }
+
+    const query = new URLSearchParams();
+    if (range) {
+      query.set('from', range.from);
+      query.set('to', range.to);
+    }
+    return request<CalendarWithClasses>(`/section-years/${id_section_year}/calendar?${query.toString()}`);
+  },
+
+  // Integrantes, docentes del curso lectivo o administrador cambian los datos del equipo
+  async updateProject(id_project: number, changes: ProjectUpdate): Promise<ProjectPublic> {
+    if (USE_MOCK) {
+      await delay();
+      const err: any = new Error('Project not found');
+      err.status = 404;
+      throw err;
+    }
+
+    return request<ProjectPublic>(`/projects/${id_project}`, {
+      method: 'PATCH',
+      body: JSON.stringify(changes),
+    });
+  },
+
+  // El docente del curso lectivo o un administrador suma un alumno a un equipo sin asegurar
+  async addMember(id_project: number, id_student: number): Promise<StudentProjectPublic> {
+    if (USE_MOCK) {
+      await delay();
+      const err: any = new Error('Project not found');
+      err.status = 404;
+      throw err;
+    }
+
+    return request<StudentProjectPublic>(`/projects/${id_project}/members/${id_student}`, { method: 'POST' });
+  },
+
+  // Alumnos inscriptos en un curso lectivo (su cursada)
+  async getStudentSectionYears(id_section_year: number): Promise<StudentSectionYearList> {
+    if (USE_MOCK) {
+      await delay();
+      return { items: [], total: 0, limit: 100, offset: 0 };
+    }
+
+    return request<StudentSectionYearList>(`/student-section-years?id_section_year=${id_section_year}&limit=100`);
   },
 
   // El jefe del grupo acepta (active) o rechaza (rejected) una solicitud para sumarse
@@ -1682,8 +1824,7 @@ export const api = {
       const existingInSY = mockDB.projects.filter(
         (p) => p.id_section_year === payload.id_section_year
       );
-      const maxNum = existingInSY.reduce((m, p) => Math.max(m, p.group_number), 0);
-      const group_number = payload.group_number || maxNum + 1;
+      const group_number = payload.group_number || firstFreeGroupNumbers(existingInSY, 1)[0];
 
       const dup = existingInSY.find((p) => p.group_number === group_number);
       if (dup) {
@@ -1743,7 +1884,7 @@ export const api = {
       const existingInSY = mockDB.projects.filter(
         (p) => p.id_section_year === payload.id_section_year
       );
-      const maxNum = existingInSY.reduce((m, p) => Math.max(m, p.group_number), 0);
+      const numbers = firstFreeGroupNumbers(existingInSY, payload.quantity);
 
       const created: ProjectPublic[] = [];
       for (let i = 1; i <= payload.quantity; i++) {
@@ -1753,7 +1894,7 @@ export const api = {
           year: sy.year,
           id_section: sy.id_section,
           section_name: sy.section_name,
-          group_number: maxNum + i,
+          group_number: numbers[i - 1],
           privacy: 'public',
           name: null,
           description: null,
@@ -1799,50 +1940,17 @@ export const api = {
     return request<void>(`/projects/${id_project}`, { method: 'DELETE' });
   },
 
-  async joinProject(id_project: number): Promise<ProjectPublic> {
+  // El alumno logueado pide sumarse a un equipo sin asegurar. Si el equipo no tiene jefe entra
+  // como jefe (activo); si no, la solicitud queda pendiente hasta que el jefe la decida
+  async joinProject(id_project: number): Promise<StudentProjectPublic> {
     if (USE_MOCK) {
-      await delay(150);
-      const targetProj = mockDB.projects.find((p) => p.id_project === id_project);
-      if (!targetProj) {
-        const err: any = new Error('No se encontró el equipo de trabajo');
-        err.status = 404;
-        throw err;
-      }
-
-      const maxLimit = targetProj.max_members || 5;
-      if (targetProj.members && targetProj.members.length >= maxLimit) {
-        const err: any = new Error(`El equipo ha alcanzado el cupo máximo de ${maxLimit} integrantes`);
-        err.status = 400;
-        throw err;
-      }
-
-      // Desvincular de cualquier otro equipo en el que esté actualmente
-      mockDB.projects.forEach((p) => {
-        if (p.members) {
-          p.members = p.members.filter((m) => m.id_student !== mockDB.me.id_user);
-          p.is_secured = p.members.length >= (p.min_members || 3);
-        }
-      });
-
-      if (!targetProj.members) {
-        targetProj.members = [];
-      }
-
-      targetProj.members.push({
-        id_student: mockDB.me.id_user,
-        legajo: mockDB.me.legajo,
-        first_name: mockDB.me.first_name,
-        last_name: mockDB.me.last_name,
-      });
-
-      targetProj.is_secured = targetProj.members.length >= (targetProj.min_members || 3);
-
-      return { ...targetProj };
+      await delay();
+      const err: any = new Error('Project not found');
+      err.status = 404;
+      throw err;
     }
 
-    return request<ProjectPublic>(`/projects/${id_project}/join`, {
-      method: 'POST',
-    });
+    return request<StudentProjectPublic>(`/projects/${id_project}/members`, { method: 'POST' });
   },
 
   async leaveProject(id_project: number): Promise<ProjectPublic> {

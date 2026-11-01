@@ -1,0 +1,38 @@
+import { api } from './api';
+import type { ProjectMember, ProjectPublic } from '../types/api';
+
+// Composición de los equipos de un curso lectivo (SCRUM-103): agregar y mover alumnos.
+
+// Todos los equipos de un curso lectivo, recorriendo las páginas del backend
+export const projectsOfCourse = async (id_section_year: number): Promise<ProjectPublic[]> => {
+  const items: ProjectPublic[] = [];
+  for (let offset = 0; ; offset += 100) {
+    const res = await api.getProjects({ id_section_year, limit: 100, offset });
+    items.push(...res.items);
+    if (items.length >= res.total || res.items.length === 0) return items;
+  }
+};
+
+// Todos los registros de un equipo (integrantes, solicitudes, rechazados, expulsados…): sin
+// filtro de estado el backend los devuelve todos
+export const allMembershipsOf = async (id_project: number): Promise<ProjectMember[]> =>
+  (await api.getProjectMembers(id_project, [])).items;
+
+// Solo impide sumar al alumno a ese equipo ser parte de él (integrante o finalizado). Con
+// cualquier otro registro (solicitud pendiente o rechazada, que salió, que lo sacaron) el backend
+// lo reactiva como integrante.
+export const blocksAdding = (m: ProjectMember) => ['active', 'finished'].includes(m.status.code);
+
+// Error del backend al sumar un alumno a un equipo, en palabras del usuario
+export const addMemberError = (err: any): string => {
+  const detail = String(err.message || '');
+  if (err.status === 409) {
+    if (detail.includes('another project')) return 'El alumno ya forma parte de otro equipo';
+    if (detail.includes('this project')) return 'El alumno ya es parte de ese equipo';
+    if (detail.includes('uninsured')) return 'El equipo ya está asegurado: no se suman integrantes';
+    if (detail.includes('current year')) return 'El alumno cursa en otro ciclo lectivo: no se puede sumar a un equipo de este';
+  }
+  if (err.status === 403) return 'Solo los docentes del curso lectivo y el administrador pueden sumar alumnos';
+  if (err.status === 404) return 'El equipo o el alumno ya no existen';
+  return detail || 'No se pudo sumar al alumno';
+};

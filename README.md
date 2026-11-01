@@ -20,7 +20,7 @@ docker compose up --build -d   # http://localhost:3000
 
   | Rol | Correo |
   |---|---|
-  | Super administrador | `marta.rodriguez@frc.utn.edu.ar` |
+  | Administrador | `marta.rodriguez@frc.utn.edu.ar` |
   | Docente | `carlos.ruiz@frc.utn.edu.ar` |
   | Estudiante | `100001@sistemas.frc.utn.edu.ar` |
 

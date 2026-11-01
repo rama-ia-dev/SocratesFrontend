@@ -187,7 +187,7 @@ export const Users: React.FC = () => {
       !profEditIsSuperAdmin &&
       currentUser.is_super_admin
     ) {
-      setProfEditError('No puede quitarse a sí mismo el rol de super administrador');
+      setProfEditError('No puede quitarse a sí mismo el rol de administrador');
       return;
     }
 
@@ -240,7 +240,7 @@ export const Users: React.FC = () => {
     <div className="space-y-6">
       <PageHeader
         title="Usuarios"
-        subtitle="Docentes, super administradores y estudiantes de la cátedra"
+        subtitle="Docentes, administradores y estudiantes de la cátedra"
         action={
           <div className="flex items-center gap-2">
             {roleFilter === 'professor' ? (
@@ -381,7 +381,7 @@ export const Users: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     {u.is_super_admin ? (
-                      <Badge variant="superadmin">Super administrador</Badge>
+                      <Badge variant="superadmin">Administrador</Badge>
                     ) : u.role === 'professor' ? (
                       <Badge variant="professor">Docente</Badge>
                     ) : (
@@ -485,7 +485,7 @@ export const Users: React.FC = () => {
                 className="w-4 h-4 rounded border-line text-primary focus:ring-accent-light"
               />
               <span className="text-sm font-medium text-ink">
-                Super administrador
+                Administrador
               </span>
             </label>
           </div>
@@ -581,12 +581,12 @@ export const Users: React.FC = () => {
                 className="w-4 h-4 rounded border-line text-primary focus:ring-accent-light"
               />
               <span className="text-sm font-medium text-ink">
-                Super administrador
+                Administrador
               </span>
             </label>
             {isEditingSelf && (
               <p className="text-xs text-warning mt-1 pl-7">
-                No puede quitarse a sí mismo el rol de super administrador
+                No puede quitarse a sí mismo el rol de administrador
               </p>
             )}
           </div>

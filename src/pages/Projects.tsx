@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { CloudOff, Eye, FolderKanban, Plus, RefreshCw, SearchX } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { CloudOff, FolderKanban, Plus, RefreshCw, Search, SearchX } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import type { ProjectPrivacy, ProjectPublic, SectionYearPublic } from '../types/api';
 import { PageHeader } from '../components/ui/PageHeader';
+import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { Badge } from '../components/ui/Badge';
@@ -20,7 +21,12 @@ const PAGE_SIZE = 10;
 
 type Scope = 'all' | 'mine';
 
-type ProjectFilters = { year: number | null; id_section: number | null; privacy: ProjectPrivacy | null };
+type ProjectFilters = {
+  year: number | null;
+  id_section: number | null;
+  privacy: ProjectPrivacy | null;
+  q: string | null;
+};
 
 // Todos los equipos de un curso lectivo, recorriendo las páginas del backend (de a 100 como máximo)
 const allProjectsOf = async (id_section_year: number, filters: ProjectFilters) => {
@@ -32,22 +38,34 @@ const allProjectsOf = async (id_section_year: number, filters: ProjectFilters) =
   }
 };
 
+// Los equipos del curso lectivo actual del usuario, recorriendo las páginas del backend
+const allMyProjects = async () => {
+  const items: ProjectPublic[] = [];
+  for (let offset = 0; ; offset += 100) {
+    const res = await api.getMySectionYearProjects({ limit: 100, offset });
+    items.push(...res.items);
+    if (items.length >= res.total || res.items.length === 0) return items;
+  }
+};
+
 // El mismo orden que usa el backend: año más reciente, comisión y número de equipo
 const byYearSectionNumber = (a: ProjectPublic, b: ProjectPublic) =>
   b.year - a.year || a.section_name.localeCompare(b.section_name, 'es') || a.group_number - b.group_number;
 
 // Equipos de trabajo (SCRUM-105). El backend decide qué equipos ve cada usuario según la
 // privacidad: los privados solo aparecen para sus integrantes, los docentes del curso y los
-// super administradores.
+// administradores.
 export const Projects: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { success } = useToast();
   const isProfessor = user?.role === 'professor';
+  // El alumno ve solo los equipos de su curso lectivo actual
+  const isStudent = user?.role === 'student';
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  // El docente ve también equipos de cursos ajenos (los públicos); puede quedarse solo con los suyos
+  // El docente ve también equipos de cursos ajenos (los públicos); arranca por los suyos
   const canFilterMine = isProfessor && !user?.is_super_admin;
-  const [scope, setScope] = useState<Scope>('all');
+  const [scope, setScope] = useState<Scope>(canFilterMine ? 'mine' : 'all');
   const [mySectionYears, setMySectionYears] = useState<number[] | null>(null);
 
   useEffect(() => {
@@ -68,6 +86,14 @@ export const Projects: React.FC = () => {
   const [year, setYear] = useState('');
   const [section, setSection] = useState('');
   const [privacy, setPrivacy] = useState<ProjectPrivacy | ''>('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // La búsqueda espera a que se deje de escribir
+  const [query, setQuery] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   // Los filtros de año y comisión salen de los cursos lectivos existentes
   useEffect(() => {
@@ -81,10 +107,17 @@ export const Projects: React.FC = () => {
     () => [...new Set(sectionYears.map((sy) => sy.year))].sort((a, b) => b - a),
     [sectionYears]
   );
-  const sectionOptions = useMemo(() => {
-    const byId = new Map(sectionYears.map((sy) => [sy.id_section, sy.section_name]));
-    return [...byId].sort((a, b) => a[1].localeCompare(b[1], 'es'));
-  }, [sectionYears]);
+  // Con un año elegido, solo las comisiones que tienen curso lectivo ese año
+  const sectionsOfYear = useCallback(
+    (y: string) => {
+      const byId = new Map(
+        sectionYears.filter((sy) => !y || sy.year === Number(y)).map((sy) => [sy.id_section, sy.section_name])
+      );
+      return [...byId].sort((a, b) => a[1].localeCompare(b[1], 'es'));
+    },
+    [sectionYears]
+  );
+  const sectionOptions = useMemo(() => sectionsOfYear(year), [sectionsOfYear, year]);
 
   const requestId = useRef(0);
   const fetchProjects = useCallback(async () => {
@@ -98,9 +131,20 @@ export const Projects: React.FC = () => {
       year: year ? Number(year) : null,
       id_section: section ? Number(section) : null,
       privacy: privacy || null,
+      q: query || null,
     };
     try {
-      if (scope === 'mine') {
+      if (isStudent) {
+        // Un solo curso lectivo: se trae entero y la búsqueda y la privacidad se aplican acá
+        const q = query.toLowerCase();
+        const mine = (await allMyProjects())
+          .filter((p) => !privacy || p.privacy === privacy)
+          .filter((p) => !q || (p.name ?? '').toLowerCase().includes(q))
+          .sort(byYearSectionNumber);
+        if (current !== requestId.current) return;
+        setProjects(mine.slice(offset, offset + PAGE_SIZE));
+        setTotal(mine.length);
+      } else if (scope === 'mine') {
         // El backend filtra por un solo curso lectivo: con varios, se piden todos y se pagina acá
         const lists = await Promise.all((mySectionYears ?? []).map((id) => allProjectsOf(id, filters)));
         if (current !== requestId.current) return;
@@ -119,23 +163,26 @@ export const Projects: React.FC = () => {
     } finally {
       if (current === requestId.current) setIsLoading(false);
     }
-  }, [year, section, privacy, offset, scope, mySectionYears]);
+  }, [year, section, privacy, query, offset, scope, mySectionYears, isStudent]);
 
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
 
-  const changeFilter = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setter(e.target.value);
+  const changeYear = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const next = e.target.value;
+    setYear(next);
+    // La comisión elegida no tiene curso lectivo en el año nuevo: se vuelve a todas
+    if (section && !sectionsOfYear(next).some(([id]) => String(id) === section)) setSection('');
     setOffset(0);
   };
-  const hasFilters = Boolean(year || section || privacy || scope === 'mine');
+  const hasFilters = Boolean(year || section || privacy || searchQuery.trim());
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Equipos de trabajo"
-        subtitle="Equipos de cada comisión y su proyecto"
+        subtitle={isStudent ? 'Equipos de su curso lectivo y su proyecto' : 'Equipos de cada comisión y su proyecto'}
         action={
           isProfessor ? (
             <Button variant="primary" onClick={() => setIsCreateOpen(true)}>
@@ -155,33 +202,55 @@ export const Projects: React.FC = () => {
             setOffset(0);
           }}
           options={[
-            { value: 'all' as const, label: 'Todos los cursos' },
             { value: 'mine' as const, label: 'Mis cursos' },
+            { value: 'all' as const, label: 'Todos los cursos' },
           ]}
         />
       )}
 
       {/* Años y comisiones pueden ser muchos: desplegables. La privacidad tiene tres: a la vista */}
       <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:w-[440px] shrink-0">
-          <Select
-            aria-label="Año"
-            value={year}
-            onChange={changeFilter(setYear)}
-            options={[
-              { value: '', label: 'Todos los años' },
-              ...yearOptions.map((y) => ({ value: y, label: String(y) })),
-            ]}
+        <div
+          className={`grid grid-cols-1 gap-3 shrink-0 ${isStudent ? 'sm:w-[320px]' : 'sm:grid-cols-3 lg:w-[660px]'}`}
+        >
+          <Input
+            type="text"
+            aria-label="Buscar por nombre del proyecto"
+            placeholder="Buscar proyecto"
+            maxLength={200}
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setOffset(0);
+            }}
+            leftIcon={<Search className="w-4 h-4" />}
           />
-          <Select
-            aria-label="Comisión"
-            value={section}
-            onChange={changeFilter(setSection)}
-            options={[
-              { value: '', label: 'Todas las comisiones' },
-              ...sectionOptions.map(([id, name]) => ({ value: id, label: name })),
-            ]}
-          />
+          {/* El alumno ve un solo curso lectivo: año y comisión no hacen falta */}
+          {!isStudent && (
+            <>
+              <Select
+                aria-label="Año"
+                value={year}
+                onChange={changeYear}
+                options={[
+                  { value: '', label: 'Todos los años' },
+                  ...yearOptions.map((y) => ({ value: y, label: String(y) })),
+                ]}
+              />
+              <Select
+                aria-label="Comisión"
+                value={section}
+                onChange={(e) => {
+                  setSection(e.target.value);
+                  setOffset(0);
+                }}
+                options={[
+                  { value: '', label: 'Todas las comisiones' },
+                  ...sectionOptions.map(([id, name]) => ({ value: id, label: name })),
+                ]}
+              />
+            </>
+          )}
         </div>
         <SegmentedControl
           label="Filtrar por privacidad"
@@ -220,19 +289,29 @@ export const Projects: React.FC = () => {
           message={
             hasFilters
               ? 'Ningún equipo de trabajo coincide con los filtros'
-              : 'Todavía no hay equipos de trabajo que pueda ver'
+              : isStudent
+                ? 'Todavía no hay equipos de trabajo en su curso lectivo'
+                : scope === 'mine'
+                  ? 'Todavía no hay equipos de trabajo en sus cursos lectivos'
+                  : 'Todavía no hay equipos de trabajo que pueda ver'
           }
-          description={hasFilters ? 'Pruebe con otro año, otra comisión u otra privacidad.' : undefined}
+          description={
+            hasFilters
+              ? isStudent
+                ? 'Pruebe con otro nombre u otra privacidad.'
+                : 'Pruebe con otro nombre, otro año, otra comisión u otra privacidad.'
+              : undefined
+          }
           action={
             hasFilters ? (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => {
+                  setSearchQuery('');
                   setYear('');
                   setSection('');
                   setPrivacy('');
-                  setScope('all');
                   setOffset(0);
                 }}
               >
@@ -244,15 +323,14 @@ export const Projects: React.FC = () => {
       ) : (
         <>
           {/* Anchos fijos por columna: al filtrar, la tabla no cambia de forma */}
-          <Table className="table-fixed min-w-[900px]">
+          <Table className="table-fixed min-w-[860px]">
             <colgroup>
               <col className="w-[12%]" />
-              <col className="w-[12%]" />
+              <col className="w-[14%]" />
               <col className="w-[9%]" />
               <col className="w-[33%]" />
-              <col className="w-[18%]" />
-              <col className="w-[16%]" />
-              <col className="w-16" />
+              <col className="w-[17%]" />
+              <col className="w-[15%]" />
             </colgroup>
             <TableHeader>
               <tr>
@@ -262,17 +340,23 @@ export const Projects: React.FC = () => {
                 <TableHead>Nombre del proyecto</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Privacidad</TableHead>
-                {/* Fija a la derecha: con la tabla más ancha que la pantalla, las acciones siguen a la vista */}
-                <TableHead className="sticky right-0 bg-canvas">
-                  <span className="sr-only">Acciones</span>
-                </TableHead>
               </tr>
             </TableHeader>
             <tbody>
               {projects.map((p) => (
                 <TableRow key={p.id_project} onClick={() => navigate(`/equipos/${p.id_project}`)}>
-                  <TableCell className="font-semibold text-ink whitespace-nowrap">{teamLabel(p)}</TableCell>
-                  <TableCell>{p.section_name}</TableCell>
+                  {/* Toda la fila abre el detalle; el enlace del equipo lo hace alcanzable con el teclado */}
+                  <TableCell className="font-semibold text-ink whitespace-nowrap">
+                    <Link
+                      to={`/equipos/${p.id_project}`}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={`Ver ${teamLabel(p)} de ${p.section_name} ${p.year}`}
+                      className="rounded-sm hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    >
+                      {teamLabel(p)}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="[overflow-wrap:anywhere]">{p.section_name}</TableCell>
                   <TableCell className="text-ink-muted tabular-nums">{p.year}</TableCell>
                   <TableCell className="[overflow-wrap:anywhere]">
                     {p.restricted ? (
@@ -293,20 +377,6 @@ export const Projects: React.FC = () => {
                   <TableCell>
                     <Badge variant={p.privacy}>{PRIVACY_LABEL[p.privacy]}</Badge>
                   </TableCell>
-                  <TableCell className="text-right sticky right-0 bg-white group-hover:bg-canvas transition-colors duration-150">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/equipos/${p.id_project}`);
-                      }}
-                      className="p-1.5 rounded-md text-ink-muted hover:text-primary hover:bg-tint transition-colors duration-150 cursor-pointer"
-                      aria-label={`Ver ${teamLabel(p)} de ${p.section_name} ${p.year}`}
-                      title="Ver detalle"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                  </TableCell>
                 </TableRow>
               ))}
             </tbody>
@@ -322,11 +392,16 @@ export const Projects: React.FC = () => {
           onCreated={(created) => {
             setIsCreateOpen(false);
             const first = created[0];
-            const last = created[created.length - 1];
+            // Los números libres pueden no ser consecutivos (4 y 6): el rango solo si no hay huecos
+            const numbers = created.map((p) => p.group_number).sort((a, b) => a - b);
+            const consecutive = numbers.every((n, i) => i === 0 || n === numbers[i - 1] + 1);
+            const which = consecutive
+              ? `del ${numbers[0]} al ${numbers[numbers.length - 1]}`
+              : `${numbers.slice(0, -1).join(', ')} y ${numbers[numbers.length - 1]}`;
             success(
               created.length === 1
                 ? `Se creó el ${teamLabel(first)} de ${first.section_name} (${first.year})`
-                : `Se crearon ${created.length} equipos en ${first.section_name} (${first.year}): del ${first.group_number} al ${last.group_number}`
+                : `Se crearon ${created.length} equipos en ${first.section_name} (${first.year}): ${which}`
             );
             fetchProjects();
           }}

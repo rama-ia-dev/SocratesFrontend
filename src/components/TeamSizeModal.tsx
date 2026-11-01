@@ -11,7 +11,7 @@ const MIN = 1;
 const MAX = 100; // rango que acepta el backend
 
 // Cupo de integrantes por equipo de un curso lectivo (SCRUM-19): PATCH /section-years/{id}.
-// Vale para todos los equipos del curso lectivo. Hoy el backend se lo permite solo al super administrador.
+// Vale para todos los equipos del curso lectivo. Hoy el backend se lo permite solo al administrador.
 export const TeamSizeModal: React.FC<{
   sectionYear: SectionYearPublic;
   onClose: () => void;
@@ -53,7 +53,7 @@ export const TeamSizeModal: React.FC<{
     } catch (err: any) {
       setError(
         err.status === 403
-          ? 'Solo un super administrador puede cambiar el cupo'
+          ? 'Solo un administrador puede cambiar el cupo'
           : err.status === 404
             ? 'El curso lectivo ya no existe'
             : err.message || 'No se pudo guardar el cupo'
