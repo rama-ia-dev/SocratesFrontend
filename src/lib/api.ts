@@ -629,9 +629,13 @@ export const api = {
   // Students: listado para docentes (SCRUM-99)
   // ==========================================
   // Un docente común ve los alumnos de sus cursos lectivos; el administrador, todos.
+  // `kind: 'registered'` lista a los inscriptos en los cursos del alcance aunque no tengan equipo;
+  // sin `kind`, el backend lista solo a los que tienen equipo (salvo el administrador sin filtros,
+  // que ve a todos)
   async getStudents(params: {
     id_section_year?: number | null;
     q?: string | null;
+    kind?: 'registered' | null;
     limit?: number;
     offset?: number;
   } = {}): Promise<StudentList> {
@@ -654,6 +658,7 @@ export const api = {
     const query = new URLSearchParams();
     if (params.id_section_year) query.set('id_section_year', params.id_section_year.toString());
     if (params.q) query.set('q', params.q);
+    if (params.kind) query.set('kind', params.kind);
     if (params.limit !== undefined) query.set('limit', params.limit.toString());
     if (params.offset !== undefined) query.set('offset', params.offset.toString());
 
