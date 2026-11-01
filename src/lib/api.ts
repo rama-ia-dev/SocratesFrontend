@@ -854,6 +854,17 @@ export const api = {
     });
   },
 
+  // Eliminar un alumno cargado por error (solo el administrador). El backend lo rechaza (409) si es
+  // parte de un equipo, terminó en uno o tiene una solicitud pendiente
+  async deleteStudent(id_student: number): Promise<void> {
+    if (USE_MOCK) {
+      await delay();
+      mockDB.users = mockDB.users.filter((u) => u.id_user !== id_student);
+      return;
+    }
+    return request<void>(`/students/${id_student}`, { method: 'DELETE' });
+  },
+
   async updateStudent(id_student: number, payload: StudentUpdate): Promise<StudentPublic> {
     if (USE_MOCK) {
       await delay();
