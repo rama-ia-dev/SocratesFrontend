@@ -734,6 +734,17 @@ export const api = {
     return request<UserList>(`/users?${query.toString()}`);
   },
 
+  // Eliminar un usuario cargado por error (solo el administrador). El backend lo rechaza (409) si
+  // es administrador, un docente con cursos lectivos asignados o un alumno con equipo o solicitud
+  async deleteUser(id_user: number): Promise<void> {
+    if (USE_MOCK) {
+      await delay();
+      mockDB.users = mockDB.users.filter((u) => u.id_user !== id_user);
+      return;
+    }
+    return request<void>(`/users/${id_user}`, { method: 'DELETE' });
+  },
+
   // ==========================================
   // Students
   // ==========================================
