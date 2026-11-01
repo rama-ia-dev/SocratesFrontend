@@ -6,11 +6,11 @@ import { Button } from './ui/Button';
 import { Alert } from './ui/Alert';
 import { Select } from './ui/Select';
 import { teamLabel } from '../lib/projects';
-import { addMemberError, allMembershipsOf, blocksAdding, projectsOfCourse } from '../lib/teamMembers';
+import { addMemberError, projectsOfCourse } from '../lib/teamMembers';
 
 // Mover a un integrante a otro equipo del mismo curso lectivo (SCRUM-103). El backend no tiene
-// "mover": se lo saca de este equipo y se lo suma al otro. Antes se revisa que el otro equipo
-// lo acepte, para no dejarlo sin equipo.
+// "mover": se lo saca de este equipo y se lo suma al otro. Cualquier otro equipo sin asegurar lo
+// acepta: un registro previo ahí (solicitud, salida) no impide sumarlo.
 export const MoveMemberModal: React.FC<{
   project: ProjectOverview;
   member: ProjectMember;
@@ -29,9 +29,7 @@ export const MoveMemberModal: React.FC<{
     (m) => m.status.code === 'active' && m.id_student_project !== member.id_student_project
   ).length;
 
-  // Los equipos sin asegurar del mismo curso lectivo, salvo este y los que no lo aceptarían (ya
-  // estuvo, pidió sumarse o salió de ellos)
-  const [skipped, setSkipped] = useState(0);
+  // Los equipos sin asegurar del mismo curso lectivo, salvo este
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -39,13 +37,7 @@ export const MoveMemberModal: React.FC<{
         const open = (await projectsOfCourse(project.id_section_year)).filter(
           (p) => p.id_project !== project.id_project && p.status?.code === 'uninsured'
         );
-        const records = await Promise.all(open.map((p) => allMembershipsOf(p.id_project)));
-        const ok = open.filter(
-          (_, i) => !records[i].some((m) => m.id_student === member.id_student && blocksAdding(m))
-        );
-        if (!alive) return;
-        setSkipped(open.length - ok.length);
-        setTargets(ok.sort((a, b) => a.group_number - b.group_number));
+        if (alive) setTargets(open.sort((a, b) => a.group_number - b.group_number));
       } catch {
         if (alive) setLoadError(true);
       }
@@ -53,7 +45,7 @@ export const MoveMemberModal: React.FC<{
     return () => {
       alive = false;
     };
-  }, [project.id_project, project.id_section_year, member.id_student]);
+  }, [project.id_project, project.id_section_year]);
 
   const handleMove = async () => {
     const target = targets?.find((p) => String(p.id_project) === selected);
@@ -63,19 +55,6 @@ export const MoveMemberModal: React.FC<{
     }
     setIsSaving(true);
     setError(null);
-    try {
-      // Un registro previo en el otro equipo (salvo un rechazo) impediría sumarlo: se avisa antes de sacarlo
-      const there = await allMembershipsOf(target.id_project);
-      if (there.some((m) => m.id_student === member.id_student && blocksAdding(m))) {
-        setError(`${name} ya tiene un registro en el ${teamLabel(target)} (una solicitud, o salió de él): no se puede mover ahí`);
-        setIsSaving(false);
-        return;
-      }
-    } catch {
-      setError('No se pudo revisar el otro equipo. Pruebe de nuevo.');
-      setIsSaving(false);
-      return;
-    }
     try {
       await api.expelMember(project.id_project, member.id_student_project);
     } catch (err: any) {
@@ -105,8 +84,7 @@ export const MoveMemberModal: React.FC<{
         <div className="h-10 rounded-lg bg-fill-neutral animate-pulse" aria-busy="true" />
       ) : targets.length === 0 ? (
         <p className="text-sm text-ink">
-          No hay otro equipo sin asegurar en {project.section_name} ({project.year}) al que mover a {name}
-          {skipped > 0 && ': en los que quedan ya tuvo un registro (pidió sumarse o salió de ellos)'}.
+          No hay otro equipo sin asegurar en {project.section_name} ({project.year}) al que mover a {name}.
         </p>
       ) : (
         <div className="space-y-3 text-sm text-ink">
@@ -134,9 +112,7 @@ export const MoveMemberModal: React.FC<{
               { value: '', label: 'Elija un equipo' },
               ...targets.map((p) => ({ value: p.id_project, label: `${teamLabel(p)}${p.name ? ` · ${p.name}` : ''}` })),
             ]}
-            helperText={`Equipos sin asegurar de ${project.section_name} (${project.year})${
-              skipped > 0 ? `, salvo ${skipped === 1 ? 'uno' : skipped} en ${skipped === 1 ? 'el' : 'los'} que ya tuvo un registro` : ''
-            }.`}
+            helperText={`Equipos sin asegurar de ${project.section_name} (${project.year}).`}
           />
         </div>
       )}
