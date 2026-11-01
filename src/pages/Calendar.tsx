@@ -450,7 +450,8 @@ export const Calendar: React.FC = () => {
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
-          <div className="flex items-center gap-2 ml-auto">
+          {/* En celular, "Hoy" baja de línea en lugar de pasarse del ancho de la pantalla */}
+          <div className="flex flex-wrap items-center gap-2 ml-auto">
             <div className="w-36">
               <Select
                 aria-label="Mes"
