@@ -136,11 +136,13 @@ const toEvents = (course: Course, cal: CalendarWithClasses): CalendarEvent[] => 
 export const Calendar: React.FC = () => {
   const { user } = useAuth();
   const isSuperAdmin = Boolean(user?.is_super_admin);
+  const isStudent = user?.role === 'student';
 
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
 
-  // Cursos lectivos que puede ver: todos para el administrador; los asignados para el docente
+  // Cursos lectivos que puede ver: todos para el administrador; los asignados para el docente; el de
+  // su cursada actual para el alumno
   const [courses, setCourses] = useState<Course[] | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loadedYear, setLoadedYear] = useState<number | null>(null);
@@ -160,9 +162,13 @@ export const Calendar: React.FC = () => {
     setLoadError(null);
     const load: Promise<Course[]> = isSuperAdmin
       ? fetchAll<SectionYearPublic>((o) => api.getSectionYears({ limit: 100, offset: o }))
-      : fetchAll<ProfessorSectionYearPublic>((o) =>
-          api.getProfessorSectionYears({ id_professor: user.id_user, limit: 100, offset: o })
-        );
+      : isStudent
+        ? // El alumno ve su curso lectivo solo si cursa en el año en curso (o uno posterior), no una
+          // cursada de un año anterior
+          api.getMySectionYears().then((res) => res.section_years.filter((c) => c.year >= today.getFullYear()))
+        : fetchAll<ProfessorSectionYearPublic>((o) =>
+            api.getProfessorSectionYears({ id_professor: user.id_user, limit: 100, offset: o })
+          );
     load
       .then((items) => {
         setCourses(items);
@@ -171,7 +177,7 @@ export const Calendar: React.FC = () => {
         if (years.length > 0 && !years.includes(today.getFullYear())) setViewYear(Math.max(...years));
       })
       .catch(() => setLoadError('No se pudieron cargar los cursos lectivos'));
-  }, [user, isSuperAdmin, reloadKey]);
+  }, [user, isSuperAdmin, isStudent, reloadKey]);
 
   const coursesOfYear = useMemo(
     () =>
@@ -345,6 +351,20 @@ export const Calendar: React.FC = () => {
 
   const openDay = (iso: string) => setDetail({ date: iso, events: eventsByDate[iso] ?? [] });
 
+  // Un alumno que no cursa en el ciclo lectivo actual no tiene calendario que mostrar
+  if (isStudent && courses !== null && courses.length === 0) {
+    return (
+      <div>
+        <PageHeader title="Calendario" subtitle="Clases y entregas de su curso lectivo" />
+        <EmptyState
+          icon={<CalendarDays className="w-5 h-5" />}
+          message={`No está cursando en el ciclo lectivo ${today.getFullYear()}`}
+          description="Cuando curse en un curso lectivo, acá va a ver sus clases y entregas."
+        />
+      </div>
+    );
+  }
+
   return (
     <div>
       <PageHeader
@@ -352,7 +372,9 @@ export const Calendar: React.FC = () => {
         subtitle={
           isSuperAdmin
             ? 'Clases y entregas de todas las comisiones'
-            : 'Clases y entregas de los cursos lectivos que dicta'
+            : isStudent
+              ? 'Clases y entregas de su curso lectivo'
+              : 'Clases y entregas de los cursos lectivos que dicta'
         }
       />
 
@@ -608,7 +630,9 @@ export const Calendar: React.FC = () => {
                   listCourses.length === 0
                     ? isSuperAdmin
                       ? 'No hay cursos lectivos en esas fechas.'
-                      : 'No tiene cursos lectivos asignados en esas fechas.'
+                      : isStudent
+                        ? 'No cursa en un curso lectivo en esas fechas.'
+                        : 'No tiene cursos lectivos asignados en esas fechas.'
                     : 'Las clases y entregas que carguen los docentes aparecen acá.'
                 }
               />
