@@ -148,6 +148,9 @@ export const Calendar: React.FC = () => {
   const [loadedYear, setLoadedYear] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  // El alumno inscripto que todavía no es parte de un equipo no puede ver el calendario: el backend
+  // lo habilita recién cuando cursa (al sumarse a un equipo) y responde 403
+  const [withoutTeam, setWithoutTeam] = useState(false);
 
   // Filtros del calendario y del listado. La comisión va por nombre: el listado puede abarcar
   // cursos lectivos de más de un año
@@ -201,10 +204,12 @@ export const Calendar: React.FC = () => {
         setEvents(calendars.flatMap((cal, i) => toEvents(coursesOfYear[i], cal)).sort(compareEvents));
         setLoadedYear(viewYear);
       })
-      .catch(() => {
-        if (id === requestId.current) setLoadError('No se pudo cargar el calendario');
+      .catch((err) => {
+        if (id !== requestId.current) return;
+        if (isStudent && err?.status === 403) setWithoutTeam(true);
+        else setLoadError('No se pudo cargar el calendario');
       });
-  }, [courses, coursesOfYear, viewYear, reloadKey]);
+  }, [courses, coursesOfYear, viewYear, reloadKey, isStudent]);
 
   const yearOptions = useMemo(() => {
     const years = new Set<number>((courses ?? []).map((c) => c.year));
@@ -360,6 +365,19 @@ export const Calendar: React.FC = () => {
           icon={<CalendarDays className="w-5 h-5" />}
           message={`No está cursando en el ciclo lectivo ${today.getFullYear()}`}
           description="Cuando curse en un curso lectivo, acá va a ver sus clases y entregas."
+        />
+      </div>
+    );
+  }
+
+  if (withoutTeam) {
+    return (
+      <div>
+        <PageHeader title="Calendario" subtitle="Clases y entregas de su curso lectivo" />
+        <EmptyState
+          icon={<CalendarDays className="w-5 h-5" />}
+          message="Todavía no es parte de un equipo de trabajo"
+          description="Cuando se sume a un equipo, acá va a ver las clases y entregas de su curso lectivo."
         />
       </div>
     );
