@@ -1745,6 +1745,17 @@ export const api = {
     );
   },
 
+  // Los cursos lectivos actuales del usuario (los del año más reciente): para el alumno, el de su
+  // cursada; para el docente, sus asignaciones de ese año
+  async getMySectionYears(): Promise<{ section_years: SectionYearPublic[] }> {
+    if (USE_MOCK) {
+      await delay();
+      return { section_years: [] };
+    }
+
+    return request<{ section_years: SectionYearPublic[] }>('/me/section-year');
+  },
+
   // Los equipos del curso lectivo actual del usuario (para el alumno, el de su cursada más reciente)
   async getMySectionYearProjects(params: { limit?: number; offset?: number } = {}): Promise<ProjectList> {
     if (USE_MOCK) {
