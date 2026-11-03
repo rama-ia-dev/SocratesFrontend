@@ -12,9 +12,10 @@ import { Alert } from '../components/ui/Alert';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { Table, TableHeader, TableRow, TableHead, TableCell } from '../components/ui/Table';
 import { EditableEvent, EventFormModal } from '../components/EventFormModal';
+import { DeletableEvent, DeleteEventModal } from '../components/DeleteEventModal';
 import { RegisterHolidaysModal } from '../components/RegisterHolidaysModal';
 import { SOURCE_TEXT, useHolidays } from '../lib/holidays';
-import { CalendarDays, CalendarX, ChevronLeft, ChevronRight, ExternalLink, MapPin, Pencil, Plus, SearchX } from 'lucide-react';
+import { CalendarDays, CalendarX, ChevronLeft, ChevronRight, ExternalLink, MapPin, Pencil, Plus, SearchX, Trash2 } from 'lucide-react';
 
 const MONTHS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -465,24 +466,49 @@ export const Calendar: React.FC = () => {
 
   // Clases posteriores de la misma serie semanal: mismo curso lectivo, día, horario y título. Se buscan
   // en el año cargado del calendario y en el listado.
-  const followingIds = useMemo(() => {
-    const ev = editingSource;
-    if (!ev || ev.kind !== 'class') return [];
-    const seen = new Map<string, CalendarEvent>();
-    for (const e of [...events, ...(listEvents ?? [])]) seen.set(e.key, e);
-    return [...seen.values()]
-      .filter(
-        (e) =>
-          e.kind === 'class' &&
-          e.id_section_year === ev.id_section_year &&
-          e.date > ev.date &&
-          e.weekday === ev.weekday &&
-          e.start === ev.start &&
-          e.end === ev.end &&
-          e.rawTitle === ev.rawTitle
-      )
-      .map((e) => e.id);
-  }, [editingSource, events, listEvents]);
+  const seriesAfter = useCallback(
+    (ev: CalendarEvent | null): number[] => {
+      if (!ev || ev.kind !== 'class') return [];
+      const seen = new Map<string, CalendarEvent>();
+      for (const e of [...events, ...(listEvents ?? [])]) seen.set(e.key, e);
+      return [...seen.values()]
+        .filter(
+          (e) =>
+            e.kind === 'class' &&
+            e.id_section_year === ev.id_section_year &&
+            e.date > ev.date &&
+            e.weekday === ev.weekday &&
+            e.start === ev.start &&
+            e.end === ev.end &&
+            e.rawTitle === ev.rawTitle
+        )
+        .map((e) => e.id);
+    },
+    [events, listEvents]
+  );
+  const followingIds = useMemo(() => seriesAfter(editingSource), [seriesAfter, editingSource]);
+
+  // ===== Eliminar evento =====
+  const [deletingSource, setDeletingSource] = useState<CalendarEvent | null>(null);
+  const openDelete = (ev: CalendarEvent) => {
+    setDetail(null);
+    setDeletingSource(ev);
+  };
+  const deletingEvent = useMemo<DeletableEvent | null>(
+    () =>
+      deletingSource && deletingSource.kind !== 'holiday'
+        ? {
+            kind: deletingSource.kind,
+            id: deletingSource.id,
+            id_section_year: deletingSource.id_section_year,
+            date: deletingSource.date,
+            title: deletingSource.title,
+            section_name: deletingSource.section_name,
+          }
+        : null,
+    [deletingSource]
+  );
+  const deleteFollowingIds = useMemo(() => seriesAfter(deletingSource), [seriesAfter, deletingSource]);
 
   // Registrar feriados: solo el administrador
   const [holidaysOpen, setHolidaysOpen] = useState(false);
@@ -969,10 +995,14 @@ export const Calendar: React.FC = () => {
                 </div>
               )}
               {canEdit(ev) && (
-                <div className="mt-2">
+                <div className="mt-2 flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => openEdit(ev)}>
                     <Pencil className="w-3.5 h-3.5" aria-hidden />
                     Modificar
+                  </Button>
+                  <Button variant="ghostDanger" size="sm" onClick={() => openDelete(ev)}>
+                    <Trash2 className="w-3.5 h-3.5" aria-hidden />
+                    Eliminar
                   </Button>
                 </div>
               )}
@@ -1004,6 +1034,13 @@ export const Calendar: React.FC = () => {
         editing={editingEvent}
         followingIds={followingIds}
         onSaved={retry}
+      />
+
+      <DeleteEventModal
+        event={deletingEvent}
+        followingIds={deleteFollowingIds}
+        onClose={() => setDeletingSource(null)}
+        onDeleted={retry}
       />
 
       {isSuperAdmin && (
