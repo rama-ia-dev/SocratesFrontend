@@ -5,8 +5,10 @@ import {
   ProjectPublic,
   SectionPublic,
   SectionYearPublic,
+  StudentListItem,
 } from '../types/api';
 import { PageHeader } from '../components/ui/PageHeader';
+import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import {
   Table,
@@ -74,6 +76,43 @@ type Summary = {
   without_professors: number;
 };
 
+// Alumno inscripto en un curso lectivo que no integra ningún equipo de ese curso, con las
+// solicitudes de ingreso que tiene pendientes en él
+type StudentWithoutTeam = {
+  id_student: number;
+  first_name: string;
+  last_name: string;
+  legajo: number;
+  pending: { id_project: number; group_number: number; project_name?: string | null }[];
+};
+
+// Un alumno es parte de un equipo cuando su membresía está activa o finalizada
+const MEMBER_CODES = ['active', 'finished'];
+
+const withoutTeamOf = (students: StudentListItem[], idSectionYear: number): StudentWithoutTeam[] =>
+  students
+    .filter(
+      (st) =>
+        !st.groups.some(
+          (g) => g.id_section_year === idSectionYear && MEMBER_CODES.includes(g.status?.code ?? '')
+        )
+    )
+    .map((st) => ({
+      id_student: st.id_student,
+      first_name: st.first_name,
+      last_name: st.last_name,
+      legajo: st.legajo,
+      pending: st.groups
+        .filter((g) => g.id_section_year === idSectionYear && g.status?.code === 'pending_approval')
+        .map((g) => ({ id_project: g.id_project, group_number: g.group_number, project_name: g.project_name })),
+    }))
+    .sort(
+      (a, b) =>
+        a.last_name.localeCompare(b.last_name, 'es') ||
+        a.first_name.localeCompare(b.first_name, 'es') ||
+        a.legajo - b.legajo
+    );
+
 const PAGE_SIZE = 10;
 
 // Opciones del filtro de año: del año que viene hacia atrás.
@@ -107,6 +146,11 @@ export const ChairOverview: React.FC = () => {
 
   // Alumnos en grupos de cada curso lectivo de la página visible
   const [studentCounts, setStudentCounts] = useState<Record<number, number>>({});
+
+  // Alumnos inscriptos sin equipo de cada curso lectivo del listado (todas las páginas, para el total)
+  const [withoutTeam, setWithoutTeam] = useState<Record<number, StudentWithoutTeam[]>>({});
+  const [withoutTeamReady, setWithoutTeamReady] = useState(false);
+  const [detailRow, setDetailRow] = useState<ChairRow | null>(null);
 
   useEffect(() => {
     api
@@ -249,6 +293,43 @@ export const ChairOverview: React.FC = () => {
     };
   }, [rows, offset]);
 
+  // Alumnos inscriptos sin equipo: se consultan los inscriptos de cada curso lectivo del listado con
+  // sus grupos (incluidas las solicitudes pendientes). Hasta que llegan se sigue mostrando lo anterior.
+  useEffect(() => {
+    if (rows.length === 0) return;
+    let cancelled = false;
+    setWithoutTeamReady(false);
+    Promise.all(
+      rows.map(async (r) => {
+        const students = await fetchAll<StudentListItem>((o) =>
+          api.getStudents({
+            id_section_year: r.id_section_year,
+            kind: 'registered',
+            status: [...MEMBER_CODES, 'pending_approval'],
+            limit: 100,
+            offset: o,
+          })
+        );
+        return [r.id_section_year, withoutTeamOf(students, r.id_section_year)] as const;
+      })
+    )
+      .then((pairs) => {
+        if (cancelled) return;
+        setWithoutTeam(Object.fromEntries(pairs));
+        setWithoutTeamReady(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        toastError('Error al cargar los alumnos sin equipo');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [rows, toastError]);
+
+  const withoutTeamTotal = rows.reduce((acc, r) => acc + (withoutTeam[r.id_section_year]?.length ?? 0), 0);
+  const detailStudents = detailRow ? withoutTeam[detailRow.id_section_year] ?? [] : [];
+
   // Grupos aprobados sobre los grupos que siguen vigentes (sin contar cancelados). Un grupo
   // rechazado sigue vigente: rehace la propuesta hasta aprobar.
   const progressOf = (row: ChairRow): number | null => {
@@ -271,7 +352,7 @@ export const ChairOverview: React.FC = () => {
     <div>
       <PageHeader
         title="Estado de la cátedra"
-        subtitle="Panorama de los cursos lectivos: docentes, grupos y aprobados"
+        subtitle="Panorama de los cursos lectivos: docentes, grupos, aprobados y alumnos sin equipo"
       />
 
       <div className="space-y-4">
@@ -320,7 +401,7 @@ export const ChairOverview: React.FC = () => {
 
         {/* Totales del filtro: una sola franja, no tarjetas sueltas */}
         {summary && summary.section_years > 0 && (
-          <dl className="grid grid-cols-2 lg:grid-cols-4 rounded-xl border border-line bg-white divide-line max-lg:[&>div:nth-child(-n+2)]:border-b lg:divide-x max-lg:[&>div:nth-child(odd)]:border-r">
+          <dl className="grid grid-cols-2 lg:grid-cols-5 rounded-xl border border-line bg-white divide-line max-lg:[&>div:nth-child(-n+4)]:border-b lg:divide-x max-lg:[&>div:nth-child(odd):not(:last-child)]:border-r max-lg:[&>div:last-child]:col-span-2">
             {[
               { label: 'Cursos lectivos', value: summary.section_years, alert: false },
               { label: 'Grupos', value: summary.projects, alert: false },
@@ -329,6 +410,15 @@ export const ChairOverview: React.FC = () => {
                 label: 'Cursos sin docentes',
                 value: summary.without_professors,
                 alert: summary.without_professors > 0,
+              },
+              {
+                label: 'Alumnos sin equipo',
+                // Mientras se cuentan, si faltan cursos del listado actual, se muestran puntos suspensivos
+                value:
+                  withoutTeamReady || rows.every((r) => r.id_section_year in withoutTeam)
+                    ? withoutTeamTotal
+                    : '…',
+                alert: withoutTeamTotal > 0,
               },
             ].map((card) => (
               <div key={card.label} className="px-5 py-3.5 border-line">
@@ -374,7 +464,7 @@ export const ChairOverview: React.FC = () => {
         ) : (
           <>
             {/* Anchos fijos por columna: al filtrar, la tabla no cambia de forma */}
-            <Table className="table-fixed min-w-[1340px]">
+            <Table className="table-fixed min-w-[1440px]">
               <colgroup>
                 <col className="w-[120px]" />
                 <col className="w-[64px]" />
@@ -384,6 +474,7 @@ export const ChairOverview: React.FC = () => {
                 <col className="w-[100px]" />
                 <col className="w-[150px]" />
                 <col className="w-[96px]" />
+                <col className="w-[100px]" />
                 <col className="w-[100px]" />
                 <col className="w-[100px]" />
                 <col className="w-[120px]" />
@@ -401,6 +492,7 @@ export const ChairOverview: React.FC = () => {
                     </TableHead>
                   ))}
                   <TableHead className="text-center">Alumnos en grupos</TableHead>
+                  <TableHead className="text-center">Alumnos sin equipo</TableHead>
                   <TableHead className="text-center">Cupo de integrantes por grupo</TableHead>
                 </tr>
               </TableHeader>
@@ -408,6 +500,7 @@ export const ChairOverview: React.FC = () => {
                 {pageRows.map((row) => {
                   const progress = progressOf(row);
                   const students = studentCounts[row.id_section_year];
+                  const noTeam = withoutTeam[row.id_section_year];
                   return (
                     <TableRow key={row.id_section_year}>
                       <TableCell className="font-medium text-ink">
@@ -495,6 +588,22 @@ export const ChairOverview: React.FC = () => {
                       <TableCell className="text-center tabular-nums">
                         {students ?? '…'}
                       </TableCell>
+                      <TableCell className="text-center tabular-nums">
+                        {noTeam === undefined ? (
+                          '…'
+                        ) : noTeam.length === 0 ? (
+                          <span className="text-ink-faint">0</span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setDetailRow(row)}
+                            title="Ver los alumnos sin equipo"
+                            className="font-semibold text-danger underline decoration-dotted underline-offset-4 hover:decoration-solid cursor-pointer"
+                          >
+                            {noTeam.length}
+                          </button>
+                        )}
+                      </TableCell>
                       <TableCell className="text-center tabular-nums whitespace-nowrap">
                         {row.min_students !== undefined && row.max_students !== undefined
                           ? `${row.min_students} – ${row.max_students}`
@@ -515,6 +624,43 @@ export const ChairOverview: React.FC = () => {
           </>
         )}
       </div>
+
+      <Modal
+        isOpen={detailRow !== null}
+        onClose={() => setDetailRow(null)}
+        title={detailRow ? `Alumnos sin equipo · ${detailRow.section_name} ${detailRow.year}` : ''}
+        maxWidth="lg"
+      >
+        <p className="text-sm text-ink-muted mb-3">
+          Inscriptos en el curso lectivo que todavía no integran ningún equipo
+          ({detailStudents.length}).
+        </p>
+        <ul className="divide-y divide-line border border-line rounded-lg max-h-[60vh] overflow-y-auto">
+          {detailStudents.map((st) => (
+            <li key={st.id_student} className="px-4 py-2.5">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="font-medium text-ink">
+                  {st.last_name}, {st.first_name}
+                </span>
+                <span className="text-xs text-ink-muted tabular-nums">Legajo {st.legajo}</span>
+              </div>
+              {st.pending.length > 0 && (
+                <p className="mt-0.5 text-xs text-ink-muted">
+                  Solicitud pendiente en{' '}
+                  {st.pending
+                    .map((p) => `Grupo ${p.group_number}${p.project_name ? ` (${p.project_name})` : ''}`)
+                    .join(', ')}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+        <div className="mt-4 flex justify-end">
+          <Button variant="outline" onClick={() => setDetailRow(null)}>
+            Cerrar
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };

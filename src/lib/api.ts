@@ -640,6 +640,8 @@ export const api = {
     id_section_year?: number | null;
     q?: string | null;
     kind?: 'registered' | null;
+    // Estados de la membresía con los que vienen los grupos de cada alumno (por defecto, activos y finalizados)
+    status?: string[] | null;
     limit?: number;
     offset?: number;
   } = {}): Promise<StudentList> {
@@ -663,6 +665,7 @@ export const api = {
     if (params.id_section_year) query.set('id_section_year', params.id_section_year.toString());
     if (params.q) query.set('q', params.q);
     if (params.kind) query.set('kind', params.kind);
+    params.status?.forEach((s) => query.append('status', s));
     if (params.limit !== undefined) query.set('limit', params.limit.toString());
     if (params.offset !== undefined) query.set('offset', params.offset.toString());
 
