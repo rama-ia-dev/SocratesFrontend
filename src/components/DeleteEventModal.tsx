@@ -44,12 +44,15 @@ export const DeleteEventModal: React.FC<DeleteEventModalProps> = ({ event, follo
   const [present, setPresent] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // La entrega tiene datos de los equipos: el backend no deja eliminarla, así que ya no se ofrece
+  const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
     if (!event) return;
     let alive = true;
     setScope('one');
     setError(null);
+    setBlocked(false);
     setPresent(null);
     if (event.kind === 'class') {
       api
@@ -83,8 +86,9 @@ export const DeleteEventModal: React.FC<DeleteEventModalProps> = ({ event, follo
       }
       onDeleted();
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       setError(errorMessage(err, event.kind));
+      if (err?.status === 409 && !isClass) setBlocked(true);
     } finally {
       setDeleting(false);
     }
@@ -128,23 +132,27 @@ export const DeleteEventModal: React.FC<DeleteEventModalProps> = ({ event, follo
         </fieldset>
       )}
 
-      <p className="mt-4 text-sm text-ink-muted">
-        {isClass
-          ? present
-            ? `Esta clase tiene la asistencia de ${present} ${present === 1 ? 'alumno' : 'alumnos'}: se borra junto con la clase. `
-            : ''
-          : ''}
-        {isClass && withFollowing && 'Si alguna de las siguientes tiene asistencia tomada, también se borra. '}
-        No se puede deshacer.
-      </p>
+      {!blocked && (
+        <p className="mt-4 text-sm text-ink-muted">
+          {isClass
+            ? present
+              ? `Esta clase tiene la asistencia de ${present} ${present === 1 ? 'alumno' : 'alumnos'}: se borra junto con la clase. `
+              : ''
+            : ''}
+          {isClass && withFollowing && 'Si alguna de las siguientes tiene asistencia tomada, también se borra. '}
+          No se puede deshacer.
+        </p>
+      )}
 
       <div className="mt-4 flex justify-end gap-3 pt-3 border-t border-line">
         <Button variant="outline" onClick={onClose} disabled={deleting}>
-          Cancelar
+          {blocked ? 'Cerrar' : 'Cancelar'}
         </Button>
-        <Button variant="destructive" onClick={handleDelete} isLoading={deleting} disabled={isClass && present === null}>
-          {withFollowing ? `Eliminar ${followingIds.length + 1} clases` : 'Eliminar'}
-        </Button>
+        {!blocked && (
+          <Button variant="destructive" onClick={handleDelete} isLoading={deleting} disabled={isClass && present === null}>
+            {withFollowing ? `Eliminar ${followingIds.length + 1} clases` : 'Eliminar'}
+          </Button>
+        )}
       </div>
     </Modal>
   );
