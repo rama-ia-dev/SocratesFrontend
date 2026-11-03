@@ -23,10 +23,12 @@ import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { useToast } from '../components/ui/Toast';
 import { ActionMenu } from '../components/ui/ActionMenu';
 import { EditStudentModal } from '../components/EditStudentModal';
+import { DeleteUserModal } from '../components/DeleteUserModal';
 import {
   Search,
   Plus,
   Edit2,
+  Trash2,
   AlertCircle,
   UserCheck,
   GraduationCap,
@@ -88,6 +90,9 @@ export const Users: React.FC = () => {
   // Diálogo Modificar Alumno
   // ==========================================
   const [editingStudent, setEditingStudent] = useState<UserListItem | null>(null);
+
+  // Eliminar un usuario cargado por error (SCRUM-111)
+  const [deletingUser, setDeletingUser] = useState<UserListItem | null>(null);
 
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
@@ -401,6 +406,12 @@ export const Users: React.FC = () => {
                           onClick: () =>
                             u.role === 'professor' ? handleOpenEditProf(u) : handleOpenEditStudent(u),
                         },
+                        {
+                          label: 'Eliminar',
+                          icon: <Trash2 className="w-3.5 h-3.5" />,
+                          onClick: () => setDeletingUser(u),
+                          danger: true,
+                        },
                       ]}
                     />
                   </TableCell>
@@ -624,6 +635,29 @@ export const Users: React.FC = () => {
           }}
           onClose={() => setEditingStudent(null)}
           onSaved={fetchUsers}
+        />
+      )}
+
+      {deletingUser && (
+        <DeleteUserModal
+          key={deletingUser.id_user}
+          person={{
+            id: deletingUser.id_user,
+            first_name: deletingUser.first_name,
+            last_name: deletingUser.last_name,
+            legajo: deletingUser.legajo,
+            role: deletingUser.role,
+            is_super_admin: deletingUser.is_super_admin,
+          }}
+          remove={api.deleteUser}
+          onClose={() => setDeletingUser(null)}
+          onDeleted={(name) => {
+            setDeletingUser(null);
+            success(`Se eliminó a ${name}`);
+            // Si era el único de la última página, se vuelve a la anterior
+            if (users.length === 1 && offset > 0) setOffset(offset - 10);
+            else fetchUsers();
+          }}
         />
       )}
     </div>
