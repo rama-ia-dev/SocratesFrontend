@@ -1812,18 +1812,25 @@ export const api = {
     });
   },
 
-  // Cargar clases y actividades de una vez (por ejemplo, clases semanales sin los feriados). Todo o nada.
-  async bulkLoadCalendar(id_section_year: number, payload: CalendarBulkLoad): Promise<CalendarBulkLoadReport> {
+  // Cargar clases y actividades de una vez (por ejemplo, clases semanales sin los feriados o una planilla
+  // de Excel). Todo o nada. Con `dryRun` solo valida, sin guardar. Errores por fila en `detail`:
+  // [{kind: 'class' | 'activity', row, detail}] (422 dentro de la carga, 409 contra lo ya cargado).
+  async bulkLoadCalendar(
+    id_section_year: number,
+    payload: CalendarBulkLoad,
+    { dryRun = false }: { dryRun?: boolean } = {}
+  ): Promise<CalendarBulkLoadReport> {
     if (USE_MOCK) {
       await delay();
       return {
-        dry_run: false,
+        dry_run: dryRun,
         classes_created: payload.classes?.length ?? 0,
         activities_created: payload.activities?.length ?? 0,
       };
     }
 
-    return request<CalendarBulkLoadReport>(`/section-years/${id_section_year}/calendar/bulk`, {
+    const query = dryRun ? '?dry_run=true' : '';
+    return request<CalendarBulkLoadReport>(`/section-years/${id_section_year}/calendar/bulk${query}`, {
       method: 'POST',
       body: JSON.stringify(payload),
     });

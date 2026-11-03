@@ -14,8 +14,9 @@ import { Table, TableHeader, TableRow, TableHead, TableCell } from '../component
 import { EditableEvent, EventFormModal } from '../components/EventFormModal';
 import { DeletableEvent, DeleteEventModal } from '../components/DeleteEventModal';
 import { RegisterHolidaysModal } from '../components/RegisterHolidaysModal';
+import { CalendarExcelModal } from '../components/CalendarExcelModal';
 import { SOURCE_TEXT, useHolidays } from '../lib/holidays';
-import { CalendarDays, CalendarX, ChevronLeft, ChevronRight, ExternalLink, MapPin, Pencil, Plus, SearchX, Trash2 } from 'lucide-react';
+import { CalendarDays, CalendarX, ChevronLeft, ChevronRight, ExternalLink, FileSpreadsheet, MapPin, Pencil, Plus, SearchX, Trash2 } from 'lucide-react';
 
 const MONTHS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -513,6 +514,15 @@ export const Calendar: React.FC = () => {
   // Registrar feriados: solo el administrador
   const [holidaysOpen, setHolidaysOpen] = useState(false);
 
+  // Cargar desde Excel: se sugiere el curso lectivo del año que se ve (el de la comisión filtrada o, si
+  // hay uno solo ese año, ese)
+  const [excelOpen, setExcelOpen] = useState(false);
+  const excelCourseId = useMemo(() => {
+    const ofYear = registrableCourses.filter((c) => c.year === viewYear);
+    const match = sectionFilter ? ofYear.find((c) => c.section_name === sectionFilter) : undefined;
+    return match?.id_section_year ?? (ofYear.length === 1 ? ofYear[0].id_section_year : null);
+  }, [registrableCourses, viewYear, sectionFilter]);
+
   const openRegister = (iso: string) => {
     setDetail(null);
     setRegisterDate(iso);
@@ -573,6 +583,10 @@ export const Calendar: React.FC = () => {
                   Registrar feriados
                 </Button>
               )}
+              <Button variant="outline" className="w-full sm:w-auto" onClick={() => setExcelOpen(true)}>
+                <FileSpreadsheet className="w-4 h-4" aria-hidden />
+                Cargar desde Excel
+              </Button>
               <Button
                 className="w-full sm:w-auto"
                 // Hoy, o el primer día del mes que se ve si es de un año posterior; si no es hábil, el siguiente
@@ -1041,6 +1055,14 @@ export const Calendar: React.FC = () => {
         followingIds={deleteFollowingIds}
         onClose={() => setDeletingSource(null)}
         onDeleted={retry}
+      />
+
+      <CalendarExcelModal
+        isOpen={excelOpen}
+        onClose={() => setExcelOpen(false)}
+        courses={registrableCourses}
+        defaultCourseId={excelCourseId}
+        onDone={retry}
       />
 
       {isSuperAdmin && (
