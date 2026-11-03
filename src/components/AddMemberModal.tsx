@@ -6,6 +6,7 @@ import { Button } from './ui/Button';
 import { Alert } from './ui/Alert';
 import { Select } from './ui/Select';
 import { teamLabel } from '../lib/projects';
+import { fetchAll } from '../lib/pagination';
 import { addMemberError, allMembershipsOf, blocksAdding, projectsOfCourse } from '../lib/teamMembers';
 
 // Sumar un alumno al equipo (SCRUM-103). Lo pueden los docentes del curso lectivo y el
@@ -29,8 +30,10 @@ export const AddMemberModal: React.FC<{
     let alive = true;
     (async () => {
       try {
+        // Todas las páginas: el backend devuelve hasta 100 filas ordenadas por apellido, y con una
+        // sola la lista se cortaba a mitad del abecedario
         const [enrolled, projects] = await Promise.all([
-          api.getStudentSectionYears(project.id_section_year),
+          fetchAll<StudentSectionYearPublic>((o) => api.getStudentSectionYears(project.id_section_year, o)),
           projectsOfCourse(project.id_section_year),
         ]);
         const memberships = await Promise.all(projects.map((p) => allMembershipsOf(p.id_project)));
@@ -38,7 +41,7 @@ export const AddMemberModal: React.FC<{
         const inTeam = new Set<number>();
         memberships.flat().forEach((m) => blocksAdding(m) && inTeam.add(m.id_student));
         // Un alumno puede tener más de una fila en el curso (la inscripción y la cursada): una por alumno
-        const byStudent = new Map(enrolled.items.map((e) => [e.id_student, e]));
+        const byStudent = new Map(enrolled.map((e) => [e.id_student, e]));
         const free = [...byStudent.values()]
           .filter((e) => !inTeam.has(e.id_student))
           .sort((a, b) => a.student_last_name.localeCompare(b.student_last_name, 'es'));

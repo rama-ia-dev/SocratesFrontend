@@ -1878,14 +1878,16 @@ export const api = {
     return request<StudentProjectPublic>(`/projects/${id_project}/members/${id_student}`, { method: 'POST' });
   },
 
-  // Alumnos inscriptos en un curso lectivo (su cursada)
-  async getStudentSectionYears(id_section_year: number): Promise<StudentSectionYearList> {
+  // Alumnos inscriptos en un curso lectivo (su cursada), de a una página de hasta 100
+  async getStudentSectionYears(id_section_year: number, offset = 0): Promise<StudentSectionYearList> {
     if (USE_MOCK) {
       await delay();
-      return { items: [], total: 0, limit: 100, offset: 0 };
+      return { items: [], total: 0, limit: 100, offset };
     }
 
-    return request<StudentSectionYearList>(`/student-section-years?id_section_year=${id_section_year}&limit=100`);
+    return request<StudentSectionYearList>(
+      `/student-section-years?id_section_year=${id_section_year}&limit=100&offset=${offset}`
+    );
   },
 
   // El jefe del grupo acepta (active) o rechaza (rejected) una solicitud para sumarse
