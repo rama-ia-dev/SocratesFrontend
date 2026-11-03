@@ -20,7 +20,9 @@ import { Pagination } from '../components/ui/Pagination';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { ActionMenu } from '../components/ui/ActionMenu';
 import { EditStudentModal } from '../components/EditStudentModal';
-import { Search, SearchX, Plus, RefreshCw, Edit2, CloudOff, GraduationCap } from 'lucide-react';
+import { DeleteUserModal } from '../components/DeleteUserModal';
+import { useToast } from '../components/ui/Toast';
+import { Search, SearchX, Plus, RefreshCw, Edit2, Trash2, CloudOff, GraduationCap } from 'lucide-react';
 
 const PAGE_SIZE = 10;
 
@@ -55,6 +57,9 @@ export const Students: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [editingStudent, setEditingStudent] = useState<StudentListItem | null>(null);
+  // Eliminar un alumno cargado por error (SCRUM-101): solo el administrador
+  const [deletingStudent, setDeletingStudent] = useState<StudentListItem | null>(null);
+  const { success } = useToast();
 
   // Filtro por curso lectivo: los del docente o, para el administrador, todos
   useEffect(() => {
@@ -287,6 +292,16 @@ export const Students: React.FC = () => {
                           icon: <Edit2 className="w-3.5 h-3.5 text-primary" />,
                           onClick: () => setEditingStudent(st),
                         },
+                        ...(user?.is_super_admin
+                          ? [
+                              {
+                                label: 'Eliminar',
+                                icon: <Trash2 className="w-3.5 h-3.5" />,
+                                onClick: () => setDeletingStudent(st),
+                                danger: true,
+                              },
+                            ]
+                          : []),
                       ]}
                     />
                   </TableCell>
@@ -312,6 +327,28 @@ export const Students: React.FC = () => {
           }}
           onClose={() => setEditingStudent(null)}
           onSaved={fetchStudents}
+        />
+      )}
+
+      {deletingStudent && (
+        <DeleteUserModal
+          key={deletingStudent.id_student}
+          person={{
+            id: deletingStudent.id_student,
+            first_name: deletingStudent.first_name,
+            last_name: deletingStudent.last_name,
+            legajo: deletingStudent.legajo,
+            role: 'student',
+          }}
+          remove={api.deleteStudent}
+          onClose={() => setDeletingStudent(null)}
+          onDeleted={(name) => {
+            setDeletingStudent(null);
+            success(`Se eliminó a ${name}`);
+            // Si era el único de la última página, se vuelve a la anterior
+            if (students.length === 1 && offset > 0) setOffset(offset - PAGE_SIZE);
+            else fetchStudents();
+          }}
         />
       )}
     </div>

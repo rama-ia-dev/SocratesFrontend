@@ -93,6 +93,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     return [
       { label: 'Mi equipo', path: '/mi-equipo', icon: Users },
       { label: 'Equipos de trabajo', path: '/equipos', icon: FolderKanban },
+      { label: 'Calendario', path: '/calendario', icon: CalendarDays },
     ];
   };
 
