@@ -10,6 +10,10 @@ import {
   AccessToken,
   ActivityCreate,
   ActivityPublic,
+  ActivityUpdate,
+  CalendarClassBulkUpdate,
+  CalendarClassUpdate,
+  ClassAttendance,
   CalendarBulkLoad,
   CalendarBulkLoadReport,
   CalendarClassCreate,
@@ -1823,6 +1827,75 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  },
+
+  // Modificar una clase. 409 si queda superpuesta con otra; 422 si la fecha sale del año del curso lectivo.
+  async updateCalendarClass(id_calendar_class: number, changes: CalendarClassUpdate): Promise<CalendarClassPublic> {
+    if (USE_MOCK) {
+      await delay();
+      return { id_calendar_class, id_calendar: 0, weekday: 1, date: '', start_time: '', end_time: '', modality: 'in_person', ...changes };
+    }
+
+    return request<CalendarClassPublic>(`/calendar-classes/${id_calendar_class}`, {
+      method: 'PATCH',
+      body: JSON.stringify(changes),
+    });
+  },
+
+  // Modificar varias clases de un curso lectivo de una vez (por ejemplo, una clase semanal y las siguientes)
+  async updateCalendarClasses(id_section_year: number, payload: CalendarClassBulkUpdate): Promise<CalendarClassPublic[]> {
+    if (USE_MOCK) {
+      await delay();
+      return [];
+    }
+
+    return request<CalendarClassPublic[]>(`/section-years/${id_section_year}/calendar-classes/bulk`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Eliminar una clase. Borra también su asistencia.
+  async deleteCalendarClass(id_calendar_class: number): Promise<void> {
+    if (USE_MOCK) {
+      await delay();
+      return;
+    }
+
+    await request<void>(`/calendar-classes/${id_calendar_class}`, { method: 'DELETE' });
+  },
+
+  // Asistencia de una clase: un ítem por alumno del curso lectivo, con `present`
+  async getClassAttendance(id_calendar_class: number): Promise<ClassAttendance> {
+    if (USE_MOCK) {
+      await delay();
+      return { session: null, items: [] };
+    }
+
+    return request<ClassAttendance>(`/calendar-classes/${id_calendar_class}/attendance`);
+  },
+
+  // Modificar una entrega
+  async updateActivity(id_activity: number, changes: ActivityUpdate): Promise<ActivityPublic> {
+    if (USE_MOCK) {
+      await delay();
+      return { id_activity, id_calendar: 0, id_section_year: 0, title: '', due_date: '', ...changes };
+    }
+
+    return request<ActivityPublic>(`/activities/${id_activity}`, {
+      method: 'PATCH',
+      body: JSON.stringify(changes),
+    });
+  },
+
+  // Eliminar una entrega. 409 si los equipos ya cargaron datos de entrega.
+  async deleteActivity(id_activity: number): Promise<void> {
+    if (USE_MOCK) {
+      await delay();
+      return;
+    }
+
+    await request<void>(`/activities/${id_activity}`, { method: 'DELETE' });
   },
 
   // Quitar varias clases de un curso lectivo (por ejemplo, las de un feriado). Borra también su asistencia.
