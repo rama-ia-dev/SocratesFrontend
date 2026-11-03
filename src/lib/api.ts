@@ -744,6 +744,17 @@ export const api = {
     return request<UserList>(`/users?${query.toString()}`);
   },
 
+  // Eliminar un usuario cargado por error (solo el administrador). El backend lo rechaza (409) si
+  // es administrador, un docente con cursos lectivos asignados o un alumno con equipo o solicitud
+  async deleteUser(id_user: number): Promise<void> {
+    if (USE_MOCK) {
+      await delay();
+      mockDB.users = mockDB.users.filter((u) => u.id_user !== id_user);
+      return;
+    }
+    return request<void>(`/users/${id_user}`, { method: 'DELETE' });
+  },
+
   // ==========================================
   // Students
   // ==========================================
@@ -851,6 +862,17 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  },
+
+  // Eliminar un alumno cargado por error (solo el administrador). El backend lo rechaza (409) si es
+  // parte de un equipo, terminó en uno o tiene una solicitud pendiente
+  async deleteStudent(id_student: number): Promise<void> {
+    if (USE_MOCK) {
+      await delay();
+      mockDB.users = mockDB.users.filter((u) => u.id_user !== id_student);
+      return;
+    }
+    return request<void>(`/students/${id_student}`, { method: 'DELETE' });
   },
 
   async updateStudent(id_student: number, payload: StudentUpdate): Promise<StudentPublic> {
@@ -1731,6 +1753,17 @@ export const api = {
       `/projects/${id_project}/members/${id_student_project}/leader`,
       { method: 'POST' }
     );
+  },
+
+  // Los cursos lectivos actuales del usuario (los del año más reciente): para el alumno, el de su
+  // cursada; para el docente, sus asignaciones de ese año
+  async getMySectionYears(): Promise<{ section_years: SectionYearPublic[] }> {
+    if (USE_MOCK) {
+      await delay();
+      return { section_years: [] };
+    }
+
+    return request<{ section_years: SectionYearPublic[] }>('/me/section-year');
   },
 
   // Los equipos del curso lectivo actual del usuario (para el alumno, el de su cursada más reciente)

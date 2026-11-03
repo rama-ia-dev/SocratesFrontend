@@ -144,11 +144,11 @@ export default function App() {
               }
             />
 
-            {/* Calendario: clases y entregas (Profesor y super admin) */}
+            {/* Calendario: clases y entregas (super admin, profesor y alumno) */}
             <Route
               path="/calendario"
               element={
-                <ProtectedRoute allowedRoles={['superadmin', 'professor']}>
+                <ProtectedRoute allowedRoles={['superadmin', 'professor', 'student']}>
                   <Calendar />
                 </ProtectedRoute>
               }
