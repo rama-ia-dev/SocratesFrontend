@@ -12,7 +12,9 @@ import { Alert } from '../components/ui/Alert';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { Table, TableHeader, TableRow, TableHead, TableCell } from '../components/ui/Table';
 import { RegisterEventModal } from '../components/RegisterEventModal';
-import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, MapPin, Plus, SearchX } from 'lucide-react';
+import { RegisterHolidaysModal } from '../components/RegisterHolidaysModal';
+import { SOURCE_TEXT, useHolidays } from '../lib/holidays';
+import { CalendarDays, CalendarX, ChevronLeft, ChevronRight, ExternalLink, MapPin, Plus, SearchX } from 'lucide-react';
 
 const MONTHS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -21,12 +23,14 @@ const MONTHS = [
 const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const WEEKDAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
-// Tipos de evento que hoy distingue el backend: las clases del calendario y las actividades
-// (entregas). Colores validados para daltonismo; el tipo siempre va también escrito.
-type EventKind = 'class' | 'delivery';
+// Tipos de evento: las clases del calendario y las actividades (entregas) que guarda el backend, y los
+// feriados nacionales, que no se guardan sino que se consultan (ver lib/holidays). Colores validados
+// para daltonismo; el tipo siempre va también escrito.
+type EventKind = 'class' | 'delivery' | 'holiday';
 const EVENT_KINDS: { value: EventKind; label: string; dot: string; chip: string }[] = [
   { value: 'class', label: 'Clase', dot: 'bg-[#2a78d6]', chip: 'border-l-[#2a78d6]' },
   { value: 'delivery', label: 'Entrega', dot: 'bg-[#1baf7a]', chip: 'border-l-[#1baf7a]' },
+  { value: 'holiday', label: 'Feriado', dot: 'bg-[#eb6834]', chip: 'border-l-[#eb6834]' },
 ];
 const kindOf = (value: EventKind) => EVENT_KINDS.find((k) => k.value === value)!;
 
@@ -97,12 +101,31 @@ const hhmm = (time: string | null | undefined) => (time ? time.slice(0, 5) : nul
 const timeText = (ev: CalendarEvent) =>
   ev.start && ev.end ? `${ev.start} a ${ev.end}` : ev.start ? `Hasta las ${ev.start}` : 'Todo el día';
 
-// Orden: fecha, hora (las entregas sin hora al final del día) y comisión
+// Orden: fecha, el feriado primero, hora (las entregas sin hora al final del día) y comisión
 const compareEvents = (a: CalendarEvent, b: CalendarEvent) =>
   a.date.localeCompare(b.date) ||
+  Number(b.kind === 'holiday') - Number(a.kind === 'holiday') ||
   (a.start ?? '99').localeCompare(b.start ?? '99') ||
   a.section_name.localeCompare(b.section_name, 'es') ||
   a.key.localeCompare(b.key);
+
+// Los feriados valen para todas las comisiones
+const sectionText = (ev: CalendarEvent) => (ev.kind === 'holiday' ? 'Todas' : ev.section_name);
+
+// Feriados entre dos fechas como eventos
+const holidayEvents = (holidays: Record<string, string>, from: string, to: string): CalendarEvent[] =>
+  Object.entries(holidays)
+    .filter(([date]) => date >= from && date <= to)
+    .map(([date, name]) => ({
+      key: `holiday-${date}`,
+      kind: 'holiday' as const,
+      date,
+      start: null,
+      end: null,
+      title: name,
+      id_section_year: 0,
+      section_name: '',
+    }));
 
 type Course = Pick<SectionYearPublic, 'id_section_year' | 'year' | 'section_name'>;
 
@@ -222,16 +245,21 @@ export const Calendar: React.FC = () => {
   const firstLoad = loadedYear === null && !loadError;
   const loadingYear = loadedYear !== viewYear && !loadError;
 
+  // Feriados del año que se ve; valen para todas las comisiones, así que el filtro de comisión no los oculta
+  const { holidays: yearHolidays, source: holidaySource } = useHolidays([viewYear]);
+
   const filtered = useMemo(
     () =>
       loadedYear === viewYear
-        ? events.filter(
-            (e) =>
-              (!sectionFilter || e.section_name === sectionFilter) &&
-              (!kindFilter || e.kind === kindFilter)
-          )
+        ? [...events, ...holidayEvents(yearHolidays, `${viewYear}-01-01`, `${viewYear}-12-31`)]
+            .filter(
+              (e) =>
+                (!sectionFilter || e.kind === 'holiday' || e.section_name === sectionFilter) &&
+                (!kindFilter || e.kind === kindFilter)
+            )
+            .sort(compareEvents)
         : [],
-    [events, loadedYear, viewYear, sectionFilter, kindFilter]
+    [events, yearHolidays, loadedYear, viewYear, sectionFilter, kindFilter]
   );
 
   const eventsByDate = useMemo(() => {
@@ -301,12 +329,27 @@ export const Calendar: React.FC = () => {
       });
   }, [courses, listCourses, listFrom, listTo, rangeError, reloadKey]);
 
+  // Feriados de los años del rango (a lo sumo unos pocos años, para no consultar de más)
+  const listYears = useMemo(() => {
+    if (rangeError) return [];
+    const from = Number(listFrom.slice(0, 4));
+    const to = Math.min(Number(listTo.slice(0, 4)), from + 4);
+    return Array.from({ length: to - from + 1 }, (_, i) => from + i);
+  }, [listFrom, listTo, rangeError]);
+  const { holidays: listHolidays } = useHolidays(listYears);
+
   const listFiltered = useMemo(
     () =>
-      (listEvents ?? []).filter(
-        (e) => (!kindFilter || e.kind === kindFilter) && (!sectionFilter || e.section_name === sectionFilter)
-      ),
-    [listEvents, kindFilter, sectionFilter]
+      listEvents === null
+        ? []
+        : [...listEvents, ...holidayEvents(listHolidays, listFrom, listTo)]
+            .filter(
+              (e) =>
+                (!kindFilter || e.kind === kindFilter) &&
+                (!sectionFilter || e.kind === 'holiday' || e.section_name === sectionFilter)
+            )
+            .sort(compareEvents),
+    [listEvents, listHolidays, listFrom, listTo, kindFilter, sectionFilter]
   );
 
   // El listado separado por semana (de lunes a domingo); solo aparecen las semanas con eventos
@@ -368,7 +411,13 @@ export const Calendar: React.FC = () => {
     [courses, canManage]
   );
   const canRegister = registrableCourses.length > 0;
-  const canRegisterOn = (iso: string) => canRegister && Number(iso.slice(0, 4)) >= today.getFullYear();
+  // En un feriado no se registran eventos
+  const isHoliday = (iso: string) => Boolean(yearHolidays[iso] ?? listHolidays[iso]);
+  const canRegisterOn = (iso: string) =>
+    canRegister && Number(iso.slice(0, 4)) >= today.getFullYear() && !isHoliday(iso);
+
+  // Registrar feriados: solo el administrador
+  const [holidaysOpen, setHolidaysOpen] = useState(false);
 
   const openRegister = (iso: string) => {
     setDetail(null);
@@ -416,21 +465,29 @@ export const Calendar: React.FC = () => {
         title="Calendario"
         subtitle={
           isSuperAdmin
-            ? 'Clases y entregas de todas las comisiones'
+            ? 'Clases, entregas y feriados de todas las comisiones'
             : isStudent
-              ? 'Clases y entregas de su curso lectivo'
-              : 'Clases y entregas de los cursos lectivos que dicta'
+              ? 'Clases, entregas y feriados de su curso lectivo'
+              : 'Clases, entregas y feriados de los cursos lectivos que dicta'
         }
         action={
           canRegister && (
-            <Button
-              className="w-full sm:w-auto"
-              // Hoy, o el primer día del mes que se ve si es de un año posterior
-              onClick={() => openRegister(viewYear > today.getFullYear() ? toIso(viewYear, viewMonth, 1) : todayIso)}
-            >
-              <Plus className="w-4 h-4" aria-hidden />
-              Registrar evento
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              {isSuperAdmin && (
+                <Button variant="outline" className="w-full sm:w-auto" onClick={() => setHolidaysOpen(true)}>
+                  <CalendarX className="w-4 h-4" aria-hidden />
+                  Registrar feriados
+                </Button>
+              )}
+              <Button
+                className="w-full sm:w-auto"
+                // Hoy, o el primer día del mes que se ve si es de un año posterior
+                onClick={() => openRegister(viewYear > today.getFullYear() ? toIso(viewYear, viewMonth, 1) : todayIso)}
+              >
+                <Plus className="w-4 h-4" aria-hidden />
+                Registrar evento
+              </Button>
+            </div>
           )
         }
       />
@@ -548,6 +605,8 @@ export const Calendar: React.FC = () => {
                   const hasEvents = dayEvents.length > 0;
                   const isToday = iso === todayIso;
                   const isWeekend = di >= 5;
+                  // El feriado se pinta aunque el filtro de tipo lo oculte de la lista del día
+                  const holidayName = yearHolidays[iso];
                   // Un día con eventos abre su detalle; uno vacío, el formulario para registrar en esa fecha
                   const canRegisterDay =
                     !hasEvents && canRegisterOn(iso) && registrableCourses.some((c) => c.year === viewYear);
@@ -573,12 +632,18 @@ export const Calendar: React.FC = () => {
                         }
                       }}
                       className={`min-h-28 p-1.5 border-r border-line last:border-r-0 flex flex-col gap-1 ${
-                        isWeekend ? 'bg-tint-soft' : 'bg-white'
+                        holidayName ? 'bg-[#fdf0ea]' : isWeekend ? 'bg-tint-soft' : 'bg-white'
                       } ${interactive ? 'cursor-pointer hover:bg-tint focus-visible:outline-2 focus-visible:outline-primary' : ''}`}
                     >
                       <span
                         className={`w-7 h-7 flex items-center justify-center rounded-full text-sm tabular-nums ${
-                          isToday ? 'bg-primary text-white font-semibold' : isWeekend ? 'text-primary' : 'text-ink'
+                          isToday
+                            ? 'bg-primary text-white font-semibold'
+                            : holidayName
+                              ? 'text-[#b4471c] font-semibold'
+                              : isWeekend
+                                ? 'text-primary'
+                                : 'text-ink'
                         }`}
                       >
                         {day}
@@ -587,10 +652,10 @@ export const Calendar: React.FC = () => {
                         <span
                           key={ev.key}
                           className={`block truncate rounded border-l-[3px] ${kindOf(ev.kind).chip} bg-white px-1.5 py-0.5 text-[11px] text-ink shadow-[0_0_0_1px_var(--color-line)]`}
-                          title={`${kindOf(ev.kind).label}: ${ev.title} (${ev.section_name})`}
+                          title={`${kindOf(ev.kind).label}: ${ev.title} (${sectionText(ev)})`}
                         >
                           {ev.start && <span className="tabular-nums text-ink-muted">{ev.start} </span>}
-                          {coursesOfYear.length > 1 && !sectionFilter && (
+                          {coursesOfYear.length > 1 && !sectionFilter && ev.kind !== 'holiday' && (
                             <span className="font-semibold">{ev.section_name} </span>
                           )}
                           {ev.title}
@@ -619,6 +684,7 @@ export const Calendar: React.FC = () => {
           <span>
             Toque un día con eventos para ver el detalle{canRegister && ', o un día vacío para registrar un evento'}
           </span>
+          {holidaySource && <span className="w-full">{SOURCE_TEXT[holidaySource]}</span>}
         </div>
       </section>
 
@@ -755,7 +821,7 @@ export const Calendar: React.FC = () => {
                               {ev.title}
                             </button>
                           </TableCell>
-                          <TableCell className="text-ink-muted">{ev.section_name}</TableCell>
+                          <TableCell className="text-ink-muted">{sectionText(ev)}</TableCell>
                           <TableCell className="text-ink-muted">
                             <EventPlace ev={ev} />
                           </TableCell>
@@ -791,7 +857,7 @@ export const Calendar: React.FC = () => {
                             </span>
                             <span className="mt-1 block font-medium text-ink">{ev.title}</span>
                             <span className="mt-0.5 block text-xs text-ink-muted">
-                              {kindOf(ev.kind).label} · {ev.section_name}
+                              {kindOf(ev.kind).label} · {sectionText(ev)}
                             </span>
                           </button>
                         </li>
@@ -822,7 +888,7 @@ export const Calendar: React.FC = () => {
                 <span className={`w-2.5 h-2.5 rounded-sm ${kindOf(ev.kind).dot}`} aria-hidden />
                 <span className="font-medium text-ink">{kindOf(ev.kind).label}</span>
                 <span>·</span>
-                <span>{ev.section_name}</span>
+                <span>{sectionText(ev)}</span>
                 <span className="ml-auto tabular-nums">{timeText(ev)}</span>
               </div>
               <p className="mt-1 font-medium text-ink">{ev.title}</p>
@@ -856,6 +922,15 @@ export const Calendar: React.FC = () => {
         defaultDate={registerDate ?? ''}
         onCreated={retry}
       />
+
+      {isSuperAdmin && (
+        <RegisterHolidaysModal
+          isOpen={holidaysOpen}
+          onClose={() => setHolidaysOpen(false)}
+          courses={registrableCourses}
+          onDone={retry}
+        />
+      )}
     </div>
   );
 };

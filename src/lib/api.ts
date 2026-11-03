@@ -10,7 +10,8 @@ import {
   AccessToken,
   ActivityCreate,
   ActivityPublic,
-  CalendarClassBulkCreate,
+  CalendarBulkLoad,
+  CalendarBulkLoadReport,
   CalendarClassCreate,
   CalendarClassPublic,
   CalendarWithClasses,
@@ -1807,20 +1808,33 @@ export const api = {
     });
   },
 
-  // Registrar clases que se repiten cada semana. Todo o nada: si alguna fecha se superpone responde
-  // 409 con `detail` = [{date, detail}].
-  async createCalendarClassesBulk(
-    id_section_year: number,
-    payload: CalendarClassBulkCreate
-  ): Promise<CalendarClassPublic[]> {
+  // Cargar clases y actividades de una vez (por ejemplo, clases semanales sin los feriados). Todo o nada.
+  async bulkLoadCalendar(id_section_year: number, payload: CalendarBulkLoad): Promise<CalendarBulkLoadReport> {
     if (USE_MOCK) {
       await delay();
-      return [];
+      return {
+        dry_run: false,
+        classes_created: payload.classes?.length ?? 0,
+        activities_created: payload.activities?.length ?? 0,
+      };
     }
 
-    return request<CalendarClassPublic[]>(`/section-years/${id_section_year}/calendar-classes/bulk`, {
+    return request<CalendarBulkLoadReport>(`/section-years/${id_section_year}/calendar/bulk`, {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  },
+
+  // Quitar varias clases de un curso lectivo (por ejemplo, las de un feriado). Borra también su asistencia.
+  async deleteCalendarClasses(id_section_year: number, ids: number[]): Promise<void> {
+    if (USE_MOCK) {
+      await delay();
+      return;
+    }
+
+    await request<void>(`/section-years/${id_section_year}/calendar-classes/bulk`, {
+      method: 'DELETE',
+      body: JSON.stringify({ ids }),
     });
   },
 

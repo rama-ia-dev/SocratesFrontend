@@ -9,6 +9,7 @@ import { Select } from './ui/Select';
 import { DateField } from './ui/DateField';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { useToast } from './ui/Toast';
+import { useHolidays } from '../lib/holidays';
 
 type Course = Pick<SectionYearPublic, 'id_section_year' | 'year' | 'section_name'>;
 
@@ -43,16 +44,21 @@ const isoWeekday = (iso: string) => ((isoToDate(iso).getDay() + 6) % 7) + 1;
 const dayMonth = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
 // Fechas entre `from` y `to` que caen en los días elegidos
-const countDates = (from: string, to: string, weekdays: number[]) => {
-  let count = 0;
+const datesBetween = (from: string, to: string, weekdays: number[]) => {
+  const dates: string[] = [];
   const date = isoToDate(from);
   const end = isoToDate(to);
   while (date <= end) {
-    if (weekdays.includes(((date.getDay() + 6) % 7) + 1)) count++;
+    if (weekdays.includes(((date.getDay() + 6) % 7) + 1)) {
+      dates.push(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`);
+    }
     date.setDate(date.getDate() + 1);
   }
-  return count;
+  return dates;
 };
+
+// Máximo de clases por carga en lote que acepta el backend
+const MAX_BULK_CLASSES = 1000;
 
 const isHttpUrl = (value: string) => {
   try {
@@ -66,10 +72,14 @@ const isHttpUrl = (value: string) => {
 const listText = (items: string[]) =>
   items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} y ${items[items.length - 1]}`;
 
-// Error del backend → mensaje para el docente
-const errorMessage = (err: any, course: Course | undefined): string => {
+// Error del backend → mensaje para el docente. `sentDates` son las fechas de una carga en lote, cuyos
+// conflictos vienen por número de fila (desde 1).
+const errorMessage = (err: any, course: Course | undefined, sentDates: string[] = []): string => {
   if (err?.status === 409 && Array.isArray(err.detail)) {
-    const dates: string[] = err.detail.map((c: { date: string }) => dayMonth(c.date));
+    const dates: string[] = err.detail
+      .map((c: { date?: string; row?: number }) => c.date ?? (c.row ? sentDates[c.row - 1] : undefined))
+      .filter(Boolean)
+      .map(dayMonth);
     const shown = dates.length > 8 ? [...dates.slice(0, 8), `${dates.length - 8} más`] : dates;
     return `Estas fechas ya tienen una clase que se superpone con ese horario: ${listText(shown)}. No se registró ninguna clase.`;
   }
@@ -163,6 +173,10 @@ export const RegisterEventModal: React.FC<RegisterEventModalProps> = ({
   const yearMin = course ? `${course.year}-01-01` : undefined;
   const yearMax = course ? `${course.year}-12-31` : undefined;
 
+  // Feriados del año del curso lectivo (o de la fecha, si todavía no se eligió el curso)
+  const holidayYear = course?.year ?? (date ? Number(date.slice(0, 4)) : null);
+  const { holidays } = useHolidays(holidayYear ? [holidayYear] : []);
+
   const toggleRepeat = (checked: boolean) => {
     setRepeat(checked);
     // Al activar la repetición se propone el día de la semana de la fecha elegida (salvo el domingo)
@@ -180,6 +194,7 @@ export const RegisterEventModal: React.FC<RegisterEventModalProps> = ({
   if (!date) errors.date = 'Ingrese la fecha';
   else if (course && date.slice(0, 4) !== String(course.year))
     errors.date = `Debe ser del año del curso lectivo (${course.year})`;
+  else if (holidays[date]) errors.date = `Es feriado: ${holidays[date]}`;
   if (kind === 'class') {
     if (!startTime) errors.startTime = 'Ingrese la hora';
     if (!endTime) errors.endTime = 'Ingrese la hora';
@@ -196,13 +211,18 @@ export const RegisterEventModal: React.FC<RegisterEventModalProps> = ({
   } else if (!title.trim()) {
     errors.title = 'Ingrese el título';
   }
+  // Clases que se van a crear al repetir: las fechas de los días elegidos, sin los feriados
+  const repeatPlan = useMemo(() => {
+    if (kind !== 'class' || !repeat || !date || !until || until < date || weekdays.length === 0) return null;
+    const all = datesBetween(date, until, weekdays);
+    return { dates: all.filter((d) => !holidays[d]), skipped: all.filter((d) => holidays[d]) };
+  }, [kind, repeat, date, until, weekdays, holidays]);
+
+  if (repeatPlan && repeatPlan.dates.length > MAX_BULK_CLASSES)
+    errors.until = `Son más de ${MAX_BULK_CLASSES} clases: acorte el período`;
+
   const isValid = Object.values(errors).every((e) => !e);
   const show = (field: string) => (submitted ? errors[field] : undefined);
-
-  const repeatCount =
-    kind === 'class' && repeat && date && until && until >= date && weekdays.length > 0
-      ? countDates(date, until, weekdays)
-      : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -211,6 +231,7 @@ export const RegisterEventModal: React.FC<RegisterEventModalProps> = ({
     if (!isValid || !course) return;
 
     setSaving(true);
+    let sentDates: string[] = [];
     try {
       const id = course.id_section_year;
       if (kind === 'delivery') {
@@ -232,13 +253,15 @@ export const RegisterEventModal: React.FC<RegisterEventModalProps> = ({
           meeting_url: modality === 'virtual' ? meetingUrl.trim() || null : null,
         };
         if (repeat) {
-          const created = await api.createCalendarClassesBulk(id, {
-            ...fields,
-            weekdays,
-            from_date: date,
-            to_date: until,
-          });
-          success(created.length === 1 ? 'Se registró 1 clase' : `Se registraron ${created.length} clases`);
+          const dates = repeatPlan?.dates ?? [];
+          if (dates.length === 0) {
+            setFormError('Ninguna fecha del período cae en los días elegidos fuera de los feriados.');
+            return;
+          }
+          sentDates = dates;
+          const report = await api.bulkLoadCalendar(id, { classes: dates.map((d) => ({ ...fields, date: d })) });
+          const n = report.classes_created;
+          success(n === 1 ? 'Se registró 1 clase' : `Se registraron ${n} clases`);
         } else {
           await api.createCalendarClass(id, { ...fields, date });
           success('Clase registrada');
@@ -247,7 +270,7 @@ export const RegisterEventModal: React.FC<RegisterEventModalProps> = ({
       onCreated();
       onClose();
     } catch (err) {
-      setFormError(errorMessage(err, course));
+      setFormError(errorMessage(err, course, sentDates));
     } finally {
       setSaving(false);
     }
@@ -415,11 +438,15 @@ export const RegisterEventModal: React.FC<RegisterEventModalProps> = ({
                     disabled={saving}
                   />
 
-                  {repeatCount !== null && (
+                  {repeatPlan && (
                     <p className="text-xs text-ink-muted">
-                      {repeatCount === 0
-                        ? 'Ninguna fecha del período cae en los días elegidos.'
-                        : `Se van a registrar ${repeatCount} ${repeatCount === 1 ? 'clase' : 'clases'}.`}
+                      {repeatPlan.dates.length === 0
+                        ? 'Ninguna fecha del período cae en los días elegidos fuera de los feriados.'
+                        : `Se van a registrar ${repeatPlan.dates.length} ${repeatPlan.dates.length === 1 ? 'clase' : 'clases'}.`}
+                      {repeatPlan.skipped.length > 0 &&
+                        ` Se saltean ${repeatPlan.skipped.length === 1 ? 'el feriado' : 'los feriados'} del ${listText(
+                          repeatPlan.skipped.map(dayMonth)
+                        )}.`}
                     </p>
                   )}
                 </>
