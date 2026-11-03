@@ -19,7 +19,8 @@ import { Pagination } from '../components/ui/Pagination';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { useToast } from '../components/ui/Toast';
 import { ActionMenu } from '../components/ui/ActionMenu';
-import { Search, SearchX, Plus, Edit2 } from 'lucide-react';
+import { DeleteUserModal } from '../components/DeleteUserModal';
+import { Search, SearchX, Plus, Edit2, Trash2 } from 'lucide-react';
 import { validateName, professorSaveError } from '../lib/validation';
 import { Alert } from '../components/ui/Alert';
 
@@ -44,6 +45,9 @@ export const Professors: React.FC = () => {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Eliminar un docente cargado por error (SCRUM-111)
+  const [deletingProf, setDeletingProf] = useState<UserListItem | null>(null);
 
   const fetchProfessors = useCallback(async () => {
     setIsLoading(true);
@@ -268,6 +272,12 @@ export const Professors: React.FC = () => {
                           icon: <Edit2 className="w-3.5 h-3.5 text-primary" />,
                           onClick: () => handleOpenEdit(prof),
                         },
+                        {
+                          label: 'Eliminar',
+                          icon: <Trash2 className="w-3.5 h-3.5" />,
+                          onClick: () => setDeletingProf(prof),
+                          danger: true,
+                        },
                       ]}
                     />
                   </TableCell>
@@ -384,6 +394,28 @@ export const Professors: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {deletingProf && (
+        <DeleteUserModal
+          key={deletingProf.id_user}
+          person={{
+            id: deletingProf.id_user,
+            first_name: deletingProf.first_name,
+            last_name: deletingProf.last_name,
+            legajo: deletingProf.legajo,
+            role: 'professor',
+            is_super_admin: deletingProf.is_super_admin,
+          }}
+          remove={api.deleteUser}
+          onClose={() => setDeletingProf(null)}
+          onDeleted={(name) => {
+            setDeletingProf(null);
+            success(`Se eliminó a ${name}`);
+            if (professors.length === 1 && offset > 0) setOffset(offset - 10);
+            else fetchProfessors();
+          }}
+        />
+      )}
     </div>
   );
 };
