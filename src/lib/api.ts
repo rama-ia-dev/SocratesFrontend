@@ -8,6 +8,11 @@
 
 import {
   AccessToken,
+  ActivityCreate,
+  ActivityPublic,
+  CalendarClassBulkCreate,
+  CalendarClassCreate,
+  CalendarClassPublic,
   CalendarWithClasses,
   LoginRequest,
   MyProject,
@@ -1786,6 +1791,50 @@ export const api = {
       query.set('to', range.to);
     }
     return request<CalendarWithClasses>(`/section-years/${id_section_year}/calendar?${query.toString()}`);
+  },
+
+  // Registrar una clase puntual. Docente del curso lectivo o administrador. 409 si se superpone con
+  // otra clase de ese día; 422 si la fecha no es del año del curso lectivo.
+  async createCalendarClass(id_section_year: number, payload: CalendarClassCreate): Promise<CalendarClassPublic> {
+    if (USE_MOCK) {
+      await delay();
+      return { id_calendar_class: Date.now(), id_calendar: id_section_year, weekday: 1, ...payload };
+    }
+
+    return request<CalendarClassPublic>(`/section-years/${id_section_year}/calendar-classes`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Registrar clases que se repiten cada semana. Todo o nada: si alguna fecha se superpone responde
+  // 409 con `detail` = [{date, detail}].
+  async createCalendarClassesBulk(
+    id_section_year: number,
+    payload: CalendarClassBulkCreate
+  ): Promise<CalendarClassPublic[]> {
+    if (USE_MOCK) {
+      await delay();
+      return [];
+    }
+
+    return request<CalendarClassPublic[]>(`/section-years/${id_section_year}/calendar-classes/bulk`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Registrar una actividad (entrega) del curso lectivo. Docente del curso lectivo o administrador.
+  async createActivity(id_section_year: number, payload: ActivityCreate): Promise<ActivityPublic> {
+    if (USE_MOCK) {
+      await delay();
+      return { id_activity: Date.now(), id_calendar: id_section_year, id_section_year, ...payload };
+    }
+
+    return request<ActivityPublic>(`/section-years/${id_section_year}/activities`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   },
 
   // Integrantes, docentes del curso lectivo o administrador cambian los datos del equipo
