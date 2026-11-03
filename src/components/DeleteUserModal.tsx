@@ -18,9 +18,9 @@ const deleteError = (err: any): string => {
   if (err.status === 409) {
     if (detail.includes('super admin')) return 'Tiene el rol de administrador: primero quítele ese rol desde Modificar.';
     if (detail.includes('assigned to a section year'))
-      return 'Tiene cursos lectivos asignados: primero quíteselos desde Comisiones, en "Docentes asignados" de cada curso.';
+      return 'Tiene cursos lectivos asignados: primero debe desasignarlo desde Comisiones, en "Docentes asignados" de cada curso.';
     if (detail.includes('membership'))
-      return 'Es parte de un equipo de trabajo, terminó en uno o tiene una solicitud pendiente: no se puede eliminar.';
+      return 'Es integrante de un equipo de trabajo (aunque el equipo haya finalizado) o tiene una solicitud pendiente: no se puede eliminar.';
     if (detail.includes('in use')) return 'Ya tiene registros en el sistema (por ejemplo, asistencias): no se puede eliminar.';
   }
   if (err.status === 404) return 'Ya no existe: puede que otra persona lo haya eliminado.';
@@ -41,6 +41,8 @@ export const DeleteUserModal: React.FC<{
 }> = ({ person, remove, onClose, onDeleted }) => {
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  // El backend lo rechazó por sus datos (409): ya no se ofrece eliminar, queda solo el motivo
+  const [blocked, setBlocked] = useState(false);
   const name = `${person.first_name} ${person.last_name}`;
   const isAdmin = Boolean(person.is_super_admin);
 
@@ -52,6 +54,7 @@ export const DeleteUserModal: React.FC<{
       onDeleted(name);
     } catch (err: any) {
       setError(deleteError(err));
+      if (err?.status === 409) setBlocked(true);
       setIsDeleting(false);
     }
   };
@@ -62,26 +65,26 @@ export const DeleteUserModal: React.FC<{
       <div className="space-y-2 text-sm text-ink">
         {isAdmin ? (
           <p>Tiene el rol de administrador: para eliminar a esta persona, primero quítele ese rol desde Modificar.</p>
-        ) : (
+        ) : blocked ? null : (
           <>
             <p>
-              Se borran sus datos y deja de poder entrar al sistema. Su legajo{' '}
+              Se borran sus datos y deja de tener acceso al sistema. Su legajo{' '}
               <span className="tabular-nums">{person.legajo}</span> queda libre para volver a cargarlo. No se
               puede deshacer.
             </p>
             <p className="text-ink-muted">
               {person.role === 'student'
-                ? 'Es para quitar a un alumno cargado por error: no se puede eliminar si es parte de un equipo, terminó en uno o tiene una solicitud pendiente.'
-                : 'Es para quitar a un docente cargado por error: no se puede eliminar si tiene cursos lectivos asignados.'}
+                ? 'No se puede eliminar si es integrante de un equipo de trabajo (aunque el equipo haya finalizado) o si tiene una solicitud pendiente.'
+                : 'No se puede eliminar si tiene cursos lectivos asignados.'}
             </p>
           </>
         )}
       </div>
       <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-line">
         <Button type="button" variant="outline" onClick={onClose} disabled={isDeleting}>
-          {isAdmin ? 'Cerrar' : 'Cancelar'}
+          {isAdmin || blocked ? 'Cerrar' : 'Cancelar'}
         </Button>
-        {!isAdmin && (
+        {!isAdmin && !blocked && (
           <Button type="button" variant="destructive" onClick={handleDelete} isLoading={isDeleting}>
             Eliminar
           </Button>
