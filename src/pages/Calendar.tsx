@@ -13,10 +13,9 @@ import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { Table, TableHeader, TableRow, TableHead, TableCell } from '../components/ui/Table';
 import { EditableEvent, EventFormModal } from '../components/EventFormModal';
 import { DeletableEvent, DeleteEventModal } from '../components/DeleteEventModal';
-import { RegisterHolidaysModal } from '../components/RegisterHolidaysModal';
 import { CalendarExcelModal } from '../components/CalendarExcelModal';
 import { SOURCE_TEXT, useHolidays } from '../lib/holidays';
-import { CalendarDays, CalendarX, ChevronLeft, ChevronRight, ExternalLink, FileSpreadsheet, MapPin, Pencil, Plus, SearchX, Trash2 } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, FileSpreadsheet, MapPin, Pencil, Plus, SearchX, Trash2 } from 'lucide-react';
 
 const MONTHS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -511,9 +510,6 @@ export const Calendar: React.FC = () => {
   );
   const deleteFollowingIds = useMemo(() => seriesAfter(deletingSource), [seriesAfter, deletingSource]);
 
-  // Registrar feriados: solo el administrador
-  const [holidaysOpen, setHolidaysOpen] = useState(false);
-
   // Cargar desde Excel: se sugiere el curso lectivo del año que se ve (el de la comisión filtrada o, si
   // hay uno solo ese año, ese)
   const [excelOpen, setExcelOpen] = useState(false);
@@ -577,12 +573,6 @@ export const Calendar: React.FC = () => {
         action={
           canRegister && (
             <div className="flex flex-col sm:flex-row gap-2">
-              {isSuperAdmin && (
-                <Button variant="outline" className="w-full sm:w-auto" onClick={() => setHolidaysOpen(true)}>
-                  <CalendarX className="w-4 h-4" aria-hidden />
-                  Registrar feriados
-                </Button>
-              )}
               <Button variant="outline" className="w-full sm:w-auto" onClick={() => setExcelOpen(true)}>
                 <FileSpreadsheet className="w-4 h-4" aria-hidden />
                 Cargar desde Excel
@@ -1064,15 +1054,6 @@ export const Calendar: React.FC = () => {
         defaultCourseId={excelCourseId}
         onDone={retry}
       />
-
-      {isSuperAdmin && (
-        <RegisterHolidaysModal
-          isOpen={holidaysOpen}
-          onClose={() => setHolidaysOpen(false)}
-          courses={registrableCourses}
-          onDone={retry}
-        />
-      )}
     </div>
   );
 };
