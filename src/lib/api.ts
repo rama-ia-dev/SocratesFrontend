@@ -871,7 +871,7 @@ export const api = {
   },
 
   // Eliminar un alumno cargado por error (solo el administrador). El backend lo rechaza (409) si es
-  // parte de un equipo, terminó en uno o tiene una solicitud pendiente
+  // integrante de un equipo (también de uno finalizado) o tiene una solicitud pendiente
   async deleteStudent(id_student: number): Promise<void> {
     if (USE_MOCK) {
       await delay();
