@@ -77,12 +77,44 @@ export const lawHolidaysOf = (year: number): Holiday[] => {
     .sort((a, b) => a.date.localeCompare(b.date));
 };
 
-// Una consulta por año mientras dure la sesión
+// Para no consultar ArgentinaDatos en cada recarga, lo que responde se guarda en el navegador por
+// una semana (los feriados de un año casi no cambian). Los de la ley no se guardan: si la API no
+// respondió, se vuelve a intentar en la próxima carga.
+const STORAGE_PREFIX = 'socrates:feriados:';
+const STORAGE_DAYS = 7;
+
+const readStored = (year: number): Holiday[] | null => {
+  try {
+    const raw = localStorage.getItem(`${STORAGE_PREFIX}${year}`);
+    if (!raw) return null;
+    const { savedAt, holidays } = JSON.parse(raw) as { savedAt: number; holidays: Holiday[] };
+    if (Date.now() - savedAt > STORAGE_DAYS * 24 * 60 * 60 * 1000 || !Array.isArray(holidays)) return null;
+    return holidays;
+  } catch {
+    return null;
+  }
+};
+
+const store = (year: number, holidays: Holiday[]) => {
+  try {
+    localStorage.setItem(`${STORAGE_PREFIX}${year}`, JSON.stringify({ savedAt: Date.now(), holidays }));
+  } catch {
+    // Sin almacenamiento (modo privado, espacio lleno): se consulta en cada carga
+  }
+};
+
+// Una consulta por año mientras dure la página, y entre recargas lo guardado en el navegador
 const cache = new Map<number, Promise<HolidayYear>>();
 
 export const fetchHolidays = (year: number): Promise<HolidayYear> => {
   let pending = cache.get(year);
   if (!pending) {
+    const stored = readStored(year);
+    if (stored) {
+      pending = Promise.resolve({ holidays: stored, source: 'argentinadatos' as const });
+      cache.set(year, pending);
+      return pending;
+    }
     pending = fetch(`${API_URL}/${year}`)
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
       .then((rows: { fecha: string; nombre: string }[]) => {
@@ -90,10 +122,9 @@ export const fetchHolidays = (year: number): Promise<HolidayYear> => {
         // Puede haber dos filas el mismo día: se queda la primera
         const byDate = new Map<string, Holiday>();
         for (const r of rows) if (!byDate.has(r.fecha)) byDate.set(r.fecha, { date: r.fecha, name: r.nombre });
-        return {
-          holidays: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)),
-          source: 'argentinadatos' as const,
-        };
+        const holidays = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+        store(year, holidays);
+        return { holidays, source: 'argentinadatos' as const };
       })
       .catch(() => ({ holidays: lawHolidaysOf(year), source: 'law' as const }));
     cache.set(year, pending);
