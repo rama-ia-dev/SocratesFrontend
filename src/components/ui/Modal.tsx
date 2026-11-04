@@ -6,7 +6,7 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '3xl';
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -33,20 +33,18 @@ export const Modal: React.FC<ModalProps> = ({
     md: 'max-w-md',
     lg: 'max-w-lg',
     xl: 'max-w-2xl',
+    '3xl': 'max-w-3xl',
   }[maxWidth];
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
-    >
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 overflow-y-auto">
       {/* Fondo */}
       <div className="fixed inset-0 bg-navy-deep/45" onClick={onClose} />
 
-      {/* Ventana */}
+      {/* Ventana: centrada; si es más alta que la pantalla, arranca arriba y se desplaza entera */}
+      <div className="relative flex min-h-full items-center justify-center p-4 pointer-events-none">
       <div
-        className={`relative w-full ${maxWidthClass} rounded-2xl bg-white shadow-[0_24px_48px_-12px_rgba(6,26,61,0.35)] z-10 dialog-in`}
+        className={`relative w-full ${maxWidthClass} rounded-2xl bg-white shadow-[0_24px_48px_-12px_rgba(6,26,61,0.35)] z-10 dialog-in pointer-events-auto`}
       >
         <div className="flex items-start justify-between gap-4 px-6 pt-5">
           <h3 className="text-[17px] font-semibold text-ink leading-snug pt-1">{title}</h3>
@@ -60,6 +58,7 @@ export const Modal: React.FC<ModalProps> = ({
           </button>
         </div>
         <div className="px-6 pt-4 pb-6">{children}</div>
+      </div>
       </div>
     </div>
   );

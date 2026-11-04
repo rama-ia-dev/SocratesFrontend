@@ -1,0 +1,508 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { api } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
+import type { StudentPublic } from '../types/api';
+import { Modal } from './ui/Modal';
+import { Input } from './ui/Input';
+import { DateField } from './ui/DateField';
+import { Select } from './ui/Select';
+import { Button } from './ui/Button';
+import { Alert } from './ui/Alert';
+import { useToast } from './ui/Toast';
+import { UploadCloud, FileSpreadsheet, AlertTriangle, AlertCircle, CheckCircle2, Download, X } from 'lucide-react';
+import { readStudentsExcel, markError, ExcelFileError, TEMPLATE_URL, type ExcelRow } from '../lib/studentsExcel';
+import {
+  useField,
+  validateName,
+  validateLegajo,
+  validateBirthDate,
+  validateEnrollmentYear,
+  enrollmentYearRange,
+  maxBirthDate,
+  minBirthDate,
+  digitsOnly,
+} from '../lib/validation';
+
+// Traduce los errores por fila que devuelve POST /students/bulk
+const bulkRowError = (detail: string) =>
+  detail.includes('already exists')
+    ? 'Ya hay un alumno registrado con este legajo'
+    : detail.includes('Duplicated')
+    ? 'Legajo repetido en el archivo'
+    : detail;
+
+const RowErrors: React.FC<{ errors: string[]; className?: string }> = ({ errors, className = '' }) => (
+  <ul className={`space-y-1 ${className}`}>
+    {errors.map((msg) => (
+      <li key={msg} className="flex items-start gap-1 text-xs font-semibold text-danger">
+        <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-px" />
+        {msg}
+      </li>
+    ))}
+  </ul>
+);
+
+const FOOTER = 'flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3 pt-4 border-t border-line';
+
+/**
+ * Registrar estudiantes (SCRUM-97, SCRUM-609): un diálogo con dos pestañas, Individual y Desde Excel.
+ * Los alumnos quedan inscriptos en el curso lectivo elegido: el docente elige entre los suyos y el
+ * administrador entre todos. `onRegistered` recibe el alumno creado en el registro individual
+ * (para resaltarlo en la lista) y `null` después de una carga desde Excel.
+ */
+export const RegisterStudentsModal: React.FC<{
+  onClose: () => void;
+  onRegistered: (created: StudentPublic | null) => void;
+}> = ({ onClose, onRegistered }) => {
+  const { success } = useToast();
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<'manual' | 'excel'>('manual');
+
+  // Curso lectivo en el que quedan inscriptos (obligatorio)
+  const [courses, setCourses] = useState<{ id: number; label: string }[] | null>(null);
+  const [course, setCourse] = useState('');
+  const [courseError, setCourseError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    const load = user.is_super_admin
+      ? api.getSectionYears({ limit: 100 }).then((r) => r.items)
+      : api.getProfessorSectionYears({ id_professor: user.id_user, limit: 100 }).then((r) => r.items);
+    load
+      .then((items) =>
+        setCourses(
+          items
+            .map((c) => ({ id: c.id_section_year, label: `${c.section_name} (${c.year})`, year: c.year, name: c.section_name }))
+            .sort((a, b) => b.year - a.year || a.name.localeCompare(b.name, 'es'))
+            .map(({ id, label }) => ({ id, label }))
+        )
+      )
+      .catch(() => setCourses([]));
+  }, [user]);
+  // Se revisa antes de registrar: sin curso lectivo el alumno quedaría sin cursada
+  const checkCourse = () => {
+    if (course) return true;
+    setCourseError('Seleccione el curso lectivo en el que se inscriben');
+    return false;
+  };
+
+  // Registro individual
+  const legajo = useField('', validateLegajo);
+  const firstName = useField('', validateName('nombre'));
+  const lastName = useField('', validateName('apellido'));
+  const birthDate = useField('', (v) => validateBirthDate(v), { validateOnChange: true });
+  const enrollmentYear = useField('', (v) => validateEnrollmentYear(v, birthDate.value));
+  // El año de ingreso se habilita recién con una fecha de nacimiento válida: el rango posible depende de ella
+  const enrollmentRange = enrollmentYearRange(birthDate.value);
+  const [manualError, setManualError] = useState<string | null>(null);
+  const [isSubmittingManual, setIsSubmittingManual] = useState(false);
+
+  // Carga desde Excel
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadState, setUploadState] = useState<'empty' | 'loading' | 'loaded' | 'error'>('empty');
+  const [excelFile, setExcelFile] = useState<File | null>(null);
+  const [previewRows, setPreviewRows] = useState<ExcelRow[]>([]);
+  const [excelErrorMsg, setExcelErrorMsg] = useState<string | null>(null);
+  const [isSubmittingExcel, setIsSubmittingExcel] = useState(false);
+  const uploadId = useRef(0);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  const isBusy = isSubmittingManual || isSubmittingExcel;
+
+  // Correo de ingreso calculado; con un legajo inválido no se muestra uno que no va a existir
+  const calculatedEmail =
+    legajo.value && !validateLegajo(legajo.value) ? `${legajo.value}@sistemas.frc.utn.edu.ar` : '—';
+
+  const handleSubmitManual = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setManualError(null);
+    // Se revisan todos (no se corta en el primero) para marcar cada campo con error a la vez
+    const checks = [legajo, firstName, lastName, birthDate, enrollmentYear].map((f) => f.check());
+    if (!checkCourse() || checks.includes(false)) return;
+
+    setIsSubmittingManual(true);
+    try {
+      const created = await api.createStudent({
+        legajo: Number(legajo.value),
+        first_name: firstName.value.trim(),
+        last_name: lastName.value.trim(),
+        birth_date: birthDate.value,
+        enrollment_year: Number(enrollmentYear.value),
+        id_section_year: Number(course),
+      });
+      success('Estudiante registrado. Recibirá un correo de bienvenida');
+      onRegistered(created);
+    } catch (err: any) {
+      // POST /students responde el legajo repetido como 422 con la lista de filas ({row, legajo, detail})
+      const rows = Array.isArray(err.detail) ? err.detail : err.errors;
+      if (Array.isArray(rows) && String(rows[0]?.detail).includes('already exists')) {
+        legajo.reject('Ya existe un alumno con ese legajo');
+      } else {
+        setManualError(
+          Array.isArray(err.detail) ? 'No se pudo registrar el estudiante' : err.message || 'No se pudo registrar el estudiante'
+        );
+      }
+    } finally {
+      setIsSubmittingManual(false);
+    }
+  };
+
+  const handleProcessFile = async (file: File) => {
+    // Si mientras se lee se cancela o se elige otro archivo, el resultado de esta lectura se descarta
+    const upload = ++uploadId.current;
+    setExcelErrorMsg(null);
+    setPreviewRows([]);
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      setExcelFile(null);
+      setUploadState('error');
+      setExcelErrorMsg('Solo se admiten archivos Excel (.xlsx)');
+      return;
+    }
+    setExcelFile(file);
+    setUploadState('loading');
+    try {
+      const rows = await readStudentsExcel(file);
+      if (upload !== uploadId.current) return;
+      setPreviewRows(rows);
+      setUploadState('loaded');
+    } catch (err) {
+      if (upload !== uploadId.current) return;
+      setExcelFile(null);
+      setUploadState('error');
+      setExcelErrorMsg(err instanceof ExcelFileError ? err.message : 'No se pudo leer el archivo');
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Se limpia para que se pueda volver a elegir el mismo archivo después de corregirlo
+    e.target.value = '';
+    if (file) handleProcessFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (isSubmittingExcel) return;
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleProcessFile(e.dataTransfer.files[0]);
+  };
+
+  const handleRemoveFile = () => {
+    uploadId.current++;
+    setExcelFile(null);
+    setPreviewRows([]);
+    setUploadState('empty');
+    setExcelErrorMsg(null);
+  };
+
+  const handleSubmitExcel = async () => {
+    if (previewRows.some((r) => !r.student) || !checkCourse()) return;
+    setExcelErrorMsg(null);
+    setIsSubmittingExcel(true);
+    try {
+      const students = previewRows.map((r) => ({ ...r.student!, id_section_year: Number(course) }));
+      await api.createStudentsBulk({ students });
+      success(
+        students.length === 1
+          ? '1 estudiante registrado. Recibirá un correo de bienvenida'
+          : `${students.length} estudiantes registrados. Recibirán un correo de bienvenida`
+      );
+      onRegistered(null);
+    } catch (err: any) {
+      // Errores por fila (legajo ya registrado): la fila del backend es la posición en el lote.
+      // Se marcan en la tabla; el aviso de "todo o nada" ya explica que no se registró nadie.
+      const rowErrors = Array.isArray(err.detail) ? err.detail : err.errors;
+      if (err.status === 422 && Array.isArray(rowErrors) && rowErrors[0]?.row) {
+        const rows = previewRows.map((r) => ({ ...r, errors: [...r.errors] }));
+        for (const e of rowErrors) {
+          const target = rows[e.row - 1];
+          if (target) markError(target, bulkRowError(String(e.detail)));
+        }
+        setPreviewRows(rows);
+      } else {
+        setExcelErrorMsg(err.message || 'No se pudieron registrar los estudiantes');
+      }
+    } finally {
+      setIsSubmittingExcel(false);
+    }
+  };
+
+  const errorCount = previewRows.filter((r) => !r.student).length;
+  const validCount = previewRows.length - errorCount;
+
+  return (
+    <Modal isOpen onClose={() => !isBusy && onClose()} title="Registrar estudiantes" maxWidth="3xl">
+      <div className="space-y-5">
+        {/* El curso lectivo vale para las dos formas de registro */}
+        <div className="max-w-md">
+          {courses !== null && courses.length === 0 ? (
+            <Alert>No tiene cursos lectivos asignados: los alumnos se registran inscriptos en uno.</Alert>
+          ) : (
+            <Select
+              id="register-course"
+              label="Curso lectivo"
+              value={course}
+              onChange={(e) => {
+                setCourse(e.target.value);
+                setCourseError(null);
+              }}
+              disabled={courses === null || isBusy}
+              error={courseError ?? undefined}
+              helperText="Los alumnos quedan inscriptos en este curso lectivo."
+              options={[
+                { value: '', label: courses === null ? 'Cargando cursos lectivos…' : 'Seleccione un curso lectivo' },
+                ...(courses ?? []).map((c) => ({ value: c.id, label: c.label })),
+              ]}
+            />
+          )}
+        </div>
+
+        <div role="tablist" aria-label="Forma de registro" className="flex items-center gap-6 border-b border-line">
+          {(
+            [
+              ['manual', 'Individual'],
+              ['excel', 'Desde Excel'],
+            ] as const
+          ).map(([tab, label]) => (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab}
+              onClick={() => setActiveTab(tab)}
+              disabled={isBusy}
+              className={`-mb-px py-2.5 text-sm border-b-2 transition-colors duration-150 cursor-pointer ${
+                activeTab === tab
+                  ? 'border-primary text-ink font-semibold'
+                  : 'border-transparent text-ink-muted font-medium hover:text-ink hover:border-line-neutral-strong'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'manual' && (
+          <form onSubmit={handleSubmitManual} className="space-y-5" noValidate>
+            {manualError && <Alert>{manualError}</Alert>}
+            <div>
+              <Input
+                label="Legajo"
+                inputMode="numeric"
+                placeholder="Ej. 92100"
+                {...legajo.inputProps}
+                onChange={(e) => legajo.setValue(digitsOnly(e.target.value))}
+                disabled={isSubmittingManual}
+              />
+              <div className="mt-2 text-xs text-ink-muted flex flex-wrap items-center gap-1.5">
+                <span className="font-medium text-ink">Correo de ingreso:</span>
+                <span className="font-mono bg-fill-neutral px-2 py-0.5 rounded border border-line break-all">
+                  {calculatedEmail}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input label="Nombre" {...firstName.inputProps} disabled={isSubmittingManual} />
+              <Input label="Apellido" {...lastName.inputProps} disabled={isSubmittingManual} />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <DateField
+                label="Fecha de nacimiento"
+                min={minBirthDate()}
+                max={maxBirthDate()}
+                {...birthDate.inputProps}
+                disabled={isSubmittingManual}
+              />
+              <Input
+                label="Año de ingreso"
+                inputMode="numeric"
+                maxLength={4}
+                placeholder={enrollmentRange ? `Ej. ${enrollmentRange.max}` : undefined}
+                {...enrollmentYear.inputProps}
+                onChange={(e) => enrollmentYear.setValue(digitsOnly(e.target.value))}
+                disabled={isSubmittingManual || !enrollmentRange}
+                helperText={enrollmentRange ? undefined : 'Ingrese una fecha de nacimiento para habilitar este campo'}
+              />
+            </div>
+
+            <div className={FOOTER}>
+              <Button type="button" variant="outline" onClick={onClose} disabled={isSubmittingManual}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="primary" isLoading={isSubmittingManual}>
+                Registrar estudiante
+              </Button>
+            </div>
+          </form>
+        )}
+
+        {activeTab === 'excel' && (
+          <div className="space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-line p-4">
+              <p className="text-sm text-ink-muted">
+                Complete la plantilla con las columnas Legajo, Apellido, Nombre, Fecha de nacimiento y Año de ingreso.
+                Hasta 500 alumnos por archivo.
+              </p>
+              <a
+                href={TEMPLATE_URL}
+                download
+                className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-primary hover:bg-tint"
+              >
+                <Download className="w-4 h-4" />
+                Descargar plantilla
+              </a>
+            </div>
+
+            <input ref={fileInput} type="file" accept=".xlsx" className="hidden" onChange={handleFileChange} />
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+              className={`relative rounded-xl p-6 text-center transition-colors ${
+                uploadState === 'error'
+                  ? 'border-2 border-danger bg-danger-soft/20'
+                  : isDragging
+                  ? 'border-2 border-primary bg-tint'
+                  : 'border-2 border-dashed border-accent bg-tint-soft'
+              }`}
+            >
+              {uploadState === 'loading' ? (
+                <div className="py-4 max-w-xs mx-auto space-y-3">
+                  <p className="text-sm font-medium text-ink">Leyendo el archivo Excel…</p>
+                  <div className="w-full bg-accent-light h-2 rounded-full overflow-hidden">
+                    <div className="bg-primary h-full w-2/3 animate-pulse" />
+                  </div>
+                  <Button variant="outline" size="sm" onClick={handleRemoveFile}>
+                    Cancelar
+                  </Button>
+                </div>
+              ) : uploadState === 'loaded' && excelFile ? (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-lg border border-line">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2.5 rounded-lg bg-success-soft text-success shrink-0">
+                      <FileSpreadsheet className="w-6 h-6" />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <p className="text-sm font-semibold text-ink break-all">{excelFile.name}</p>
+                      <p className="text-xs text-ink-muted">{(excelFile.size / 1024).toFixed(1)} KB</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => fileInput.current?.click()}
+                      disabled={isSubmittingExcel}
+                    >
+                      Reemplazar
+                    </Button>
+                    <Button variant="ghostDanger" size="sm" onClick={handleRemoveFile} disabled={isSubmittingExcel}>
+                      <X className="w-4 h-4 mr-1" />
+                      Quitar
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center space-y-3 py-2">
+                  <div className="w-12 h-12 rounded-full bg-white shadow-xs border border-accent-light flex items-center justify-center text-primary">
+                    <UploadCloud className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-ink">Arrastre el archivo aquí o selecciónelo</p>
+                    <p className="text-xs text-ink-muted mt-0.5">Archivo Excel (.xlsx)</p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={() => fileInput.current?.click()}>
+                    Seleccionar archivo
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {excelErrorMsg && <Alert>{excelErrorMsg}</Alert>}
+
+            {uploadState === 'loaded' && previewRows.length > 0 && (
+              <div className="space-y-4">
+                <div className="p-3.5 rounded-lg bg-warning-soft border border-warning-line text-warning text-sm flex items-start gap-2.5">
+                  <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <span className="font-semibold">El registro es de todo o nada:</span> si una fila tiene error, no se
+                    registra ninguna. Corrija el archivo y vuelva a cargarlo.
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-medium px-1">
+                  <span className="text-ink">
+                    {validCount} {validCount === 1 ? 'fila válida' : 'filas válidas'} · {errorCount} con error
+                  </span>
+                  <span className="text-xs text-ink-muted">Total: {previewRows.length} registros</span>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-line bg-white max-h-80 overflow-y-auto">
+                  <table className="w-full text-left text-sm text-ink">
+                    <thead className="bg-tint border-b border-line text-[12px] font-semibold text-ink-muted uppercase tracking-wider sticky top-0">
+                      <tr>
+                        <th className="px-4 py-3 w-16">Fila</th>
+                        <th className="px-4 py-3">Legajo</th>
+                        <th className="px-4 py-3">Apellido y nombre</th>
+                        <th className="px-4 py-3">Fecha nac.</th>
+                        <th className="px-4 py-3">Año ing.</th>
+                        <th className="px-4 py-3 hidden lg:table-cell">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line">
+                      {previewRows.map((row) => (
+                        <tr
+                          key={row.row}
+                          className={!row.student ? 'bg-danger-soft/30 align-top' : 'hover:bg-tint-strong/30 align-top'}
+                        >
+                          <td className="px-4 py-3 font-mono text-xs text-ink-muted">{row.row}</td>
+                          <td className="px-4 py-3 font-mono">{row.display.legajo || '—'}</td>
+                          <td className="px-4 py-3 font-medium min-w-[160px]">
+                            {[row.display.last_name, row.display.first_name].filter(Boolean).join(', ') || '—'}
+                            {/* Sin la columna Estado a la vista, el error va acá */}
+                            {!row.student && <RowErrors errors={row.errors} className="lg:hidden mt-1.5" />}
+                          </td>
+                          <td className="px-4 py-3 text-ink-muted whitespace-nowrap">{row.display.birth_date || '—'}</td>
+                          <td className="px-4 py-3 text-ink-muted">{row.display.enrollment_year || '—'}</td>
+                          <td className="px-4 py-3 min-w-[200px] hidden lg:table-cell">
+                            {row.student ? (
+                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-success">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                Válida
+                              </span>
+                            ) : (
+                              <RowErrors errors={row.errors} />
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div className={FOOTER}>
+              <Button type="button" variant="outline" onClick={onClose} disabled={isSubmittingExcel}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={handleSubmitExcel}
+                disabled={uploadState !== 'loaded' || previewRows.length === 0 || errorCount > 0 || isSubmittingExcel}
+                isLoading={isSubmittingExcel}
+              >
+                Registrar estudiantes
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+};
