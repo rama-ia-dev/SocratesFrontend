@@ -10,7 +10,7 @@ import { useToast } from './ui/Toast';
 interface Option {
   action: ProjectStatusAction;
   label: string;
-  /** Lo que pasa al confirmar, en una frase */
+  /** Qué ocurre al confirmar */
   effect: string;
   /** Aprobar y cancelar son estados finales: después no se puede modificar el equipo */
   final?: boolean;
@@ -19,35 +19,38 @@ interface Option {
 const START: Option = {
   action: 'start',
   label: 'Pasar a En proceso',
-  effect: 'El equipo ya definió la idea y empieza a desarrollar el proyecto.',
+  effect: 'El proyecto pasa al estado En proceso: el equipo comienza su desarrollo.',
 };
 const SUBMIT: Option = {
   action: 'submit',
   label: 'Enviar a aprobación',
-  effect: 'El proyecto queda Pendiente de aprobación hasta que un docente lo apruebe o lo rechace.',
+  effect:
+    'El proyecto pasa al estado Pendiente de aprobación hasta que un docente del curso lectivo lo apruebe o lo rechace.',
 };
 const APPROVE: Option = {
   action: 'approve',
-  label: 'Aprobar',
+  label: 'Aprobar el proyecto',
   effect:
-    'Los integrantes terminan el proyecto y su cursada de este curso lectivo queda aprobada. Las solicitudes pendientes se rechazan.',
+    'El proyecto pasa al estado Aprobado. Los integrantes finalizan su participación en el equipo y su cursada del curso lectivo se registra como aprobada. Las solicitudes pendientes se rechazan.',
   final: true,
 };
 const REJECT: Option = {
   action: 'reject',
-  label: 'Rechazar',
-  effect: 'El equipo sigue con sus integrantes y puede corregir el proyecto para volver a enviarlo.',
+  label: 'Rechazar el proyecto',
+  effect:
+    'El proyecto pasa al estado Rechazado. El equipo conserva a sus integrantes y puede corregirlo para volver a enviarlo a aprobación.',
 };
 const RETRY: Option = {
   action: 'retry',
-  label: 'Volver a En proceso',
-  effect: 'El equipo retoma el proyecto para corregirlo y volver a enviarlo a aprobación.',
+  label: 'Pasar a En proceso',
+  effect:
+    'El proyecto vuelve al estado En proceso para que el equipo lo corrija y lo envíe nuevamente a aprobación.',
 };
 const CANCEL: Option = {
   action: 'cancel',
-  label: 'Cancelar el equipo',
+  label: 'Cancelar el equipo de trabajo',
   effect:
-    'El equipo se disuelve: los integrantes quedan como abandono y su cursada de este curso lectivo queda desaprobada. Las solicitudes pendientes se rechazan.',
+    'El equipo pasa al estado Cancelado. Sus integrantes quedan registrados como abandono y su cursada del curso lectivo, como desaprobada. Las solicitudes pendientes se rechazan.',
   final: true,
 };
 
@@ -62,23 +65,24 @@ const OPTIONS: Record<string, Option[]> = {
 
 export const statusOptions = (code?: string | null): Option[] => (code ? OPTIONS[code] ?? [] : []);
 
-const DONE: Record<ProjectStatusAction, (team: string) => string> = {
-  start: (t) => `El ${t} pasó a En proceso`,
-  submit: (t) => `El ${t} se envió a aprobación`,
-  approve: (t) => `Se aprobó el ${t}`,
-  reject: (t) => `Se rechazó el ${t}`,
-  retry: (t) => `El ${t} volvió a En proceso`,
-  cancel: (t) => `Se canceló el ${t}`,
+// Estado al que llega el equipo con cada acción, para el aviso de confirmación
+const TARGET: Record<ProjectStatusAction, string> = {
+  start: 'En proceso',
+  submit: 'Pendiente de aprobación',
+  approve: 'Aprobado',
+  reject: 'Rechazado',
+  retry: 'En proceso',
+  cancel: 'Cancelado',
 };
 
 const statusError = (err: any): string => {
   if (err.status === 409)
-    return 'El equipo cambió de estado mientras tanto. Ya se actualizó: revise el estado actual y elija de nuevo.';
-  if (err.status === 403) return 'Solo los docentes del curso lectivo y los administradores cambian el estado del equipo';
-  if (err.status === 404) return 'El equipo ya no existe';
-  return err.message || 'No se pudo cambiar el estado. Pruebe de nuevo en unos segundos.';
+    return 'El estado del equipo cambió mientras se realizaba la operación. La información se actualizó: verifique el estado actual antes de continuar.';
+  if (err.status === 403)
+    return 'Solo los docentes del curso lectivo y los administradores pueden cambiar el estado del equipo.';
+  if (err.status === 404) return 'El equipo de trabajo ya no existe.';
+  return err.message || 'No se pudo cambiar el estado del equipo. Intente nuevamente en unos segundos.';
 };
-
 export const ChangeProjectStatusModal: React.FC<{
   project: ProjectOverview;
   isOpen: boolean;
@@ -109,7 +113,7 @@ export const ChangeProjectStatusModal: React.FC<{
     setErrorText(null);
     try {
       await api.changeProjectStatus(project.id_project, option.action);
-      success(DONE[option.action](team));
+      success(`El estado del ${team} se cambió a ${TARGET[option.action]}`);
       onClose();
       onChanged();
     } catch (err: any) {
@@ -126,9 +130,9 @@ export const ChangeProjectStatusModal: React.FC<{
       <p className="text-sm text-ink">
         Estado actual: <span className="font-semibold">{project.status?.name}</span>
       </p>
-      <fieldset className="mt-3">
-        <legend className="sr-only">Nuevo estado</legend>
-        <div className="space-y-2">
+      <fieldset className="mt-4">
+        <legend className="text-[13px] font-medium text-ink-muted">Seleccione la acción a realizar</legend>
+        <div className="mt-2 space-y-2">
           {options.map((o) => {
             const checked = selected === o.action;
             return (
@@ -160,12 +164,13 @@ export const ChangeProjectStatusModal: React.FC<{
       </fieldset>
       {option?.final && (
         <p className="mt-3 text-sm text-ink">
-          No se puede deshacer: después ya no se pueden modificar los datos ni los integrantes del equipo.
+          Esta acción no se puede deshacer. Una vez confirmada, no se podrán modificar los datos ni los integrantes del equipo.
         </p>
       )}
-      <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-line">
+      {/* En pantallas angostas los botones se apilan: la acción puede tener un nombre largo */}
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3 pt-3 mt-4 border-t border-line">
         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
-          Volver
+          Cerrar
         </Button>
         <Button
           type="button"
@@ -174,7 +179,7 @@ export const ChangeProjectStatusModal: React.FC<{
           disabled={!option}
           isLoading={isSaving}
         >
-          {option ? option.label : 'Cambiar estado'}
+          {option ? option.label : 'Confirmar'}
         </Button>
       </div>
     </Modal>
