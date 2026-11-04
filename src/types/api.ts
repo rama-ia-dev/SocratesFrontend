@@ -335,6 +335,9 @@ export interface ProjectMemberList {
   offset: number;
 }
 
+// Cambios de estado de un equipo asegurado (SCRUM-27): cada uno es `POST /projects/{id}/<acción>`
+export type ProjectStatusAction = 'start' | 'submit' | 'approve' | 'reject' | 'retry' | 'cancel';
+
 // Docente del curso lectivo que hace el seguimiento de un equipo (sin correo)
 export interface ProfessorResponsible {
   id_professor: number;
