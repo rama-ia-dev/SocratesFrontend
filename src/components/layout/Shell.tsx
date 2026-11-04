@@ -18,6 +18,7 @@ import {
   Shield,
   BarChart3,
   CalendarDays,
+  UserCheck,
 } from 'lucide-react';
 
 interface NavItem {
@@ -26,6 +27,8 @@ interface NavItem {
   icon: React.ElementType;
   /** Otras rutas que pertenecen a esta sección y la dejan marcada. */
   also?: string[];
+  /** Grupo desplegable: el ítem no navega, abre sus secciones. */
+  children?: NavItem[];
 }
 
 // Fondo del menú lateral y de la barra del celular: la identidad UTN
@@ -39,6 +42,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  // Grupos del menú abiertos o cerrados a mano; sin elección, está abierto el que contiene la pantalla actual
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const desktopUserRef = useRef<HTMLDivElement>(null);
   const mobileUserRef = useRef<HTMLDivElement>(null);
   const drawerUserRef = useRef<HTMLDivElement>(null);
@@ -75,8 +80,16 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         { label: 'Comisiones', path: '/comisiones', icon: Layers },
         { label: 'Estado de la cátedra', path: '/catedra', icon: BarChart3 },
         { label: 'Calendario', path: '/calendario', icon: CalendarDays },
-        // Las pantallas de estudiantes y docentes se abren desde Usuarios
-        { label: 'Usuarios', path: '/usuarios', icon: Users, also: ['/estudiantes', '/docentes'] },
+        // Usuarios agrupa las dos pantallas de personas: Docentes y Estudiantes (SCRUM-609)
+        {
+          label: 'Usuarios',
+          path: '/usuarios',
+          icon: Users,
+          children: [
+            { label: 'Docentes', path: '/docentes', icon: UserCheck },
+            { label: 'Estudiantes', path: '/estudiantes', icon: GraduationCap },
+          ],
+        },
         { label: 'Equipos de trabajo', path: '/equipos', icon: FolderKanban },
       ];
     }
@@ -107,23 +120,56 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   const fullName = user ? `${user.first_name} ${user.last_name}` : '';
 
+  const linkClass = (active: boolean) =>
+    `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 ${
+      active ? 'bg-white text-navy font-semibold' : 'text-accent-light/85 hover:bg-white/8 hover:text-white font-medium'
+    }`;
+  const inSection = (item: NavItem) =>
+    [item.path, ...(item.also ?? [])].some((p) => location.pathname === p || location.pathname.startsWith(`${p}/`));
+
   // La misma lista de secciones en el menú lateral y en el menú del celular
   const navList = (
     <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
       {navItems.map((item) => {
         const Icon = item.icon;
+        if (item.children) {
+          const groupActive = item.children.some(inSection);
+          const open = openGroups[item.path] ?? groupActive;
+          const groupId = `nav-group-${item.path.slice(1)}`;
+          return (
+            <div key={item.path}>
+              <button
+                type="button"
+                onClick={() => setOpenGroups((g) => ({ ...g, [item.path]: !open }))}
+                aria-expanded={open}
+                aria-controls={groupId}
+                className={`w-full cursor-pointer ${linkClass(false)} ${groupActive ? 'text-white' : ''}`}
+              >
+                <Icon className="w-[18px] h-[18px] shrink-0" />
+                <span className="flex-1 text-left">{item.label}</span>
+                <ChevronDown
+                  className={`w-4 h-4 shrink-0 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+                  aria-hidden="true"
+                />
+              </button>
+              {open && (
+                <div id={groupId} className="mt-1 ml-4 pl-3 border-l border-white/15 space-y-1">
+                  {item.children.map((child) => {
+                    const ChildIcon = child.icon;
+                    return (
+                      <NavLink key={child.path} to={child.path} className={() => linkClass(inSection(child))}>
+                        <ChildIcon className="w-[18px] h-[18px] shrink-0" />
+                        <span>{child.label}</span>
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        }
         return (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 ${
-                isActive || item.also?.some((p) => location.pathname.startsWith(p))
-                  ? 'bg-white text-navy font-semibold'
-                  : 'text-accent-light/85 hover:bg-white/8 hover:text-white font-medium'
-              }`
-            }
-          >
+          <NavLink key={item.path} to={item.path} className={({ isActive }) => linkClass(isActive || inSection(item))}>
             <Icon className="w-[18px] h-[18px] shrink-0" />
             <span>{item.label}</span>
           </NavLink>

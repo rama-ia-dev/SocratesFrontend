@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
-import type { StudentListItem } from '../types/api';
+import type { StudentListItem, StudentPublic } from '../types/api';
 import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Badge } from '../components/ui/Badge';
@@ -22,6 +21,8 @@ import { ActionMenu } from '../components/ui/ActionMenu';
 import { EditStudentModal } from '../components/EditStudentModal';
 import { DeleteUserModal } from '../components/DeleteUserModal';
 import { useToast } from '../components/ui/Toast';
+import { RegisterStudentsModal } from '../components/RegisterStudentsModal';
+import { useHighlight } from '../lib/useHighlight';
 import { Search, SearchX, Plus, RefreshCw, Edit2, Trash2, CloudOff, GraduationCap } from 'lucide-react';
 
 const PAGE_SIZE = 10;
@@ -36,6 +37,19 @@ const allStudents = async (params: Parameters<typeof api.getStudents>[0]): Promi
   }
 };
 
+const getId = (s: StudentListItem) => s.id_student;
+
+// El alumno recién registrado todavía no integra ningún equipo
+const fromCreated = (s: StudentPublic): StudentListItem => ({
+  id_student: s.id_student,
+  first_name: s.first_name,
+  last_name: s.last_name,
+  legajo: s.legajo,
+  email: s.email,
+  enrollment_year: s.enrollment_year,
+  groups: [],
+});
+
 interface CourseOption {
   id_section_year: number;
   label: string;
@@ -45,7 +59,6 @@ interface CourseOption {
 // cursos lectivos (inscriptos, tengan equipo o no, y los que están en un equipo de esos cursos),
 // con el equipo de cada uno; el administrador, todos los alumnos, o los del curso que elija.
 export const Students: React.FC = () => {
-  const navigate = useNavigate();
   const { user } = useAuth();
 
   const [students, setStudents] = useState<StudentListItem[]>([]);
@@ -60,6 +73,9 @@ export const Students: React.FC = () => {
   // Eliminar un alumno cargado por error (SCRUM-101): solo el administrador
   const [deletingStudent, setDeletingStudent] = useState<StudentListItem | null>(null);
   const { success } = useToast();
+  // Registrar estudiantes (SCRUM-97) en un diálogo; el registro individual queda resaltado (SCRUM-609)
+  const [isRegistering, setIsRegistering] = useState(false);
+  const { highlight, withHighlighted, isHighlighted } = useHighlight(getId);
 
   // Filtro por curso lectivo: los del docente o, para el administrador, todos
   useEffect(() => {
@@ -127,6 +143,7 @@ export const Students: React.FC = () => {
   }, [fetchStudents]);
 
   const hasFilters = Boolean(searchQuery.trim() || course);
+  const rows = withHighlighted(students);
 
   return (
     <div className="space-y-6">
@@ -138,7 +155,7 @@ export const Students: React.FC = () => {
             : 'Alumnos de sus cursos lectivos y el equipo de cada uno'
         }
         action={
-          <Button variant="primary" onClick={() => navigate('/estudiantes/nuevo')}>
+          <Button variant="primary" onClick={() => setIsRegistering(true)}>
             <Plus className="w-4 h-4 mr-1.5" />
             Registrar estudiantes
           </Button>
@@ -172,7 +189,7 @@ export const Students: React.FC = () => {
         />
       </div>
 
-      {isLoading ? (
+      {isLoading && rows.length === 0 ? (
         <TableSkeleton rows={4} cols={5} />
       ) : loadError ? (
         <EmptyState
@@ -186,7 +203,7 @@ export const Students: React.FC = () => {
             </Button>
           }
         />
-      ) : students.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState
           icon={hasFilters ? <SearchX className="w-5 h-5" /> : <GraduationCap className="w-5 h-5" />}
           message={
@@ -244,8 +261,8 @@ export const Students: React.FC = () => {
               </tr>
             </TableHeader>
             <tbody>
-              {students.map((st) => (
-                <TableRow key={st.id_student}>
+              {rows.map((st) => (
+                <TableRow key={st.id_student} className={isHighlighted(st) ? 'row-highlight' : ''}>
                   <TableCell className="font-medium text-ink tabular-nums">{st.legajo}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -312,6 +329,17 @@ export const Students: React.FC = () => {
 
           <Pagination total={total} limit={PAGE_SIZE} offset={offset} onChangeOffset={setOffset} />
         </>
+      )}
+
+      {isRegistering && (
+        <RegisterStudentsModal
+          onClose={() => setIsRegistering(false)}
+          onRegistered={(created) => {
+            setIsRegistering(false);
+            if (created) highlight(fromCreated(created));
+            fetchStudents();
+          }}
+        />
       )}
 
       {/* GET /students no expone la fecha de nacimiento al docente: el diálogo no la muestra */}

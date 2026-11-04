@@ -7,6 +7,7 @@ import {
   Layers,
   GraduationCap,
   Users,
+  UserCheck,
   ChevronRight,
   BarChart3,
   Compass,
@@ -41,10 +42,16 @@ export const Home: React.FC = () => {
           icon: BarChart3,
         },
         {
-          title: 'Usuarios',
-          desc: 'Docentes, administradores y estudiantes: altas y modificaciones.',
-          path: '/usuarios',
-          icon: Users,
+          title: 'Docentes',
+          desc: 'Docentes y administradores, con sus cursos lectivos asignados.',
+          path: '/docentes',
+          icon: UserCheck,
+        },
+        {
+          title: 'Estudiantes',
+          desc: 'Alumnos registrados, con su equipo de trabajo y curso lectivo.',
+          path: '/estudiantes',
+          icon: GraduationCap,
         },
         {
           title: 'Equipos de trabajo',
