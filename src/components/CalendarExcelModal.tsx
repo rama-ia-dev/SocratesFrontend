@@ -415,7 +415,7 @@ export const CalendarExcelModal: React.FC<CalendarExcelModalProps> = ({
             Cancelar
           </Button>
           <Button onClick={handleSave} disabled={!canSave} isLoading={saving}>
-            {total > 0 ? `Cargar ${plural(total, 'evento', 'eventos')}` : 'Cargar eventos'}
+            {total > 0 && errorCount === 0 ? `Cargar ${plural(total, 'evento', 'eventos')}` : 'Cargar eventos'}
           </Button>
         </div>
       </div>
@@ -432,7 +432,8 @@ const PreviewTable: React.FC<{
 }> = ({ title, headers, rows, showStatus }) => (
   <section>
     <h4 className="text-sm font-semibold text-ink mb-2">{title}</h4>
-    <div className="max-h-64 overflow-auto rounded-lg border border-line">
+    {/* Contenedor de consulta: los mensajes de error miden su ancho visible (100cqw) */}
+    <div className="max-h-64 overflow-auto rounded-lg border border-line [container-type:inline-size]">
       <table className="w-full text-left text-sm text-ink">
         <thead className="sticky top-0 bg-tint border-b border-line text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
           <tr>
@@ -465,10 +466,11 @@ const PreviewTable: React.FC<{
               </tr>
               {!r.valid && (
                 <tr className="bg-danger-soft/30">
-                  <td />
-                  <td colSpan={headers.length + 1} className="px-3 pb-2 pt-0">
-                    <ul className="space-y-0.5">
-                      {r.errors.map((msg) => (
+                  {/* Fijo a la izquierda y del ancho visible: en el celular la tabla se desplaza de
+                      costado y el mensaje se tiene que leer sin moverla. El 1rem deja lugar a la
+                      barra de desplazamiento vertical, que 100cqw no descuenta */}
+                  <td colSpan={headers.length + 2} className="p-0">
+                    <ul className="sticky left-0 space-y-0.5 px-3 pb-2 max-w-[calc(100cqw-1rem)]">                      {r.errors.map((msg) => (
                         <li key={msg} className="text-xs font-semibold text-danger">
                           {msg}
                         </li>
