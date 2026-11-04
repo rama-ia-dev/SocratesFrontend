@@ -35,6 +35,7 @@ import {
   ProjectMemberList,
   ProjectPublic,
   ProjectOverview,
+  ProjectStatusAction,
   ProjectUpdate,
   SectionCreate,
   SectionList,
@@ -1744,6 +1745,19 @@ export const api = {
     }
 
     return request<ProjectPublic>(`/projects/${id_project}/uninsure`, { method: 'POST' });
+  },
+
+  // Un docente del curso lectivo o un administrador cambia el estado de un equipo asegurado
+  // (SCRUM-27). Cada acción es su propia ruta del backend, sin cuerpo.
+  async changeProjectStatus(id_project: number, action: ProjectStatusAction): Promise<ProjectPublic> {
+    if (USE_MOCK) {
+      await delay();
+      const err: any = new Error('Project not found');
+      err.status = 404;
+      throw err;
+    }
+
+    return request<ProjectPublic>(`/projects/${id_project}/${action}`, { method: 'POST' });
   },
 
   // El jefe del grupo le pasa la jefatura a otro integrante activo; él sigue en el equipo

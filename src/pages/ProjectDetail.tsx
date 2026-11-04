@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, CloudOff, Lock, Mail, Pencil, RefreshCw, SearchX, ShieldCheck, ShieldOff, UserPlus } from 'lucide-react';
+import { ArrowLeft, ArrowRightLeft, CloudOff, Lock, Mail, Pencil, RefreshCw, SearchX, ShieldCheck, ShieldOff, UserPlus } from 'lucide-react';
 import { api } from '../lib/api';
 import type { MyProject, ProjectMember, ProjectOverview, SectionYearPublic } from '../types/api';
 import { Alert } from '../components/ui/Alert';
@@ -13,6 +13,7 @@ import { TeamSizeModal } from '../components/TeamSizeModal';
 import { EditProjectModal } from '../components/EditProjectModal';
 import { AddMemberModal } from '../components/AddMemberModal';
 import { MoveMemberModal } from '../components/MoveMemberModal';
+import { ChangeProjectStatusModal, statusOptions } from '../components/ChangeProjectStatusModal';
 import { useAuth } from '../context/AuthContext';
 import { PRIVACY_HELP, PRIVACY_LABEL, STATUS_VARIANT, studentEmail, teamLabel } from '../lib/projects';
 
@@ -257,6 +258,8 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
   const [uninsureErrorText, setUninsureErrorText] = useState<string | null>(null);
   // Modificar el equipo (SCRUM-103): sus datos, sumar un alumno o moverlo a otro equipo del curso
   const [isEditOpen, setIsEditOpen] = useState(false);
+  // Cambiar el estado del equipo (SCRUM-27)
+  const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [toMove, setToMove] = useState<ProjectMember | null>(null);
   // Pedir sumarse (SCRUM-20): el equipo y las solicitudes del alumno logueado (null si no es alumno
@@ -505,6 +508,8 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
     (m) => m.id_student === user?.id_user && ['active', 'finished'].includes(m.status.code)
   );
   const canEdit = (canManage || iAmMember) && !isFinal && !project.restricted;
+  // Cambiar el estado (SCRUM-27): los docentes del curso y el administrador, con el equipo asegurado
+  const canChangeStatus = canManage && statusOptions(project.status?.code).length > 0;
   const memberAction =
     canTransfer || canExpel
       ? (m: ProjectMember) =>
@@ -637,11 +642,21 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
           {project.status && (
             <Badge variant={STATUS_VARIANT[project.status.code] ?? 'neutral'}>{project.status.name}</Badge>
           )}
-          {canEdit && (
-            <Button size="sm" variant="outline" className="sm:ml-auto" onClick={() => setIsEditOpen(true)}>
-              <Pencil className="w-4 h-4 mr-1.5" />
-              Modificar datos
-            </Button>
+          {(canEdit || canChangeStatus) && (
+            <div className="flex flex-wrap gap-2 sm:ml-auto">
+              {canChangeStatus && (
+                <Button size="sm" variant="outline" onClick={() => setIsStatusOpen(true)}>
+                  <ArrowRightLeft className="w-4 h-4 mr-1.5" />
+                  Cambiar estado
+                </Button>
+              )}
+              {canEdit && (
+                <Button size="sm" variant="outline" onClick={() => setIsEditOpen(true)}>
+                  <Pencil className="w-4 h-4 mr-1.5" />
+                  Modificar datos
+                </Button>
+              )}
+            </div>
           )}
         </div>
         <p className="mt-1.5 text-sm text-ink-muted">
@@ -694,6 +709,13 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
       />
 
       {requests && <Requests requests={requests} busyId={busyId} onDecide={handleDecide} />}
+
+      <ChangeProjectStatusModal
+        project={project}
+        isOpen={isStatusOpen}
+        onClose={() => setIsStatusOpen(false)}
+        onChanged={() => load(true)}
+      />
 
       <Modal
         isOpen={newLeader !== null}
