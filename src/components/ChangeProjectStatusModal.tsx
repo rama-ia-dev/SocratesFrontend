@@ -12,7 +12,7 @@ interface Option {
   label: string;
   /** Qué ocurre al confirmar */
   effect: string;
-  /** Aprobar y cancelar son estados finales: después no se puede modificar el equipo */
+  /** Aprobado y Cancelado son estados finales: después no se puede cambiar el estado ni modificar el equipo */
   final?: boolean;
 }
 
@@ -65,7 +65,7 @@ const OPTIONS: Record<string, Option[]> = {
 
 export const statusOptions = (code?: string | null): Option[] => (code ? OPTIONS[code] ?? [] : []);
 
-// Estado al que llega el equipo con cada acción, para el aviso de confirmación
+// Estado al que llega el equipo con cada acción, para los avisos
 const TARGET: Record<ProjectStatusAction, string> = {
   start: 'En proceso',
   submit: 'Pendiente de aprobación',
@@ -75,6 +75,8 @@ const TARGET: Record<ProjectStatusAction, string> = {
   cancel: 'Cancelado',
 };
 
+const FINAL_NOTE = 'Es un estado final: no admite cambios posteriores.';
+
 const statusError = (err: any): string => {
   if (err.status === 409)
     return 'El estado del equipo cambió mientras se realizaba la operación. La información se actualizó: verifique el estado actual antes de continuar.';
@@ -83,6 +85,10 @@ const statusError = (err: any): string => {
   if (err.status === 404) return 'El equipo de trabajo ya no existe.';
   return err.message || 'No se pudo cambiar el estado del equipo. Intente nuevamente en unos segundos.';
 };
+
+// En pantallas angostas los botones se apilan: la acción puede tener un nombre largo
+const FOOTER = 'flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3 pt-3 mt-4 border-t border-line';
+
 export const ChangeProjectStatusModal: React.FC<{
   project: ProjectOverview;
   isOpen: boolean;
@@ -95,12 +101,15 @@ export const ChangeProjectStatusModal: React.FC<{
   const [selected, setSelected] = useState<ProjectStatusAction | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
+  // Aprobar y cancelar piden una segunda confirmación, con la advertencia de que son definitivos
+  const [confirming, setConfirming] = useState(false);
 
   // Cada vez que se abre, o si el estado cambió, arranca sin nada elegido
   useEffect(() => {
     if (isOpen) {
       setSelected(null);
       setErrorText(null);
+      setConfirming(false);
     }
   }, [isOpen, project.status?.code]);
 
@@ -118,6 +127,7 @@ export const ChangeProjectStatusModal: React.FC<{
       onChanged();
     } catch (err: any) {
       setErrorText(statusError(err));
+      setConfirming(false);
       if (err.status === 409) onChanged();
     } finally {
       setIsSaving(false);
@@ -127,61 +137,89 @@ export const ChangeProjectStatusModal: React.FC<{
   return (
     <Modal isOpen={isOpen} onClose={() => !isSaving && onClose()} title={`Cambiar el estado del ${team}`}>
       {errorText && <Alert className="mb-4">{errorText}</Alert>}
-      <p className="text-sm text-ink">
-        Estado actual: <span className="font-semibold">{project.status?.name}</span>
-      </p>
-      <fieldset className="mt-4">
-        <legend className="text-[13px] font-medium text-ink-muted">Seleccione la acción a realizar</legend>
-        <div className="mt-2 space-y-2">
-          {options.map((o) => {
-            const checked = selected === o.action;
-            return (
-              <label
-                key={o.action}
-                className={`flex gap-3 rounded-lg border px-3.5 py-3 cursor-pointer transition-colors duration-150 ${
-                  checked ? 'border-primary bg-tint' : 'border-line hover:bg-fill-neutral-soft'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="project-status"
-                  value={o.action}
-                  checked={checked}
-                  onChange={() => setSelected(o.action)}
-                  disabled={isSaving}
-                  className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
-                />
-                <span className="min-w-0">
-                  <span className={`block text-sm font-medium ${o.action === 'cancel' ? 'text-danger' : 'text-ink'}`}>
-                    {o.label}
-                  </span>
-                  <span className="block mt-0.5 text-sm text-ink-muted">{o.effect}</span>
-                </span>
-              </label>
-            );
-          })}
-        </div>
-      </fieldset>
-      {option?.final && (
-        <p className="mt-3 text-sm text-ink">
-          Esta acción no se puede deshacer. Una vez confirmada, no se podrán modificar los datos ni los integrantes del equipo.
-        </p>
+      {confirming && option ? (
+        <>
+          <Alert tone="warning">
+            <p className="font-semibold">Esta acción no se puede deshacer</p>
+            <p className="mt-1">
+              El {team} pasará al estado {TARGET[option.action]}, que es un estado final: luego no se podrá cambiar su
+              estado ni modificar sus datos o sus integrantes.
+            </p>
+          </Alert>
+          <p className="mt-4 text-sm text-ink">{option.effect}</p>
+          <p className="mt-3 text-sm text-ink">¿Confirma que desea continuar?</p>
+          <div className={FOOTER}>
+            <Button type="button" variant="outline" onClick={() => setConfirming(false)} disabled={isSaving}>
+              Volver
+            </Button>
+            <Button
+              type="button"
+              variant={option.action === 'cancel' ? 'destructive' : 'primary'}
+              onClick={handleConfirm}
+              isLoading={isSaving}
+            >
+              {option.label}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-ink">
+            Estado actual: <span className="font-semibold">{project.status?.name}</span>
+          </p>
+          <fieldset className="mt-4">
+            <legend className="text-[13px] font-medium text-ink-muted">Seleccione la acción a realizar</legend>
+            <div className="mt-2 space-y-2">
+              {options.map((o) => {
+                const checked = selected === o.action;
+                return (
+                  <label
+                    key={o.action}
+                    className={`flex gap-3 rounded-lg border px-3.5 py-3 cursor-pointer transition-colors duration-150 ${
+                      checked ? 'border-primary bg-tint' : 'border-line hover:bg-fill-neutral-soft'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="project-status"
+                      value={o.action}
+                      checked={checked}
+                      onChange={() => setSelected(o.action)}
+                      disabled={isSaving}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                    />
+                    <span className="min-w-0">
+                      <span
+                        className={`block text-sm font-medium ${o.action === 'cancel' ? 'text-danger' : 'text-ink'}`}
+                      >
+                        {o.label}
+                      </span>
+                      <span className="block mt-0.5 text-sm text-ink-muted">
+                        {o.effect}
+                        {o.final && <span className="block mt-1 font-medium text-ink">{FINAL_NOTE}</span>}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+          <div className={FOOTER}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
+              Cerrar
+            </Button>
+            <Button
+              type="button"
+              variant={option?.action === 'cancel' ? 'destructive' : 'primary'}
+              onClick={() => (option?.final ? setConfirming(true) : handleConfirm())}
+              disabled={!option}
+              isLoading={isSaving}
+            >
+              {option?.final ? 'Continuar' : option ? option.label : 'Confirmar'}
+            </Button>
+          </div>
+        </>
       )}
-      {/* En pantallas angostas los botones se apilan: la acción puede tener un nombre largo */}
-      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3 pt-3 mt-4 border-t border-line">
-        <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
-          Cerrar
-        </Button>
-        <Button
-          type="button"
-          variant={option?.action === 'cancel' ? 'destructive' : 'primary'}
-          onClick={handleConfirm}
-          disabled={!option}
-          isLoading={isSaving}
-        >
-          {option ? option.label : 'Confirmar'}
-        </Button>
-      </div>
     </Modal>
   );
 };
