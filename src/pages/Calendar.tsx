@@ -59,7 +59,7 @@ type CalendarEvent = {
   description?: string | null;
 };
 
-// Años que ofrece el selector a cada lado del actual
+// Años que ofrece el selector a cada lado del actual y del que se está viendo
 const YEAR_SPAN = 5;
 
 const toIso = (year: number, month: number, day: number) =>
@@ -251,12 +251,13 @@ export const Calendar: React.FC = () => {
   }, [courses, coursesOfYear, viewYear, reloadKey, isStudent]);
 
   // Cualquier año se puede consultar (sin cursos solo muestra los feriados): se ofrecen cinco años
-  // antes y después del actual, más los años con cursos lectivos y el que se está viendo
+  // antes y después del actual y del que se está viendo, más los años con cursos lectivos
   const yearOptions = useMemo(() => {
     const current = today.getFullYear();
     const years = new Set<number>((courses ?? []).map((c) => c.year));
-    for (let y = current - YEAR_SPAN; y <= current + YEAR_SPAN; y++) years.add(y);
-    years.add(viewYear);
+    // El rango se corre con el año elegido, así se puede seguir avanzando o retrocediendo
+    for (const center of [current, viewYear])
+      for (let y = center - YEAR_SPAN; y <= center + YEAR_SPAN; y++) years.add(y);
     return [...years].sort((a, b) => b - a);
   }, [courses, viewYear]);
 
