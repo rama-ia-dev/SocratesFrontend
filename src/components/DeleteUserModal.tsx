@@ -66,18 +66,11 @@ export const DeleteUserModal: React.FC<{
         {isAdmin ? (
           <p>Tiene el rol de administrador: para eliminar a esta persona, primero quítele ese rol desde Modificar.</p>
         ) : blocked ? null : (
-          <>
-            <p>
-              Se borran sus datos y deja de tener acceso al sistema. Su legajo{' '}
-              <span className="tabular-nums">{person.legajo}</span> queda libre para volver a cargarlo. No se
-              puede deshacer.
-            </p>
-            <p className="text-ink-muted">
-              {person.role === 'student'
-                ? 'No se puede eliminar si es integrante de un equipo de trabajo (aunque el equipo haya finalizado) o si tiene una solicitud pendiente.'
-                : 'No se puede eliminar si tiene cursos lectivos asignados.'}
-            </p>
-          </>
+          <p>
+            Se borran sus datos y deja de tener acceso al sistema. Su legajo{' '}
+            <span className="tabular-nums">{person.legajo}</span> queda libre para volver a cargarlo. No se
+            puede deshacer.
+          </p>
         )}
       </div>
       <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-line">
