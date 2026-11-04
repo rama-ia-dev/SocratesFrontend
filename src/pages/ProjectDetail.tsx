@@ -88,6 +88,37 @@ const Members: React.FC<{
   );
 };
 
+// Responsables del seguimiento: los docentes asignados al curso lectivo del equipo
+const Responsibles: React.FC<{ responsible: ProjectOverview['responsible'] }> = ({ responsible }) => {
+  const sorted = [...responsible].sort(
+    (a, b) => a.last_name.localeCompare(b.last_name, 'es') || a.first_name.localeCompare(b.first_name, 'es'),
+  );
+  return (
+    <section className="rounded-xl border border-line bg-white">
+      <div className="px-5 pt-4 sm:px-6">
+        <h2 className="text-[15px] font-semibold text-ink">
+          Responsables <span className="font-normal text-ink-muted">({responsible.length})</span>
+        </h2>
+        <p className="mt-0.5 text-sm text-ink-muted">Los docentes del curso lectivo hacen el seguimiento del equipo.</p>
+      </div>
+      {sorted.length === 0 ? (
+        <p className="px-5 sm:px-6 pt-1.5 pb-4 text-sm italic text-ink-subtle">El curso lectivo todavía no tiene docentes asignados</p>
+      ) : (
+        <ul className="mt-3 divide-y divide-line border-t border-line">
+          {sorted.map((r) => (
+            <li key={r.id_professor} className="px-5 sm:px-6 py-3 flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-ink">
+                {r.last_name}, {r.first_name}
+              </span>
+              <span className="text-xs text-ink-muted tabular-nums">{r.legajo}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+};
+
 // Error del backend al pedir sumarse, en palabras del alumno
 const joinError = (err: any): string => {
   const detail = String(err.message || '');
@@ -692,6 +723,8 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
           )
         }
       />
+
+      <Responsibles responsible={project.responsible ?? []} />
 
       {requests && <Requests requests={requests} busyId={busyId} onDecide={handleDecide} />}
 
