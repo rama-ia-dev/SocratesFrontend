@@ -14,8 +14,6 @@ import { ChairOverview } from './pages/ChairOverview';
 import { Calendar } from './pages/Calendar';
 import { Professors } from './pages/Professors';
 import { Students } from './pages/Students';
-import { RegisterStudents } from './pages/RegisterStudents';
-import { Users } from './pages/Users';
 import { Projects } from './pages/Projects';
 import { ProjectDetail } from './pages/ProjectDetail';
 import { MyTeam } from './pages/MyTeam';
@@ -173,24 +171,10 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/estudiantes/nuevo"
-              element={
-                <ProtectedRoute allowedRoles={['superadmin', 'professor']}>
-                  <RegisterStudents />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* P8: Usuarios (Solo super admin) */}
-            <Route
-              path="/usuarios"
-              element={
-                <ProtectedRoute allowedRoles={['superadmin']}>
-                  <Users />
-                </ProtectedRoute>
-              }
-            />
+            {/* Direcciones anteriores (SCRUM-609): el registro es un diálogo de Estudiantes y la
+                lista única de Usuarios se separó en Docentes y Estudiantes */}
+            <Route path="/estudiantes/nuevo" element={<Navigate to="/estudiantes" replace />} />
+            <Route path="/usuarios" element={<Navigate to="/docentes" replace />} />
 
             {/* Equipos de trabajo (todos los roles; el backend filtra por privacidad) */}
             <Route
