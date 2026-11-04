@@ -84,13 +84,16 @@ export const DateField: React.FC<DateFieldProps> = ({
   const localError = text.length === 10 && !textToIso(text) ? 'Esa fecha no existe' : undefined;
   const shownError = typing ? undefined : (localError ?? error);
 
-  // Mes que muestra el calendario: el de la fecha elegida, o el del máximo permitido
-  const anchor = value || max || toIso(new Date().getFullYear(), new Date().getMonth(), 1);
+  // Mes que muestra el calendario: el de la fecha elegida, o el del máximo permitido. Si la fecha
+  // queda fuera del rango (por ejemplo, de otro año que el permitido), se abre en el extremo más
+  // cercano del rango para poder elegir otra.
+  const clampToRange = (iso: string) => (min && iso < min ? min : max && iso > max ? max : iso);
+  const anchor = clampToRange(value || max || toIso(new Date().getFullYear(), new Date().getMonth(), 1));
   const [viewYear, setViewYear] = useState(Number(anchor.slice(0, 4)));
   const [viewMonth, setViewMonth] = useState(Number(anchor.slice(5, 7)) - 1);
 
   const openCalendar = () => {
-    const a = value || max || anchor;
+    const a = anchor;
     setViewYear(Number(a.slice(0, 4)));
     setViewMonth(Number(a.slice(5, 7)) - 1);
     setOpen(true);
