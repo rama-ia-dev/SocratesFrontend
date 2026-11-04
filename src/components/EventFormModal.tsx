@@ -7,6 +7,7 @@ import { Button } from './ui/Button';
 import { Input, FieldLabel, fieldClasses } from './ui/Input';
 import { Select } from './ui/Select';
 import { DateField } from './ui/DateField';
+import { TimeField } from './ui/TimeField';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { useToast } from './ui/Toast';
 import { useHolidays } from '../lib/holidays';
@@ -437,19 +438,17 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
                 error={show('date')}
                 disabled={saving}
               />
-              <Input
+              <TimeField
                 id="evento-inicio"
                 label="Desde"
-                type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
                 error={show('startTime')}
                 disabled={saving}
               />
-              <Input
+              <TimeField
                 id="evento-fin"
                 label="Hasta"
-                type="time"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
                 error={show('endTime')}
@@ -611,11 +610,10 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({
                 error={show('date')}
                 disabled={saving}
               />
-              <Input
+              <TimeField
                 id="evento-hora"
                 label="Hora límite"
                 optional
-                type="time"
                 value={dueTime}
                 onChange={(e) => setDueTime(e.target.value)}
                 disabled={saving}
