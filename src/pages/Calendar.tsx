@@ -59,6 +59,9 @@ type CalendarEvent = {
   description?: string | null;
 };
 
+// Años que ofrece el selector a cada lado del actual y del que se está viendo
+const YEAR_SPAN = 5;
+
 const toIso = (year: number, month: number, day: number) =>
   `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
@@ -247,9 +250,14 @@ export const Calendar: React.FC = () => {
       });
   }, [courses, coursesOfYear, viewYear, reloadKey, isStudent]);
 
+  // Cualquier año se puede consultar (sin cursos solo muestra los feriados): se ofrecen cinco años
+  // antes y después del actual y del que se está viendo, más los años con cursos lectivos
   const yearOptions = useMemo(() => {
+    const current = today.getFullYear();
     const years = new Set<number>((courses ?? []).map((c) => c.year));
-    years.add(viewYear);
+    // El rango se corre con el año elegido, así se puede seguir avanzando o retrocediendo
+    for (const center of [current, viewYear])
+      for (let y = center - YEAR_SPAN; y <= center + YEAR_SPAN; y++) years.add(y);
     return [...years].sort((a, b) => b - a);
   }, [courses, viewYear]);
 
@@ -926,7 +934,7 @@ export const Calendar: React.FC = () => {
                             {/* El botón da acceso con teclado; el clic en cualquier parte de la fila hace lo mismo */}
                             <button
                               type="button"
-                              className="text-left font-medium text-ink hover:text-primary rounded focus-visible:outline-2 focus-visible:outline-primary"
+                              className="text-left font-medium text-ink hover:text-primary rounded focus-visible:outline-2 focus-visible:outline-primary [overflow-wrap:anywhere]"
                             >
                               {ev.title}
                             </button>
@@ -965,7 +973,7 @@ export const Calendar: React.FC = () => {
                               {ev.date === todayIso && <span className="font-semibold text-primary">Hoy</span>}
                               <span className="ml-auto tabular-nums">{timeText(ev)}</span>
                             </span>
-                            <span className="mt-1 block font-medium text-ink">{ev.title}</span>
+                            <span className="mt-1 block font-medium text-ink [overflow-wrap:anywhere]">{ev.title}</span>
                             <span className="mt-0.5 block text-xs text-ink-muted">
                               {kindOf(ev.kind).label} · {sectionText(ev)}
                             </span>
@@ -1001,8 +1009,11 @@ export const Calendar: React.FC = () => {
                 <span>{sectionText(ev)}</span>
                 <span className="ml-auto tabular-nums">{timeText(ev)}</span>
               </div>
-              <p className="mt-1 font-medium text-ink">{ev.title}</p>
-              {ev.description && <p className="mt-1 text-sm text-ink-muted whitespace-pre-line">{ev.description}</p>}
+              {/* Un texto largo sin espacios se corta en cualquier punto para no salirse del recuadro */}
+              <p className="mt-1 font-medium text-ink [overflow-wrap:anywhere]">{ev.title}</p>
+              {ev.description && (
+                <p className="mt-1 text-sm text-ink-muted whitespace-pre-line [overflow-wrap:anywhere]">{ev.description}</p>
+              )}
               {ev.kind === 'class' && (
                 <div className="mt-1 text-sm text-ink-muted">
                   <EventPlace ev={ev} />
@@ -1084,9 +1095,9 @@ const EventPlace: React.FC<{ ev: CalendarEvent }> = ({ ev }) => {
     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
       <span>{MODALITY_LABELS[ev.modality]}</span>
       {ev.location && (
-        <span className="flex items-center gap-1">
-          <MapPin className="w-3.5 h-3.5" aria-hidden />
-          {ev.location}
+        <span className="flex min-w-0 items-start gap-1">
+          <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
+          <span className="min-w-0 [overflow-wrap:anywhere]">{ev.location}</span>
         </span>
       )}
       {ev.meeting_url && (
