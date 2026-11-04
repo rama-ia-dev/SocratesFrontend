@@ -99,10 +99,10 @@ const Responsibles: React.FC<{ responsible: ProjectOverview['responsible'] }> = 
         <h2 className="text-[15px] font-semibold text-ink">
           Responsables <span className="font-normal text-ink-muted">({responsible.length})</span>
         </h2>
-        <p className="mt-0.5 text-sm text-ink-muted">Los docentes del curso lectivo hacen el seguimiento del equipo.</p>
+        <p className="mt-0.5 text-sm text-ink-muted">Docentes del curso lectivo a cargo del seguimiento del equipo.</p>
       </div>
       {sorted.length === 0 ? (
-        <p className="px-5 sm:px-6 pt-1.5 pb-4 text-sm italic text-ink-subtle">El curso lectivo todavía no tiene docentes asignados</p>
+        <p className="px-5 sm:px-6 pt-1.5 pb-4 text-sm italic text-ink-subtle">El curso lectivo no tiene docentes asignados</p>
       ) : (
         <ul className="mt-3 divide-y divide-line border-t border-line">
           {sorted.map((r) => (
