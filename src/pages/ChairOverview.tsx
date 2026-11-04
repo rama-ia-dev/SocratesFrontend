@@ -76,35 +76,43 @@ type Summary = {
   without_professors: number;
 };
 
-// Alumno inscripto en un curso lectivo que no integra ningún equipo de ese curso, con las
-// solicitudes de ingreso que tiene pendientes en él
+// Alumno inscripto en un curso lectivo que no integra ningún equipo de su año, con las solicitudes
+// de ingreso que tiene pendientes (la comisión va solo si el equipo es de otra)
 type StudentWithoutTeam = {
   id_student: number;
   first_name: string;
   last_name: string;
   legajo: number;
-  pending: { id_project: number; group_number: number; project_name?: string | null }[];
+  pending: { id_project: number; group_number: number; project_name?: string | null; section_name?: string }[];
 };
 
 // Un alumno es parte de un equipo cuando su membresía está activa o finalizada
 const MEMBER_CODES = ['active', 'finished'];
 
-const withoutTeamOf = (students: StudentListItem[], idSectionYear: number): StudentWithoutTeam[] =>
-  students
+// El alumno puede integrar un equipo de cualquier comisión de su año, así que la pertenencia se mira
+// en los equipos de todo el año (`groupsOfYear`), no solo en los del curso lectivo donde se inscribió
+const withoutTeamOf = (
+  registered: StudentListItem[],
+  groupsOfYear: Map<number, StudentListItem['groups']>,
+  idSectionYear: number
+): StudentWithoutTeam[] =>
+  registered
     .filter(
-      (st) =>
-        !st.groups.some(
-          (g) => g.id_section_year === idSectionYear && MEMBER_CODES.includes(g.status?.code ?? '')
-        )
+      (st) => !(groupsOfYear.get(st.id_student) ?? []).some((g) => MEMBER_CODES.includes(g.status?.code ?? ''))
     )
     .map((st) => ({
       id_student: st.id_student,
       first_name: st.first_name,
       last_name: st.last_name,
       legajo: st.legajo,
-      pending: st.groups
-        .filter((g) => g.id_section_year === idSectionYear && g.status?.code === 'pending_approval')
-        .map((g) => ({ id_project: g.id_project, group_number: g.group_number, project_name: g.project_name })),
+      pending: (groupsOfYear.get(st.id_student) ?? [])
+        .filter((g) => g.status?.code === 'pending_approval')
+        .map((g) => ({
+          id_project: g.id_project,
+          group_number: g.group_number,
+          project_name: g.project_name,
+          section_name: g.id_section_year === idSectionYear ? undefined : g.section_name,
+        })),
     }))
     .sort(
       (a, b) =>
@@ -293,26 +301,42 @@ export const ChairOverview: React.FC = () => {
     };
   }, [rows, offset]);
 
-  // Alumnos inscriptos sin equipo: se consultan los inscriptos de cada curso lectivo del listado con
-  // sus grupos (incluidas las solicitudes pendientes). Hasta que llegan se sigue mostrando lo anterior.
+  // Alumnos inscriptos sin equipo: los inscriptos de cada curso lectivo del listado, contra los
+  // equipos de todo su año (una consulta por año, con las solicitudes pendientes). Hasta que llegan
+  // se sigue mostrando lo anterior.
   useEffect(() => {
     if (rows.length === 0) return;
     let cancelled = false;
     setWithoutTeamReady(false);
+    const years = [...new Set(rows.map((r) => r.year))];
     Promise.all(
-      rows.map(async (r) => {
-        const students = await fetchAll<StudentListItem>((o) =>
+      years.map(async (year) => {
+        const inTeams = await fetchAll<StudentListItem>((o) =>
           api.getStudents({
-            id_section_year: r.id_section_year,
-            kind: 'registered',
+            year,
+            kind: 'project',
             status: [...MEMBER_CODES, 'pending_approval'],
             limit: 100,
             offset: o,
           })
         );
-        return [r.id_section_year, withoutTeamOf(students, r.id_section_year)] as const;
+        return [year, new Map(inTeams.map((st) => [st.id_student, st.groups]))] as const;
       })
     )
+      .then((byYear) => {
+        const groupsByYear = new Map(byYear);
+        return Promise.all(
+          rows.map(async (r) => {
+            const registered = await fetchAll<StudentListItem>((o) =>
+              api.getStudents({ id_section_year: r.id_section_year, kind: 'registered', limit: 100, offset: o })
+            );
+            return [
+              r.id_section_year,
+              withoutTeamOf(registered, groupsByYear.get(r.year) ?? new Map(), r.id_section_year),
+            ] as const;
+          })
+        );
+      })
       .then((pairs) => {
         if (cancelled) return;
         setWithoutTeam(Object.fromEntries(pairs));
@@ -648,7 +672,10 @@ export const ChairOverview: React.FC = () => {
                 <p className="mt-0.5 text-xs text-ink-muted">
                   Solicitud pendiente en{' '}
                   {st.pending
-                    .map((p) => `Grupo ${p.group_number}${p.project_name ? ` (${p.project_name})` : ''}`)
+                    .map(
+                      (p) =>
+                        `Grupo ${p.group_number}${p.section_name ? ` de ${p.section_name}` : ''}${p.project_name ? ` (${p.project_name})` : ''}`
+                    )
                     .join(', ')}
                 </p>
               )}

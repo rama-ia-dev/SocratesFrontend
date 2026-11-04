@@ -634,12 +634,14 @@ export const api = {
   // ==========================================
   // Un docente común ve los alumnos de sus cursos lectivos; el administrador, todos.
   // `kind: 'registered'` lista a los inscriptos en los cursos del alcance aunque no tengan equipo;
-  // sin `kind`, el backend lista solo a los que tienen equipo (salvo el administrador sin filtros,
-  // que ve a todos)
+  // `kind: 'project'`, a los integrantes de equipos del alcance en los estados pedidos; sin `kind`,
+  // el backend lista solo a los que tienen equipo (salvo el administrador sin filtros, que ve a todos).
+  // El alcance es el curso lectivo o el año: con `year`, cubre todas las comisiones de ese año.
   async getStudents(params: {
     id_section_year?: number | null;
+    year?: number | null;
     q?: string | null;
-    kind?: 'registered' | null;
+    kind?: 'registered' | 'project' | null;
     // Estados de la membresía con los que vienen los grupos de cada alumno (por defecto, activos y finalizados)
     status?: string[] | null;
     limit?: number;
@@ -663,6 +665,7 @@ export const api = {
 
     const query = new URLSearchParams();
     if (params.id_section_year) query.set('id_section_year', params.id_section_year.toString());
+    if (params.year) query.set('year', params.year.toString());
     if (params.q) query.set('q', params.q);
     if (params.kind) query.set('kind', params.kind);
     params.status?.forEach((s) => query.append('status', s));
