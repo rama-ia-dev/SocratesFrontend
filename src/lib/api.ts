@@ -37,6 +37,8 @@ import {
   ProjectOverview,
   ProjectStatusAction,
   ProjectUpdate,
+  TechnologyList,
+  TechnologyPublic,
   SectionCreate,
   SectionList,
   SectionPublic,
@@ -1758,6 +1760,71 @@ export const api = {
     }
 
     return request<ProjectPublic>(`/projects/${id_project}/${action}`, { method: 'POST' });
+  },
+
+  // Catálogo de tecnologías completo, ordenado por nombre (SCRUM-42). El backend pagina de a 100
+  async getAllTechnologies(): Promise<TechnologyPublic[]> {
+    if (USE_MOCK) {
+      await delay();
+      return [];
+    }
+
+    const items: TechnologyPublic[] = [];
+    for (let offset = 0; ; offset += 100) {
+      const page = await request<TechnologyList>(`/technologies?limit=100&offset=${offset}`);
+      items.push(...page.items);
+      if (page.items.length === 0 || items.length >= page.total) return items;
+    }
+  },
+
+  // Un docente o un administrador suma una tecnología al catálogo (el nombre no se repite)
+  async createTechnology(name: string): Promise<TechnologyPublic> {
+    if (USE_MOCK) {
+      await delay();
+      return { id_technology: Date.now(), name, description: null, image: null };
+    }
+
+    return request<TechnologyPublic>('/technologies', { method: 'POST', body: JSON.stringify({ name }) });
+  },
+
+  // Tecnologías registradas en el proyecto de un equipo, ordenadas por nombre
+  async getProjectTechnologies(id_project: number): Promise<TechnologyPublic[]> {
+    if (USE_MOCK) {
+      await delay();
+      return [];
+    }
+
+    const items: TechnologyPublic[] = [];
+    for (let offset = 0; ; offset += 100) {
+      const page = await request<TechnologyList>(
+        `/projects/${id_project}/technologies?limit=100&offset=${offset}`
+      );
+      items.push(...page.items);
+      if (page.items.length === 0 || items.length >= page.total) return items;
+    }
+  },
+
+  // Registra varias tecnologías en el proyecto: todo o nada
+  async addProjectTechnologies(id_project: number, id_technologies: number[]): Promise<TechnologyPublic[]> {
+    if (USE_MOCK) {
+      await delay();
+      return [];
+    }
+
+    return request<TechnologyPublic[]>(`/projects/${id_project}/technologies/bulk`, {
+      method: 'POST',
+      body: JSON.stringify({ id_technologies }),
+    });
+  },
+
+  // Quita una tecnología del proyecto; sigue en el catálogo
+  async removeProjectTechnology(id_project: number, id_technology: number): Promise<void> {
+    if (USE_MOCK) {
+      await delay();
+      return;
+    }
+
+    return request<void>(`/projects/${id_project}/technologies/${id_technology}`, { method: 'DELETE' });
   },
 
   // El jefe del grupo le pasa la jefatura a otro integrante activo; él sigue en el equipo

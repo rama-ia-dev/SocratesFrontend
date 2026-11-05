@@ -338,6 +338,21 @@ export interface ProjectMemberList {
 // Cambios de estado de un equipo asegurado (SCRUM-27): cada uno es `POST /projects/{id}/<acción>`
 export type ProjectStatusAction = 'start' | 'submit' | 'approve' | 'reject' | 'retry' | 'cancel';
 
+// Tecnología del catálogo (SCRUM-42). La imagen es opcional y hoy no se usa en pantalla
+export interface TechnologyPublic {
+  id_technology: number;
+  name: string;
+  description: string | null;
+  image: { id_image: number; url: string; original_name: string | null; content_type: string } | null;
+}
+
+export interface TechnologyList {
+  items: TechnologyPublic[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 // Docente del curso lectivo que hace el seguimiento de un equipo (sin correo)
 export interface ProfessorResponsible {
   id_professor: number;

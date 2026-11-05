@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRightLeft, CloudOff, Lock, Mail, Pencil, RefreshCw, SearchX, ShieldCheck, ShieldOff, UserPlus } from 'lucide-react';
+import { ArrowLeft, ArrowRightLeft, CloudOff, Lock, Mail, Pencil, Plus, RefreshCw, SearchX, ShieldCheck, ShieldOff, UserPlus, X } from 'lucide-react';
 import { api } from '../lib/api';
-import type { MyProject, ProjectMember, ProjectOverview, SectionYearPublic } from '../types/api';
+import type { MyProject, ProjectMember, ProjectOverview, SectionYearPublic, TechnologyPublic } from '../types/api';
 import { Alert } from '../components/ui/Alert';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -14,6 +14,7 @@ import { EditProjectModal } from '../components/EditProjectModal';
 import { AddMemberModal } from '../components/AddMemberModal';
 import { MoveMemberModal } from '../components/MoveMemberModal';
 import { ChangeProjectStatusModal, statusOptions } from '../components/ChangeProjectStatusModal';
+import { RegisterTechnologiesModal } from '../components/RegisterTechnologiesModal';
 import { useAuth } from '../context/AuthContext';
 import { PRIVACY_HELP, PRIVACY_LABEL, STATUS_VARIANT, studentEmail, teamLabel } from '../lib/projects';
 
@@ -118,6 +119,91 @@ const Responsibles: React.FC<{ responsible: ProjectOverview['responsible'] }> = 
       )}
     </section>
   );
+};
+
+// Tecnologías utilizadas en el proyecto (SCRUM-42). `null` mientras cargan; `failed` si no se pudieron leer
+const Technologies: React.FC<{
+  technologies: TechnologyPublic[] | null;
+  failed: boolean;
+  onRetry: () => void;
+  /** Registrar y quitar: los docentes del curso lectivo y el administrador, salvo en un estado final */
+  canManage: boolean;
+  removingId: number | null;
+  onAdd: () => void;
+  onRemove: (t: TechnologyPublic) => void;
+}> = ({ technologies, failed, onRetry, canManage, removingId, onAdd, onRemove }) => (
+  <section className="rounded-xl border border-line bg-white">
+    <div className="px-5 pt-4 sm:px-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+      <div>
+        <h2 className="text-[15px] font-semibold text-ink">
+          Tecnologías
+          {technologies && <span className="font-normal text-ink-muted"> ({technologies.length})</span>}
+        </h2>
+        <p className="mt-0.5 text-sm text-ink-muted">Herramientas con las que se desarrolla el proyecto.</p>
+      </div>
+      {canManage && technologies && (
+        <Button size="sm" variant="outline" onClick={onAdd} className="self-start shrink-0">
+          <Plus className="w-4 h-4 mr-1.5" />
+          Registrar tecnologías
+        </Button>
+      )}
+    </div>
+    <div className="px-5 sm:px-6 pt-3 pb-4">
+      {failed ? (
+        <p className="text-sm text-ink-muted">
+          No se pudieron cargar las tecnologías.{' '}
+          <button type="button" onClick={onRetry} className="text-primary font-medium hover:underline cursor-pointer">
+            Reintentar
+          </button>
+        </p>
+      ) : technologies === null ? (
+        <div className="flex gap-2" aria-busy="true">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-7 w-20 rounded-full bg-fill-neutral animate-pulse" />
+          ))}
+        </div>
+      ) : technologies.length === 0 ? (
+        <p className="text-sm italic text-ink-subtle">No se registraron tecnologías para este proyecto</p>
+      ) : (
+        <ul className="flex flex-wrap gap-2">
+          {technologies.map((t) => (
+            <li
+              key={t.id_technology}
+              className="inline-flex items-center gap-1 rounded-full border border-line bg-canvas pl-3 pr-1 py-1 text-sm text-ink max-w-full"
+              title={t.description ?? undefined}
+            >
+              <span className={`[overflow-wrap:anywhere] ${canManage ? '' : 'pr-2'}`}>{t.name}</span>
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => onRemove(t)}
+                  disabled={removingId !== null}
+                  aria-label={`Quitar ${t.name} del proyecto`}
+                  title={`Quitar ${t.name} del proyecto`}
+                  className="w-6 h-6 rounded-full inline-flex items-center justify-center text-ink-muted hover:bg-fill-neutral hover:text-danger disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed shrink-0"
+                >
+                  {removingId === t.id_technology ? (
+                    <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                  ) : (
+                    <X className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  </section>
+);
+
+// Error del backend al quitar una tecnología, en palabras del docente
+const removeTechError = (err: any): string => {
+  const detail = String(err.message || '');
+  if (err.status === 409) return 'El equipo está aprobado o cancelado: sus tecnologías ya no se pueden modificar';
+  if (err.status === 404) return 'La tecnología ya no estaba registrada en el proyecto';
+  if (err.status === 403) return 'Solo los docentes del curso lectivo y los administradores pueden quitar tecnologías';
+  return detail || 'No se pudo quitar la tecnología';
 };
 
 // Error del backend al pedir sumarse, en palabras del alumno
@@ -291,6 +377,11 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
   const [isEditOpen, setIsEditOpen] = useState(false);
   // Cambiar el estado del equipo (SCRUM-27)
   const [isStatusOpen, setIsStatusOpen] = useState(false);
+  // Tecnologías del proyecto (SCRUM-42)
+  const [technologies, setTechnologies] = useState<TechnologyPublic[] | null>(null);
+  const [techFailed, setTechFailed] = useState(false);
+  const [isTechOpen, setIsTechOpen] = useState(false);
+  const [removingTechId, setRemovingTechId] = useState<number | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [toMove, setToMove] = useState<ProjectMember | null>(null);
   // Pedir sumarse (SCRUM-20): el equipo y las solicitudes del alumno logueado (null si no es alumno
@@ -310,6 +401,8 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
       setRequests(null);
       setCanManage(false);
       setMyProject(null);
+      setTechnologies(null);
+      setTechFailed(false);
     }
     const idProject = Number(id);
     if (!Number.isInteger(idProject) || idProject <= 0) {
@@ -327,6 +420,15 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
         .getSectionYear(p.id_section_year)
         .then((sy) => isCurrent() && setSectionYear(sy))
         .catch(() => undefined);
+      // Tecnologías: si no se pueden leer, la sección ofrece reintentar y el resto se muestra igual
+      api
+        .getProjectTechnologies(idProject)
+        .then((items) => {
+          if (!isCurrent()) return;
+          setTechnologies(items);
+          setTechFailed(false);
+        })
+        .catch(() => isCurrent() && setTechFailed(true));
       // Solo el jefe del grupo ve las solicitudes, y solo existen mientras el equipo no está asegurado
       const isLeader = p.members.some(
         (m) => m.id_student === user?.id_user && m.is_leader && m.status.code === 'active'
@@ -410,6 +512,21 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
       setExpelErrorText(expelError(err));
     } finally {
       setIsExpelling(false);
+    }
+  };
+
+  // Quitar una tecnología: solo se borra el vínculo, sigue en el catálogo
+  const handleRemoveTech = async (t: TechnologyPublic) => {
+    if (!project) return;
+    setRemovingTechId(t.id_technology);
+    try {
+      await api.removeProjectTechnology(project.id_project, t.id_technology);
+      success(`Se quitó ${t.name} de las tecnologías del proyecto`);
+    } catch (err: any) {
+      showError(removeTechError(err));
+    } finally {
+      setRemovingTechId(null);
+      load(true);
     }
   };
 
@@ -740,6 +857,34 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
       />
 
       <Responsibles responsible={project.responsible ?? []} />
+
+      <Technologies
+        technologies={technologies}
+        failed={techFailed}
+        onRetry={() => load(true)}
+        canManage={canManage && !isFinal}
+        removingId={removingTechId}
+        onAdd={() => setIsTechOpen(true)}
+        onRemove={handleRemoveTech}
+      />
+
+      {isTechOpen && technologies && (
+        <RegisterTechnologiesModal
+          project={project}
+          registered={technologies}
+          onClose={() => setIsTechOpen(false)}
+          onChanged={() => load(true)}
+          onRegistered={(names) => {
+            setIsTechOpen(false);
+            success(
+              names.length === 1
+                ? `Se registró ${names[0]} en el proyecto del ${teamLabel(project)}`
+                : `Se registraron ${names.length} tecnologías en el proyecto del ${teamLabel(project)}`
+            );
+            load(true);
+          }}
+        />
+      )}
 
       {requests && <Requests requests={requests} busyId={busyId} onDecide={handleDecide} />}
 
