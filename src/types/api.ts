@@ -482,6 +482,15 @@ export interface AttendancePublic {
   recorded_at: string;
 }
 
+// Resultado de marcar varios alumnos a la vez. `already_present` son los que ya figuraban presentes
+// (conservan su método original).
+export interface AttendanceBulkResult {
+  requested: number;
+  created: number;
+  already_present: number;
+  items: AttendancePublic[];
+}
+
 // Carga en lote del calendario de un curso lectivo: agrega las filas, todo o nada. 409 si alguna clase
 // se superpone con una existente: `detail` = [{kind, row, detail}], con `row` desde 1.
 export interface CalendarBulkLoad {
