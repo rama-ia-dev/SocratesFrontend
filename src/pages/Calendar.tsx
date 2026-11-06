@@ -13,9 +13,10 @@ import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { Table, TableHeader, TableRow, TableHead, TableCell } from '../components/ui/Table';
 import { EditableEvent, EventFormModal } from '../components/EventFormModal';
 import { DeletableEvent, DeleteEventModal } from '../components/DeleteEventModal';
+import { AttendanceClass, AttendanceModal } from '../components/AttendanceModal';
 import { CalendarExcelModal } from '../components/CalendarExcelModal';
 import { SOURCE_TEXT, useHolidays } from '../lib/holidays';
-import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, FileSpreadsheet, MapPin, Pencil, Plus, SearchX, Trash2 } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, ExternalLink, FileSpreadsheet, MapPin, Pencil, Plus, SearchX, Trash2 } from 'lucide-react';
 
 const MONTHS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -518,6 +519,50 @@ export const Calendar: React.FC = () => {
   );
   const deleteFollowingIds = useMemo(() => seriesAfter(deletingSource), [seriesAfter, deletingSource]);
 
+  // ===== Asistencia =====
+  // La toman los docentes del curso lectivo y el administrador, en clases de hoy o anteriores (de
+  // cualquier año: se puede corregir la asistencia de un curso pasado)
+  const [attendanceClass, setAttendanceClass] = useState<AttendanceClass | null>(null);
+  const canTakeAttendance = (ev: CalendarEvent) =>
+    canManage &&
+    ev.kind === 'class' &&
+    ev.date <= todayIso &&
+    (courses ?? []).some((c) => c.id_section_year === ev.id_section_year);
+  const openAttendance = (ev: CalendarEvent) => {
+    setDetail(null);
+    setAttendanceClass({
+      id: ev.id,
+      date: ev.date,
+      start: ev.start,
+      end: ev.end,
+      title: ev.title,
+      section_name: ev.section_name,
+    });
+  };
+
+  // Presentes de cada clase del día abierto, para avisar cuáles no tienen asistencia registrada. Se
+  // piden al abrir el detalle, así que reflejan los cambios hechos en el modal de asistencia.
+  const [presentCounts, setPresentCounts] = useState<Record<number, number>>({});
+  useEffect(() => {
+    setPresentCounts({});
+    if (!detail) return;
+    let alive = true;
+    for (const ev of detail.events.filter(canTakeAttendance)) {
+      api
+        .getClassAttendance(ev.id)
+        .then((res) => {
+          const count = res.items.filter((s) => s.present).length;
+          if (alive) setPresentCounts((prev) => ({ ...prev, [ev.id]: count }));
+        })
+        // Si falla, no se muestra el indicador: el botón de asistencia sigue disponible
+        .catch(() => {});
+    }
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail]);
+
   // Cargar desde Excel: se sugiere el curso lectivo del año que se ve (el de la comisión filtrada o, si
   // hay uno solo ese año, ese)
   const [excelOpen, setExcelOpen] = useState(false);
@@ -1009,16 +1054,29 @@ export const Calendar: React.FC = () => {
                   <EventPlace ev={ev} />
                 </div>
               )}
-              {canEdit(ev) && (
-                <div className="mt-2 flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => openEdit(ev)}>
-                    <Pencil className="w-3.5 h-3.5" aria-hidden />
-                    Modificar
-                  </Button>
-                  <Button variant="ghostDanger" size="sm" onClick={() => openDelete(ev)}>
-                    <Trash2 className="w-3.5 h-3.5" aria-hidden />
-                    Eliminar
-                  </Button>
+              {(canEdit(ev) || canTakeAttendance(ev)) && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {canTakeAttendance(ev) && (
+                    <Button variant="secondary" size="sm" onClick={() => openAttendance(ev)}>
+                      <ClipboardCheck className="w-3.5 h-3.5" aria-hidden />
+                      Asistencia
+                    </Button>
+                  )}
+                  {canTakeAttendance(ev) && presentCounts[ev.id] !== undefined && (
+                    <AttendanceTag present={presentCounts[ev.id]} />
+                  )}
+                  {canEdit(ev) && (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => openEdit(ev)}>
+                        <Pencil className="w-3.5 h-3.5" aria-hidden />
+                        Modificar
+                      </Button>
+                      <Button variant="ghostDanger" size="sm" onClick={() => openDelete(ev)}>
+                        <Trash2 className="w-3.5 h-3.5" aria-hidden />
+                        Eliminar
+                      </Button>
+                    </>
+                  )}
                 </div>
               )}
             </li>
@@ -1058,6 +1116,8 @@ export const Calendar: React.FC = () => {
         onDeleted={retry}
       />
 
+      <AttendanceModal classInfo={attendanceClass} onClose={() => setAttendanceClass(null)} />
+
       <CalendarExcelModal
         isOpen={excelOpen}
         onClose={() => setExcelOpen(false)}
@@ -1068,6 +1128,18 @@ export const Calendar: React.FC = () => {
     </div>
   );
 };
+
+// Estado de la asistencia de una clase pasada: aviso si nadie figura presente, o cuántos lo están
+const AttendanceTag: React.FC<{ present: number }> = ({ present }) =>
+  present === 0 ? (
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-soft text-warning border border-warning-line">
+      Sin asistencia registrada
+    </span>
+  ) : (
+    <span className="text-xs text-ink-muted tabular-nums">
+      {present} {present === 1 ? 'presente' : 'presentes'}
+    </span>
+  );
 
 // Modalidad y aula o link de la clase; las entregas no tienen lugar
 const EventPlace: React.FC<{ ev: CalendarEvent }> = ({ ev }) => {
