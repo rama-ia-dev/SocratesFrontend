@@ -14,6 +14,7 @@ import {
   CalendarClassBulkUpdate,
   CalendarClassUpdate,
   ClassAttendance,
+  ProjectAttendanceList,
   AttendancePublic,
   AttendanceBulkResult,
   CalendarBulkLoad,
@@ -1969,6 +1970,35 @@ export const api = {
     }
 
     return request<ClassAttendance>(`/calendar-classes/${id_calendar_class}/attendance`);
+  },
+
+  // Asistencia de los integrantes activos o finalizados de un equipo en su curso lectivo (docente del
+  // curso lectivo o administrador). Con `from`/`to`, el porcentaje se calcula sobre las clases del rango.
+  async getProjectAttendance(
+    id_project: number,
+    range: { from?: string; to?: string } = {}
+  ): Promise<ProjectAttendanceList> {
+    if (USE_MOCK) {
+      await delay();
+      const project = mockDB.projects.find((p) => p.id_project === id_project);
+      return {
+        id_project,
+        id_section_year: project?.id_section_year ?? 0,
+        year: project?.year ?? 0,
+        id_section: project?.id_section ?? 0,
+        section_name: project?.section_name ?? '',
+        group_number: project?.group_number ?? 0,
+        items: [],
+        total: 0,
+        limit: 100,
+        offset: 0,
+      };
+    }
+
+    const query = new URLSearchParams({ limit: '100' });
+    if (range.from) query.set('from', range.from);
+    if (range.to) query.set('to', range.to);
+    return request<ProjectAttendanceList>(`/projects/${id_project}/attendance?${query.toString()}`);
   },
 
   // Marcar presente a un alumno a mano. Idempotente; funciona con la toma abierta o cerrada.

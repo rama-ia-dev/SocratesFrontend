@@ -335,6 +335,26 @@ export interface ProjectMemberList {
   offset: number;
 }
 
+// `GET /projects/{id}/attendance` (docente del curso lectivo o administrador): integrantes del equipo
+// con su asistencia en el curso lectivo, jefe primero. `attendance` es null si el integrante no tiene
+// cursada en el curso lectivo.
+export interface ProjectAttendanceMember extends ProjectMember {
+  attendance: AttendanceStats | null;
+}
+
+export interface ProjectAttendanceList {
+  id_project: number;
+  id_section_year: number;
+  year: number;
+  id_section: number;
+  section_name: string;
+  group_number: number;
+  items: ProjectAttendanceMember[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 // Cambios de estado de un equipo asegurado (SCRUM-27): cada uno es `POST /projects/{id}/<acción>`
 export type ProjectStatusAction = 'start' | 'submit' | 'approve' | 'reject' | 'retry' | 'cancel';
 
