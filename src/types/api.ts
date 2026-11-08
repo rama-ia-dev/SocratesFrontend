@@ -491,6 +491,43 @@ export interface ClassAttendance {
   items: AttendanceStudent[];
 }
 
+// Toma de asistencia con código recién habilitada (o con el código rotado). El código se muestra solo
+// en esta respuesta: el backend lo guarda hasheado.
+export interface AttendanceSessionOpened {
+  id_attendance_session: number;
+  id_calendar_class: number;
+  code: string;
+  expires_at: string;
+}
+
+// `GET /me/attendance`: clases a las que asistió el alumno logueado, la más reciente primero
+export interface MyAttendanceItem {
+  id_attendance: number;
+  id_calendar_class: number;
+  id_section_year: number;
+  year: number;
+  id_section: number;
+  section_name: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  title: string | null;
+  modality: string;
+  method: AttendanceMethod;
+  recorded_at: string;
+}
+
+export interface MyAttendanceList {
+  section_years: {
+    id_section_year: number;
+    year: number;
+    id_section: number;
+    section_name: string;
+    attendance: AttendanceStats;
+  }[];
+  items: MyAttendanceItem[];
+}
+
 // Marca de asistencia guardada
 export interface AttendancePublic {
   id_attendance: number;

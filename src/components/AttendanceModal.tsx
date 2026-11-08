@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCheck, Search, Users } from 'lucide-react';
+import { CheckCheck, KeyRound, RefreshCw, Search, Users } from 'lucide-react';
 import { api } from '../lib/api';
 import { fetchAll } from '../lib/pagination';
-import { AttendanceMethod, AttendanceStudent, StudentListItem } from '../types/api';
+import { AttendanceMethod, AttendanceStudent, ClassAttendance, StudentListItem } from '../types/api';
 import { Modal } from './ui/Modal';
 import { Alert } from './ui/Alert';
 import { Button } from './ui/Button';
@@ -73,7 +73,30 @@ const errorMessage = (err: any, marking: boolean): string => {
   return marking ? 'No se pudo marcar la asistencia. Intente de nuevo.' : 'No se pudo quitar la asistencia. Intente de nuevo.';
 };
 
-const teamErrorMessage = (err: any): string => {
+// Códigos generados en esta pestaña (id de la clase → código y vencimiento). El backend no vuelve a
+// mostrar un código: así se puede cerrar y reabrir el modal sin perderlo mientras siga vigente.
+const issuedCodes = new Map<number, { code: string; expires_at: string }>();
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const localIso = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const countdownText = (ms: number) => {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(total / 60)}:${pad2(total % 60)}`;
+};
+const clockText = (iso: string) => {
+  const d = new Date(iso);
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+};
+
+const codeErrorMessage = (err: any, opening: boolean): string => {
+  if (err?.status === 403) return 'Solo un docente del curso lectivo o el administrador puede habilitar la asistencia.';
+  if (err?.status === 404) return opening ? 'La clase ya no existe. Recargue la página.' : 'La asistencia con código ya estaba cerrada.';
+  return opening
+    ? 'No se pudo habilitar la asistencia con código. Intente de nuevo.'
+    : 'No se pudo cerrar la asistencia con código. Intente de nuevo.';
+};
+
+const teamErrorMessage =(err: any): string => {
   if (err?.status === 403) return 'Solo un docente del curso lectivo o el administrador puede registrar asistencia.';
   if (err?.status === 422)
     return 'Algún integrante ya no está cursando este curso lectivo: no se marcó a nadie del equipo. Se actualizó la lista.';
@@ -100,15 +123,24 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ classInfo, onC
   // Cursadas con un cambio en curso: se deshabilita su casilla hasta que responda el backend
   const [pending, setPending] = useState<Set<number>>(new Set());
   const [markingTeam, setMarkingTeam] = useState<number | null>(null);
+  // Toma de asistencia con código: estado según el backend, código generado y reloj de la cuenta regresiva
+  const [session, setSession] = useState<ClassAttendance['session']>(null);
+  const [code, setCode] = useState<{ code: string; expires_at: string } | null>(null);
+  const [codeBusy, setCodeBusy] = useState<'open' | 'close' | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   const load = useCallback((id: number, quiet = false) => {
     if (!quiet) {
       setStudents(null);
       setLoadError(null);
+      setSession(null);
     }
     return api
       .getClassAttendance(id)
-      .then((res) => setStudents(res.items))
+      .then((res) => {
+        setStudents(res.items);
+        setSession(res.session);
+      })
       .catch(() => !quiet && setLoadError('No se pudo cargar la asistencia de la clase.'));
   }, []);
 
@@ -137,6 +169,9 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ classInfo, onC
     setView('students');
     setPending(new Set());
     setMarkingTeam(null);
+    setCodeBusy(null);
+    setCode(issuedCodes.get(classInfo.id) ?? null);
+    setNow(Date.now());
     load(classInfo.id);
     loadTeams(classInfo.id_section_year);
   }, [classInfo, load, loadTeams]);
@@ -174,7 +209,59 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ classInfo, onC
     };
   }, [students, teamOf, q]);
 
+  // La asistencia con código vale mientras la toma no esté cerrada ni vencida
+  const codeOpen = !!session && !session.closed_at && new Date(session.expires_at).getTime() > now;
+  // El código se conoce solo si se generó en esta pestaña y es el vigente
+  const visibleCode = codeOpen && code && code.expires_at === session?.expires_at ? code.code : null;
+
+  // Mientras está habilitada, la cuenta regresiva avanza cada segundo y la lista se actualiza cada 5
+  // segundos con los alumnos que van ingresando el código
+  useEffect(() => {
+    if (!classInfo || !codeOpen) return;
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    const poll = setInterval(() => load(classInfo.id, true), 5000);
+    return () => {
+      clearInterval(tick);
+      clearInterval(poll);
+    };
+  }, [classInfo, codeOpen, load]);
+
   if (!classInfo) return null;
+
+  // El código se habilita solo el día de la clase
+  const isToday = classInfo.date === localIso(new Date());
+
+  const openCode = async () => {
+    setError(null);
+    setCodeBusy('open');
+    try {
+      const res = await api.openAttendance(classInfo.id);
+      const issued = { code: res.code, expires_at: res.expires_at };
+      issuedCodes.set(classInfo.id, issued);
+      setCode(issued);
+      setNow(Date.now());
+      await load(classInfo.id, true);
+    } catch (err: any) {
+      setError(codeErrorMessage(err, true));
+    } finally {
+      setCodeBusy(null);
+    }
+  };
+
+  const closeCode = async () => {
+    setError(null);
+    setCodeBusy('close');
+    try {
+      await api.closeAttendance(classInfo.id);
+      issuedCodes.delete(classInfo.id);
+      setCode(null);
+    } catch (err: any) {
+      if (err?.status !== 404) setError(codeErrorMessage(err, false));
+    } finally {
+      await load(classInfo.id, true);
+      setCodeBusy(null);
+    }
+  };
 
   const presentCount = students?.filter((s) => s.present).length ?? 0;
 
@@ -252,6 +339,19 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ classInfo, onC
         {dateText(classInfo.date)}
         {timeText}
       </p>
+
+      {isToday && students !== null && !loadError && (
+        <CodePanel
+          open={codeOpen}
+          code={visibleCode}
+          expiresAt={session?.expires_at ?? null}
+          remaining={session ? new Date(session.expires_at).getTime() - now : 0}
+          wasOpened={!!session}
+          busy={codeBusy}
+          onOpen={openCode}
+          onClose={closeCode}
+        />
+      )}
 
       {error && <Alert className="mt-4">{error}</Alert>}
 
@@ -380,6 +480,58 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ classInfo, onC
     </Modal>
   );
 };
+
+/** Asistencia con código: habilitarla, mostrar el código con su vencimiento, generar otro o cerrarla. */
+const CodePanel: React.FC<{
+  open: boolean;
+  code: string | null;
+  expiresAt: string | null;
+  remaining: number;
+  wasOpened: boolean;
+  busy: 'open' | 'close' | null;
+  onOpen: () => void;
+  onClose: () => void;
+}> = ({ open, code, expiresAt, remaining, wasOpened, busy, onOpen, onClose }) => (
+  <section className="mt-4 rounded-xl border border-line bg-canvas px-4 py-3" aria-label="Asistencia con código">
+    {!open ? (
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-ink-muted">
+          {wasOpened
+            ? 'La asistencia con código está cerrada. Puede habilitarla de nuevo con un código nuevo.'
+            : 'Habilite la asistencia con código para que los alumnos la registren desde el calendario.'}
+        </p>
+        <Button size="sm" className="shrink-0" onClick={onOpen} isLoading={busy === 'open'} disabled={busy !== null}>
+          {busy !== 'open' && <KeyRound className="w-3.5 h-3.5" aria-hidden />}
+          Habilitar asistencia con código
+        </Button>
+      </div>
+    ) : (
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {code ? (
+          <div>
+            <p className="text-xs text-ink-muted">Código para los alumnos</p>
+            <p className="font-mono text-3xl font-semibold tracking-[0.3em] text-navy tabular-nums">{code}</p>
+            <p className="text-xs text-ink-muted tabular-nums">Vence en {countdownText(remaining)}</p>
+          </div>
+        ) : (
+          <p className="text-sm text-ink-muted">
+            La asistencia con código está habilitada hasta las {expiresAt ? clockText(expiresAt) : ''}. El código se
+            muestra solo al generarlo: genere uno nuevo para verlo.
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <Button variant="secondary" size="sm" onClick={onOpen} isLoading={busy === 'open'} disabled={busy !== null}>
+            {busy !== 'open' && <RefreshCw className="w-3.5 h-3.5" aria-hidden />}
+            Generar código nuevo
+          </Button>
+          <Button variant="outline" size="sm" onClick={onClose} isLoading={busy === 'close'} disabled={busy !== null}>
+            Cerrar
+          </Button>
+        </div>
+      </div>
+    )}
+  </section>
+);
 
 /** Un alumno con su casilla de presente. */
 const StudentRow: React.FC<{

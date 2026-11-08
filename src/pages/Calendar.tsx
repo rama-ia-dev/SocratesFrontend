@@ -15,8 +15,9 @@ import { EditableEvent, EventFormModal } from '../components/EventFormModal';
 import { DeletableEvent, DeleteEventModal } from '../components/DeleteEventModal';
 import { AttendanceClass, AttendanceModal } from '../components/AttendanceModal';
 import { CalendarExcelModal } from '../components/CalendarExcelModal';
+import { CheckInClass, CheckInModal } from '../components/CheckInModal';
 import { SOURCE_TEXT, useHolidays } from '../lib/holidays';
-import { CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, ExternalLink, FileSpreadsheet, MapPin, Pencil, Plus, SearchX, Trash2 } from 'lucide-react';
+import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, ExternalLink, FileSpreadsheet, KeyRound, MapPin, Pencil, Plus, SearchX, Trash2 } from 'lucide-react';
 
 const MONTHS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -564,6 +565,31 @@ export const Calendar: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail]);
 
+  // ===== Mi asistencia (alumno) =====
+  // Clases en las que el alumno figura presente. Registra su asistencia con el código del docente
+  // solo el día de la clase.
+  const [myPresent, setMyPresent] = useState<Set<number>>(new Set());
+  const [checkInClass, setCheckInClass] = useState<CheckInClass | null>(null);
+  useEffect(() => {
+    if (!isStudent) return;
+    api
+      .getMyAttendance()
+      .then((res) => setMyPresent(new Set(res.items.map((a) => a.id_calendar_class))))
+      // Si falla, no se marca "Presente": el botón para registrar la asistencia sigue disponible
+      .catch(() => {});
+  }, [isStudent, reloadKey]);
+  const canCheckIn = (ev: CalendarEvent) =>
+    isStudent && ev.kind === 'class' && ev.date === todayIso && !myPresent.has(ev.id);
+  const openCheckIn = (ev: CalendarEvent) => {
+    setDetail(null);
+    setCheckInClass({ id: ev.id, title: ev.title, section_name: ev.section_name, start: ev.start, end: ev.end });
+  };
+  // Clases de hoy en las que el alumno todavía no registró su asistencia
+  const pendingCheckIns = useMemo(
+    () => (isStudent ? events.filter((ev) => ev.kind === 'class' && ev.date === todayIso && !myPresent.has(ev.id)) : []),
+    [isStudent, events, myPresent]
+  );
+
   // Cargar desde Excel: se sugiere el curso lectivo del año que se ve (el de la comisión filtrada o, si
   // hay uno solo ese año, ese)
   const [excelOpen, setExcelOpen] = useState(false);
@@ -658,6 +684,25 @@ export const Calendar: React.FC = () => {
           {loadError}
         </Alert>
       )}
+
+      {/* Alumno: aviso de las clases de hoy en las que todavía no registró su asistencia */}
+      {pendingCheckIns.map((ev) => (
+        <Alert
+          key={ev.key}
+          tone="info"
+          className="mb-4"
+          action={
+            <Button size="sm" onClick={() => openCheckIn(ev)}>
+              <KeyRound className="w-3.5 h-3.5" aria-hidden />
+              Registrar mi asistencia
+            </Button>
+          }
+        >
+          Hoy tiene clase de {ev.section_name}
+          {ev.start ? ` de ${ev.start}${ev.end ? ` a ${ev.end}` : ''}` : ''}. Cuando el docente habilite la asistencia,
+          ingrese el código que le dé.
+        </Alert>
+      ))}
 
       {/* ===================== Filtros (calendario y listado) ===================== */}
       <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1055,6 +1100,20 @@ export const Calendar: React.FC = () => {
                   <EventPlace ev={ev} />
                 </div>
               )}
+              {isStudent && ev.kind === 'class' && myPresent.has(ev.id) && (
+                <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-success">
+                  <CheckCircle2 className="w-4 h-4" aria-hidden />
+                  Presente
+                </p>
+              )}
+              {canCheckIn(ev) && (
+                <div className="mt-2">
+                  <Button size="sm" onClick={() => openCheckIn(ev)}>
+                    <KeyRound className="w-3.5 h-3.5" aria-hidden />
+                    Registrar mi asistencia
+                  </Button>
+                </div>
+              )}
               {(canEdit(ev) || canTakeAttendance(ev)) && (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {canTakeAttendance(ev) && (
@@ -1118,6 +1177,12 @@ export const Calendar: React.FC = () => {
       />
 
       <AttendanceModal classInfo={attendanceClass} onClose={() => setAttendanceClass(null)} />
+
+      <CheckInModal
+        classInfo={checkInClass}
+        onClose={() => setCheckInClass(null)}
+        onDone={(id) => setMyPresent((prev) => new Set(prev).add(id))}
+      />
 
       <CalendarExcelModal
         isOpen={excelOpen}

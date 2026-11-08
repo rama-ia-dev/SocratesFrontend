@@ -15,6 +15,8 @@ import {
   CalendarClassUpdate,
   ClassAttendance,
   ProjectAttendanceList,
+  AttendanceSessionOpened,
+  MyAttendanceList,
   AttendancePublic,
   AttendanceBulkResult,
   CalendarBulkLoad,
@@ -1970,6 +1972,67 @@ export const api = {
     }
 
     return request<ClassAttendance>(`/calendar-classes/${id_calendar_class}/attendance`);
+  },
+
+  // Habilitar la asistencia con código de una clase (docente del curso lectivo o administrador). Si ya
+  // estaba habilitada, genera un código nuevo y el anterior deja de valer.
+  async openAttendance(id_calendar_class: number): Promise<AttendanceSessionOpened> {
+    if (USE_MOCK) {
+      await delay();
+      return {
+        id_attendance_session: id_calendar_class,
+        id_calendar_class,
+        code: String(Math.floor(100000 + Math.random() * 900000)),
+        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      };
+    }
+
+    return request<AttendanceSessionOpened>(`/calendar-classes/${id_calendar_class}/attendance/open`, {
+      method: 'POST',
+    });
+  },
+
+  // Cerrar la asistencia con código: los alumnos ya no pueden marcar (las marcas manuales siguen)
+  async closeAttendance(id_calendar_class: number): Promise<void> {
+    if (USE_MOCK) {
+      await delay();
+      return;
+    }
+
+    await request<void>(`/calendar-classes/${id_calendar_class}/attendance/close`, { method: 'POST' });
+  },
+
+  // El alumno logueado marca su asistencia con el código del docente. Idempotente.
+  // 403 si no cursa (`attending`) el curso lectivo de la clase, 409 si la asistencia está cerrada o el
+  // código venció, 422 si el código no es correcto.
+  async checkInAttendance(id_calendar_class: number, code: string): Promise<AttendancePublic> {
+    if (USE_MOCK) {
+      await delay();
+      return {
+        id_attendance: Date.now(),
+        id_calendar_class,
+        id_student_section_year: 0,
+        id_student: 0,
+        id_section_year: 0,
+        method: 'code',
+        recorded_at: new Date().toISOString(),
+      };
+    }
+
+    return request<AttendancePublic>(`/calendar-classes/${id_calendar_class}/attendance/check-in`, {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+  },
+
+  // Clases a las que asistió el alumno logueado (solo alumnos)
+  async getMyAttendance(): Promise<MyAttendanceList> {
+    if (USE_MOCK) {
+      await delay();
+      return { section_years: [], items: [] };
+    }
+
+    return request<MyAttendanceList>('/me/attendance');
   },
 
   // Asistencia de los integrantes activos o finalizados de un equipo en su curso lectivo (docente del
