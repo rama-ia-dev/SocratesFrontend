@@ -13,6 +13,7 @@ import { Sections } from './pages/Sections';
 import { ChairOverview } from './pages/ChairOverview';
 import { Calendar } from './pages/Calendar';
 import { TeamAttendancePage } from './pages/TeamAttendance';
+import { MyAttendancePage } from './pages/MyAttendance';
 import { Professors } from './pages/Professors';
 import { Students } from './pages/Students';
 import { Projects } from './pages/Projects';
@@ -201,6 +202,16 @@ export default function App() {
               element={
                 <ProtectedRoute allowedRoles={['superadmin', 'professor']}>
                   <TeamAttendancePage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Mi asistencia (Solo alumnos) */}
+            <Route
+              path="/mi-asistencia"
+              element={
+                <ProtectedRoute allowedRoles={['student']}>
+                  <MyAttendancePage />
                 </ProtectedRoute>
               }
             />
