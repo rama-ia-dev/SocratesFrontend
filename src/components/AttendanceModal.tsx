@@ -46,8 +46,15 @@ const normalize = (text: string) =>
 const errorMessage = (err: any, marking: boolean): string => {
   if (err?.status === 403) return 'Solo un docente del curso lectivo o el administrador puede registrar asistencia.';
   if (err?.status === 422) return 'El alumno ya no está cursando este curso lectivo: no se puede marcar presente.';
-  if (err?.status === 404)
-    return marking ? 'La clase ya no existe. Recargue la página.' : 'El alumno ya no figuraba como presente.';
+  if (err?.status === 404) {
+    // El backend responde 404 si no existe la clase, la cursada del alumno o (al desmarcar) la marca
+    if (err?.detail === 'Calendar class not found') return 'La clase ya no existe. Recargue la página.';
+    if (err?.detail === 'Student enrollment not found')
+      return 'La cursada del alumno ya no existe. Se actualizó la lista.';
+    return marking
+      ? 'La clase o la cursada del alumno ya no existe. Recargue la página.'
+      : 'El alumno ya no figuraba como presente.';
+  }
   return marking ? 'No se pudo marcar la asistencia. Intente de nuevo.' : 'No se pudo quitar la asistencia. Intente de nuevo.';
 };
 
@@ -63,6 +70,12 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ classInfo, onC
   const [query, setQuery] = useState('');
   // Cursadas con un cambio en curso: se deshabilita su casilla hasta que responda el backend
   const [pending, setPending] = useState<Set<number>>(new Set());
+  // Cursadas finalizadas que se muestran: las que figuraban presentes al abrir. Se fijan en la carga
+  // inicial para que, si el docente quita una, la fila no desaparezca mientras el modal está abierto.
+  const [shownFinished, setShownFinished] = useState<Set<number>>(new Set());
+  // Cursada finalizada a la que se le está por quitar la asistencia: como no se puede volver a marcar,
+  // se pide confirmación en la misma fila
+  const [confirming, setConfirming] = useState<number | null>(null);
 
   const load = useCallback(
     (id: number, quiet = false) => {
@@ -72,7 +85,15 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ classInfo, onC
       }
       return api
         .getClassAttendance(id)
-        .then((res) => setStudents(res.items))
+        .then((res) => {
+          setStudents(res.items);
+          if (!quiet)
+            setShownFinished(
+              new Set(
+                res.items.filter((s) => s.state !== 'attending' && s.present).map((s) => s.id_student_section_year)
+              )
+            );
+        })
         .catch(() => !quiet && setLoadError('No se pudo cargar la asistencia de la clase.'));
     },
     []
@@ -83,21 +104,31 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ classInfo, onC
     setQuery('');
     setError(null);
     setPending(new Set());
+    setConfirming(null);
     load(classInfo.id);
   }, [classInfo, load]);
 
+  // Se listan los que están cursando y, de los finalizados, solo los que figuraban presentes: a una
+  // cursada finalizada no se la puede marcar, pero su asistencia registrada se puede revisar o quitar.
+  const listed = useMemo(
+    () => (students ?? []).filter((s) => s.state === 'attending' || shownFinished.has(s.id_student_section_year)),
+    [students, shownFinished]
+  );
+
   const visible = useMemo(() => {
-    if (!students) return [];
     const q = normalize(query.trim());
-    if (!q) return students;
-    return students.filter(
+    if (!q) return listed;
+    return listed.filter(
       (s) => normalize(`${s.last_name} ${s.first_name}`).includes(q) || String(s.legajo).startsWith(q)
     );
-  }, [students, query]);
+  }, [listed, query]);
 
   if (!classInfo) return null;
 
-  const presentCount = students?.filter((s) => s.present).length ?? 0;
+  // El total cuenta solo a los que están cursando; los finalizados presentes se informan aparte
+  const attending = listed.filter((s) => s.state === 'attending');
+  const presentCount = attending.filter((s) => s.present).length;
+  const finishedPresent = listed.filter((s) => s.state !== 'attending' && s.present).length;
 
   const toggle = async (student: AttendanceStudent) => {
     const id = student.id_student_section_year;
@@ -159,19 +190,37 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ classInfo, onC
         <div className="mt-4">
           <TableSkeleton rows={5} cols={3} />
         </div>
-      ) : students.length === 0 ? (
-        <EmptyState
-          className="mt-4"
-          icon={<Users className="w-5 h-5" aria-hidden />}
-          message="No hay alumnos cursando"
-          description="Aparecen los alumnos con cursada en este curso lectivo. Un alumno solo inscripto empieza a cursar al integrar un equipo."
-        />
+      ) : listed.length === 0 ? (
+        students.length === 0 ? (
+          <EmptyState
+            className="mt-4"
+            icon={<Users className="w-5 h-5" aria-hidden />}
+            message="No hay alumnos cursando"
+            description="Aparecen los alumnos con cursada en este curso lectivo. Un alumno solo inscripto empieza a cursar al integrar un equipo."
+          />
+        ) : (
+          <EmptyState
+            className="mt-4"
+            icon={<Users className="w-5 h-5" aria-hidden />}
+            message="Nadie figura presente"
+            description="Los alumnos de este curso lectivo ya terminaron la cursada: no se los puede marcar presentes."
+          />
+        )
       ) : (
         <>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-ink-muted" aria-live="polite">
-              <span className="font-semibold text-ink tabular-nums">{presentCount}</span> de{' '}
-              <span className="tabular-nums">{students.length}</span> presentes
+            <p className="text-sm text-ink-muted tabular-nums" aria-live="polite">
+              {attending.length > 0 ? (
+                <>
+                  <span className="font-semibold text-ink">{presentCount}</span> de {attending.length} presentes
+                  {finishedPresent > 0 && `, más ${finishedPresent} con la cursada finalizada`}
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold text-ink">{finishedPresent}</span>{' '}
+                  {finishedPresent === 1 ? 'presente' : 'presentes'} con la cursada finalizada
+                </>
+              )}
             </p>
             <div className="sm:w-64">
               <Input
@@ -208,22 +257,52 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ classInfo, onC
                         className="w-4 h-4 shrink-0 accent-primary"
                         checked={s.present}
                         disabled={disabled}
-                        onChange={() => toggle(s)}
+                        onChange={() => {
+                          if (finished && s.present) setConfirming(confirming === id ? null : id);
+                          else toggle(s);
+                        }}
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-medium text-ink truncate">
+                        <span className="block text-sm font-medium text-ink [overflow-wrap:anywhere]">
                           {s.last_name}, {s.first_name}
                         </span>
-                        <span className="block text-xs text-ink-muted tabular-nums">
-                          Legajo {s.legajo}
-                          {pct !== null && pct !== undefined && ` · ${Math.round(pct)}% de asistencia`}
+                        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-muted tabular-nums">
+                          <span>
+                            Legajo {s.legajo}
+                            {pct !== null && pct !== undefined && ` · ${Math.round(pct)}% de asistencia`}
+                          </span>
+                          {finished && <Badge>{STATE_LABELS[s.state] ?? 'Finalizada'}</Badge>}
                         </span>
                       </span>
-                      {finished && <Badge>{STATE_LABELS[s.state] ?? 'Finalizada'}</Badge>}
                       {s.present && s.method && (
                         <span className="text-xs text-ink-muted whitespace-nowrap">{METHOD_LABELS[s.method]}</span>
                       )}
                     </label>
+                    {confirming === id && (
+                      <div className="px-4 pb-3">
+                        <Alert tone="warning">
+                          <p>
+                            La cursada de {s.last_name}, {s.first_name} ya finalizó: si le quitás la asistencia,
+                            no se va a poder volver a marcar.
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => {
+                                setConfirming(null);
+                                toggle(s);
+                              }}
+                            >
+                              Quitar asistencia
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => setConfirming(null)}>
+                              Cancelar
+                            </Button>
+                          </div>
+                        </Alert>
+                      </div>
+                    )}
                   </li>
                 );
               })}
