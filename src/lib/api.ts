@@ -53,7 +53,9 @@ import {
   StudentUpdate,
   StudentList,
   StudentProjectPublic,
+  StudentSectionYearCreate,
   StudentSectionYearList,
+  StudentSectionYearPublic,
   UserList,
   UserPublic,
   UserUpdate,
@@ -2055,6 +2057,32 @@ export const api = {
     return request<StudentSectionYearList>(
       `/student-section-years?id_section_year=${id_section_year}&limit=100&offset=${offset}`
     );
+  },
+
+  // Cursos lectivos de un alumno: inscripciones y cursadas, el año más reciente primero
+  async getStudentEnrollments(id_student: number): Promise<StudentSectionYearList> {
+    if (USE_MOCK) {
+      await delay();
+      return { items: [], total: 0, limit: 100, offset: 0 };
+    }
+
+    return request<StudentSectionYearList>(`/student-section-years?id_student=${id_student}&limit=100`);
+  },
+
+  // Inscribir a un alumno en otro curso lectivo (SCRUM-610), solo el administrador. Suma una
+  // inscripción: las anteriores y sus cursadas quedan como están. Una inscripción por año (409).
+  async enrollStudent(payload: StudentSectionYearCreate): Promise<StudentSectionYearPublic> {
+    if (USE_MOCK) {
+      await delay();
+      const err: any = new Error('Student not found');
+      err.status = 404;
+      throw err;
+    }
+
+    return request<StudentSectionYearPublic>('/student-section-years', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   },
 
   // El jefe del grupo acepta (active) o rechaza (rejected) una solicitud para sumarse
