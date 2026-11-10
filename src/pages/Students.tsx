@@ -22,8 +22,9 @@ import { EditStudentModal } from '../components/EditStudentModal';
 import { DeleteUserModal } from '../components/DeleteUserModal';
 import { useToast } from '../components/ui/Toast';
 import { RegisterStudentsModal } from '../components/RegisterStudentsModal';
+import { EnrollStudentModal } from '../components/EnrollStudentModal';
 import { useHighlight } from '../lib/useHighlight';
-import { Search, SearchX, Plus, RefreshCw, Edit2, Trash2, CloudOff, GraduationCap } from 'lucide-react';
+import { Search, SearchX, Plus, RefreshCw, Edit2, Trash2, CloudOff, GraduationCap, CalendarPlus } from 'lucide-react';
 
 const PAGE_SIZE = 10;
 
@@ -72,6 +73,8 @@ export const Students: React.FC = () => {
   const [editingStudent, setEditingStudent] = useState<StudentListItem | null>(null);
   // Eliminar un alumno cargado por error (SCRUM-101): solo el administrador
   const [deletingStudent, setDeletingStudent] = useState<StudentListItem | null>(null);
+  // Inscribir en otro curso lectivo (SCRUM-610): solo el administrador
+  const [enrollingStudent, setEnrollingStudent] = useState<StudentListItem | null>(null);
   const { success } = useToast();
   // Registrar estudiantes (SCRUM-97) en un diálogo; el registro individual queda resaltado (SCRUM-609)
   const [isRegistering, setIsRegistering] = useState(false);
@@ -312,6 +315,11 @@ export const Students: React.FC = () => {
                         ...(user?.is_super_admin
                           ? [
                               {
+                                label: 'Inscribir en otro curso lectivo',
+                                icon: <CalendarPlus className="w-3.5 h-3.5 text-primary" />,
+                                onClick: () => setEnrollingStudent(st),
+                              },
+                              {
                                 label: 'Eliminar',
                                 icon: <Trash2 className="w-3.5 h-3.5" />,
                                 onClick: () => setDeletingStudent(st),
@@ -355,6 +363,19 @@ export const Students: React.FC = () => {
           }}
           onClose={() => setEditingStudent(null)}
           onSaved={fetchStudents}
+        />
+      )}
+
+      {enrollingStudent && (
+        <EnrollStudentModal
+          key={enrollingStudent.id_student}
+          student={enrollingStudent}
+          onClose={() => setEnrollingStudent(null)}
+          onEnrolled={(message) => {
+            setEnrollingStudent(null);
+            success(message);
+            fetchStudents();
+          }}
         />
       )}
 
