@@ -202,7 +202,7 @@ export const Profile: React.FC = () => {
               max={maxBirthDate()}
               {...birthDate.inputProps}
               disabled={isLoading}
-              helperText={user.birth_date ? undefined : 'Completala solo si querés actualizarla'}
+              helperText={user.birth_date ? undefined : 'Complétela solo si desea registrarla.'}
             />
           </div>
 
