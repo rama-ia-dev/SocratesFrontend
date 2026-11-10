@@ -14,6 +14,7 @@ import {
   CalendarClassBulkUpdate,
   CalendarClassUpdate,
   ClassAttendance,
+  AttendancePublic,
   CalendarBulkLoad,
   CalendarBulkLoadReport,
   CalendarClassCreate,
@@ -1969,6 +1970,40 @@ export const api = {
     }
 
     return request<ClassAttendance>(`/calendar-classes/${id_calendar_class}/attendance`);
+  },
+
+  // Marcar presente a un alumno a mano. Idempotente; funciona con la toma abierta o cerrada.
+  // 422 si la cursada no es `attending` en el curso lectivo de la clase.
+  async markAttendance(id_calendar_class: number, id_student_section_year: number): Promise<AttendancePublic> {
+    if (USE_MOCK) {
+      await delay();
+      return {
+        id_attendance: Date.now(),
+        id_calendar_class,
+        id_student_section_year,
+        id_student: 0,
+        id_section_year: 0,
+        method: 'manual',
+        recorded_at: new Date().toISOString(),
+      };
+    }
+
+    return request<AttendancePublic>(
+      `/calendar-classes/${id_calendar_class}/attendance/students/${id_student_section_year}`,
+      { method: 'POST' }
+    );
+  },
+
+  // Quitar la asistencia de un alumno (404 si no estaba marcado)
+  async unmarkAttendance(id_calendar_class: number, id_student_section_year: number): Promise<void> {
+    if (USE_MOCK) {
+      await delay();
+      return;
+    }
+
+    await request<void>(`/calendar-classes/${id_calendar_class}/attendance/students/${id_student_section_year}`, {
+      method: 'DELETE',
+    });
   },
 
   // Modificar una entrega

@@ -441,10 +441,54 @@ export interface CalendarClassBulkUpdate {
   changes: Omit<CalendarClassUpdate, 'date'>;
 }
 
-// Asistencia de una clase (docente del curso lectivo o administrador): un ítem por alumno del curso
+// Porcentaje de asistencia de una cursada: sobre las clases con toma de asistencia del curso lectivo.
+// `attendance_percentage` es null si todavía no hay clases con toma.
+export interface AttendanceStats {
+  attended_classes: number;
+  total_classes: number;
+  attendance_percentage: number | null;
+}
+
+// Cómo se registró la asistencia: código del alumno, marca del docente o importada del chat
+export type AttendanceMethod = 'code' | 'manual' | 'transcript';
+
+// Un alumno en la asistencia de una clase. Solo vienen cursadas `attending` o `finished_*`; solo
+// las `attending` se pueden marcar (una `finished_*` solo se puede desmarcar).
+export interface AttendanceStudent {
+  id_student_section_year: number;
+  id_student: number;
+  first_name: string;
+  last_name: string;
+  legajo: number;
+  state: string;
+  present: boolean;
+  method: AttendanceMethod | null;
+  recorded_at: string | null;
+  attendance: AttendanceStats | null;
+}
+
+// Asistencia de una clase (docente del curso lectivo o administrador), ordenada por apellido y nombre.
+// `session` es la toma con código, sin exponer el código; null si nunca se habilitó.
 export interface ClassAttendance {
-  session: { id_attendance_session: number; open: boolean } | null;
-  items: { id_student: number; present: boolean }[];
+  session: {
+    id_attendance_session: number;
+    open: boolean;
+    opened_at: string;
+    expires_at: string;
+    closed_at: string | null;
+  } | null;
+  items: AttendanceStudent[];
+}
+
+// Marca de asistencia guardada
+export interface AttendancePublic {
+  id_attendance: number;
+  id_calendar_class: number;
+  id_student_section_year: number;
+  id_student: number;
+  id_section_year: number;
+  method: AttendanceMethod;
+  recorded_at: string;
 }
 
 // Carga en lote del calendario de un curso lectivo: agrega las filas, todo o nada. 409 si alguna clase
