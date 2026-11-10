@@ -393,7 +393,7 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ classInfo, onC
                 const toMark = full.filter(markable).length;
                 return (
                   <section key={t.id_project} className="rounded-xl border border-line">
-                    <header className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 bg-canvas rounded-t-xl border-b border-line">
+                    <header className="flex items-center gap-3 px-4 py-2.5 bg-canvas rounded-t-xl border-b border-line">
                       <div className="min-w-0 flex-1">
                         <h4 className="text-sm font-semibold text-ink [overflow-wrap:anywhere]">{teamLabel(t)}</h4>
                         <p className="text-xs text-ink-muted tabular-nums">
@@ -401,18 +401,31 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ classInfo, onC
                         </p>
                       </div>
                       {toMark > 0 ? (
+                        // En pantallas chicas el texto se acorta y va en dos líneas para no bajar de renglón
                         <Button
                           variant="secondary"
                           size="sm"
+                          className="shrink-0 h-auto min-h-8 py-1 sm:h-8 sm:py-0"
+                          aria-label={`Marcar presente al ${teamLabel(t)}`}
                           onClick={() => markTeam(t)}
                           isLoading={markingTeam === t.id_project}
                           disabled={markingTeam !== null || full.some((s) => pending.has(s.id_student_section_year))}
                         >
-                          {markingTeam !== t.id_project && <CheckCheck className="w-3.5 h-3.5" aria-hidden />}
-                          Marcar equipo presente
+                          {markingTeam !== t.id_project && <CheckCheck className="w-3.5 h-3.5 shrink-0" aria-hidden />}
+                          <span className="sm:hidden text-left leading-tight">
+                            Marcar
+                            <br />
+                            todos
+                          </span>
+                          <span className="hidden sm:inline">Marcar equipo presente</span>
                         </Button>
                       ) : (
-                        present > 0 && <span className="text-xs font-medium text-success">Equipo completo</span>
+                        present > 0 && (
+                          <span className="shrink-0 text-right text-xs font-medium leading-tight text-success">
+                            Equipo
+                            <br className="sm:hidden" /> completo
+                          </span>
+                        )
                       )}
                     </header>
                     <ul className="divide-y divide-line">{t.members.map(renderRow)}</ul>
