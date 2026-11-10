@@ -532,6 +532,7 @@ export const Calendar: React.FC = () => {
     setDetail(null);
     setAttendanceClass({
       id: ev.id,
+      id_section_year: ev.id_section_year,
       date: ev.date,
       start: ev.start,
       end: ev.end,
