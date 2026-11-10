@@ -282,8 +282,8 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ classInfo, onC
                       <div className="px-4 pb-3">
                         <Alert tone="warning">
                           <p>
-                            La cursada de {s.last_name}, {s.first_name} ya finalizó: si le quitás la asistencia,
-                            no se va a poder volver a marcar.
+                            La cursada de {s.last_name}, {s.first_name} ya finalizó: si se quita la asistencia,
+                            no se podrá volver a marcar.
                           </p>
                           <div className="mt-2 flex flex-wrap gap-2">
                             <Button
