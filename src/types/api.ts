@@ -104,6 +104,19 @@ export interface StudentListItem {
   email: string;
   enrollment_year: number;
   groups: StudentGroup[];
+  // Cursos lectivos del alumno (SCRUM-602): inscripción y cursada vienen como filas separadas
+  section_years?: StudentSectionYearSummary[];
+}
+
+export interface StudentSectionYearSummary {
+  id_student_section_year: number;
+  id_section_year: number;
+  year: number;
+  id_section: number;
+  section_name: string;
+  // registered (inscripción), attending (cursando) o finished_* (cursada terminada)
+  state: string;
+  status?: { code: string; name: string };
 }
 
 export interface StudentList {

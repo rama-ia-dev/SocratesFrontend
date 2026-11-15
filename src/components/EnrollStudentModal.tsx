@@ -5,8 +5,7 @@ import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { Alert } from './ui/Alert';
 import { Select } from './ui/Select';
-
-const courseLabel = (c: { section_name: string; year: number }) => `${c.section_name} (${c.year})`;
+import { byCourse, courseLabel } from '../lib/courses';
 
 const enrollError = (err: any, target: SectionYearPublic): string => {
   const detail = String(err?.message ?? '');
@@ -19,19 +18,6 @@ const enrollError = (err: any, target: SectionYearPublic): string => {
   if (err?.status === 404) return `El curso lectivo ${courseLabel(target)} ya no existe.`;
   if (err?.status === 403) return 'Solo el administrador puede inscribir estudiantes en otro curso lectivo.';
   return detail || 'No se pudo realizar la inscripción.';
-};
-
-// El backend guarda la inscripción (registered) y la cursada (attending, finished_*) como filas
-// separadas del mismo curso lectivo. Se muestra un renglón por curso, con la cursada si la hay.
-const byCourse = (rows: StudentSectionYearPublic[]): StudentSectionYearPublic[] => {
-  const map = new Map<number, StudentSectionYearPublic>();
-  for (const r of rows) {
-    const prev = map.get(r.id_section_year);
-    if (!prev || prev.state === 'registered') map.set(r.id_section_year, r);
-  }
-  return [...map.values()].sort(
-    (a, b) => b.year - a.year || a.section_name.localeCompare(b.section_name, 'es')
-  );
 };
 
 // Inscribir a un estudiante ya registrado en otro curso lectivo (SCRUM-610). La inscripción se
