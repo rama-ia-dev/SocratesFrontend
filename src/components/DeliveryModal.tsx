@@ -30,13 +30,14 @@ const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 /**
  * Una entrega de un equipo (SCRUM-59 a 61 y 590): el enlace, el estado, las notas y los comentarios.
  * La manejan el docente del curso lectivo y el administrador. `onChanged` recibe la entrega
- * actualizada después de cada cambio.
+ * actualizada después de cada cambio; `onCommentsChanged`, la lista de comentarios cada vez que cambia.
  */
 export const DeliveryModal: React.FC<{
   delivery: DeliveryPublic;
   onClose: () => void;
   onChanged: (d: DeliveryPublic) => void;
-}> = ({ delivery: initial, onClose, onChanged }) => {
+  onCommentsChanged?: (id_delivery: number, comments: DeliveryComment[]) => void;
+}> = ({ delivery: initial, onClose, onChanged, onCommentsChanged }) => {
   const { success } = useToast();
   const [delivery, setDelivery] = useState(initial);
   const [error, setError] = useState<string | null>(null);
@@ -154,6 +155,10 @@ export const DeliveryModal: React.FC<{
   useEffect(() => {
     loadComments();
   }, [loadComments]);
+
+  useEffect(() => {
+    if (comments) onCommentsChanged?.(delivery.id_delivery, comments);
+  }, [comments, delivery.id_delivery, onCommentsChanged]);
 
   const addComment = () => {
     const text = content.trim();

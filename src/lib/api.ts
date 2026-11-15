@@ -2197,6 +2197,18 @@ export const api = {
     }
   },
 
+  // Devoluciones y anotaciones de todas las entregas de una actividad, de la más nueva a la más vieja
+  async getActivityComments(id_activity: number): Promise<DeliveryComment[]> {
+    const items: DeliveryComment[] = [];
+    for (let offset = 0; ; offset += 100) {
+      const res = await request<DeliveryCommentList>(
+        `/delivery-comments?id_activity=${id_activity}&limit=100&offset=${offset}`
+      );
+      items.push(...res.items);
+      if (items.length >= res.total || res.items.length === 0) return items;
+    }
+  },
+
   async createDeliveryComment(id_delivery: number, kind: CommentKind, content: string): Promise<DeliveryComment> {
     return request<DeliveryComment>(`/deliveries/${id_delivery}/comments`, {
       method: 'POST',

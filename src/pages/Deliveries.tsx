@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
-import type { ActivityPublic, DeliveryPublic } from '../types/api';
+import type { ActivityPublic, DeliveryComment, DeliveryPublic, ProjectMember } from '../types/api';
 import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Select } from '../components/ui/Select';
@@ -10,7 +10,7 @@ import { Badge } from '../components/ui/Badge';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { DeliveryModal } from '../components/DeliveryModal';
 import { CATEGORY_LABEL, formatDue, latestGrade, statusVariant } from '../lib/deliveries';
-import { CalendarX, ClipboardList, CloudOff, RefreshCw, Users } from 'lucide-react';
+import { CalendarX, ClipboardList, CloudOff, MessageSquare, RefreshCw, Users } from 'lucide-react';
 
 interface CourseOption {
   id_section_year: number;
@@ -22,42 +22,66 @@ interface Team {
   id_project: number;
   group_number: number;
   name?: string | null;
+  members: string[];
 }
 
-// Una celda de la planilla: estado y notas de la entrega de un equipo
-const Cell: React.FC<{ d: DeliveryPublic; onOpen: () => void }> = ({ d, onOpen }) => {
+// Integrantes, "Apellido, Nombre", en orden alfabético
+const memberNames = (members: ProjectMember[]) =>
+  members.map((m) => `${m.last_name}, ${m.first_name}`).sort((a, b) => a.localeCompare(b, 'es'));
+
+/**
+ * Una celda de la planilla, en el orden de la planilla de notas de la cátedra: primero la nota de
+ * la entrega, después la de seguimiento y el último comentario; el estado va al final.
+ */
+const Cell: React.FC<{ d: DeliveryPublic; comments: DeliveryComment[]; onOpen: () => void }> = ({
+  d,
+  comments,
+  onOpen,
+}) => {
   const activity = latestGrade(d, 'activity');
   const followUp = latestGrade(d, 'follow_up');
+  const last = comments[0];
   return (
     <button
       type="button"
       onClick={onOpen}
-      aria-label={`Entrega ${d.activity.title} del Equipo ${d.project.group_number}: ${d.status.name}`}
-      className="w-full h-full text-left rounded-lg px-2.5 py-2 hover:bg-tint focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/15 transition-colors cursor-pointer space-y-1"
+      aria-label={`Entrega ${d.activity.title} del Equipo ${d.project.group_number}: ${
+        activity ? `${CATEGORY_LABEL.activity} ${activity.score.name}, ` : ''
+      }${d.status.name}`}
+      className="w-full h-full text-left rounded-lg px-2.5 py-2 hover:bg-tint focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/15 transition-colors cursor-pointer space-y-1.5"
     >
-      <Badge variant={statusVariant(d.status.code)}>{d.status.name}</Badge>
-      {(activity || followUp) && (
-        <span className="block text-xs text-ink-muted leading-snug">
-          {activity && (
-            <span className="block">
-              {CATEGORY_LABEL.activity}: <span className="text-ink">{activity.score.name}</span>
-            </span>
-          )}
-          {followUp && (
-            <span className="block">
-              {CATEGORY_LABEL.follow_up}: <span className="text-ink">{followUp.score.name}</span>
-            </span>
-          )}
+      <span className="block">
+        <span className="block text-xs text-ink-muted">{CATEGORY_LABEL.activity}</span>
+        {activity ? (
+          <span className="block text-sm font-semibold text-ink">{activity.score.name}</span>
+        ) : (
+          <span className="block text-sm italic text-ink-subtle">Sin nota</span>
+        )}
+      </span>
+      {followUp && (
+        <span className="block text-xs text-ink-muted">
+          {CATEGORY_LABEL.follow_up}: <span className="font-medium text-ink">{followUp.score.name}</span>
         </span>
       )}
+      {last && (
+        <span className="flex gap-1.5 text-xs text-ink-muted">
+          <MessageSquare className="w-3.5 h-3.5 mt-px shrink-0" aria-hidden="true" />
+          <span className="min-w-0">
+            <span className="line-clamp-2 [overflow-wrap:anywhere]">{last.content}</span>
+            {comments.length > 1 && <span className="text-ink-subtle">y {comments.length - 1} más</span>}
+          </span>
+        </span>
+      )}
+      <Badge variant={statusVariant(d.status.code)}>{d.status.name}</Badge>
     </button>
   );
 };
 
 /**
- * Entregas de un curso lectivo (SCRUM-59 a 61 y 590): una fila por equipo y una columna por cada
- * entrega del calendario, como la planilla de notas de la cátedra. Cada celda abre la entrega para
- * registrarla, cambiar su estado, calificarla y comentarla. Docentes del curso y administrador.
+ * Entregas de un curso lectivo (SCRUM-59 a 61 y 590), con la forma de la planilla de notas de la
+ * cátedra: una fila por equipo, con sus integrantes, y una columna por cada entrega del calendario.
+ * Cada celda abre la entrega para registrarla, cambiar su estado, calificarla y comentarla.
+ * Docentes del curso y administrador.
  */
 export const Deliveries: React.FC = () => {
   const { user } = useAuth();
@@ -67,6 +91,8 @@ export const Deliveries: React.FC = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   // Entrega de cada equipo para cada actividad: clave `${id_project}-${id_activity}`
   const [byKey, setByKey] = useState<Map<string, DeliveryPublic>>(new Map());
+  // Comentarios de cada entrega, del más nuevo al más viejo
+  const [commentsBy, setCommentsBy] = useState<Map<number, DeliveryComment[]>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [open, setOpen] = useState<DeliveryPublic | null>(null);
@@ -98,20 +124,39 @@ export const Deliveries: React.FC = () => {
     setIsLoading(true);
     setLoadError(false);
     try {
-      const acts = (await api.getSectionYearActivities(Number(course))).items.sort(
+      const [actList, projects] = await Promise.all([
+        api.getSectionYearActivities(Number(course)),
+        api.getProjects({ id_section_year: Number(course), limit: 100 }),
+      ]);
+      const acts = actList.items.sort(
         (a, b) => a.due_date.localeCompare(b.due_date) || a.id_activity - b.id_activity
       );
-      const lists = await Promise.all(acts.map((a) => api.getActivityDeliveries(a.id_activity)));
+      // El listado de equipos no trae los integrantes: se piden los activos de cada equipo
+      const [deliveryLists, commentLists, memberLists] = await Promise.all([
+        Promise.all(acts.map((a) => api.getActivityDeliveries(a.id_activity))),
+        Promise.all(acts.map((a) => api.getActivityComments(a.id_activity))),
+        Promise.all(projects.items.map((p) => api.getProjectMembers(p.id_project, ['active']))),
+      ]);
       if (current !== requestId.current) return;
       const map = new Map<string, DeliveryPublic>();
-      const teamMap = new Map<number, Team>();
-      for (const d of lists.flat()) {
-        map.set(`${d.id_project}-${d.id_activity}`, d);
-        teamMap.set(d.id_project, d.project);
+      for (const d of deliveryLists.flat()) map.set(`${d.id_project}-${d.id_activity}`, d);
+      const comments = new Map<number, DeliveryComment[]>();
+      for (const c of commentLists.flat()) {
+        comments.set(c.id_delivery, [...(comments.get(c.id_delivery) ?? []), c]);
       }
       setActivities(acts);
-      setTeams([...teamMap.values()].sort((a, b) => a.group_number - b.group_number));
+      setTeams(
+        projects.items
+          .map((p, i) => ({
+            id_project: p.id_project,
+            group_number: p.group_number,
+            name: p.name,
+            members: memberNames(memberLists[i].items),
+          }))
+          .sort((a, b) => a.group_number - b.group_number)
+      );
       setByKey(map);
+      setCommentsBy(comments);
     } catch {
       if (current === requestId.current) setLoadError(true);
     } finally {
@@ -127,9 +172,13 @@ export const Deliveries: React.FC = () => {
     setByKey((prev) => new Map(prev).set(`${d.id_project}-${d.id_activity}`, d));
   }, []);
 
+  const handleCommentsChanged = useCallback((id: number, list: DeliveryComment[]) => {
+    setCommentsBy((prev) => new Map(prev).set(id, list));
+  }, []);
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Entregas" subtitle="Estado y notas de cada equipo en cada entrega del curso lectivo" />
+      <PageHeader title="Entregas" subtitle="Notas, comentarios y estado de cada equipo en cada entrega del curso lectivo" />
 
       <div className="w-full sm:max-w-sm">
         <Select
@@ -176,9 +225,9 @@ export const Deliveries: React.FC = () => {
         <EmptyState icon={<Users className="w-5 h-5" />} message="Este curso lectivo no tiene equipos de trabajo" />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-line bg-white">
-          <table className="w-full table-fixed border-collapse text-sm" style={{ minWidth: `${128 + activities.length * 190}px` }}>
+          <table className="w-full table-fixed border-collapse text-sm" style={{ minWidth: `${144 + activities.length * 190}px` }}>
             <colgroup>
-              <col className="w-32 sm:w-44" />
+              <col className="w-36 sm:w-52" />
               {activities.map((a) => (
                 <col key={a.id_activity} />
               ))}
@@ -204,13 +253,24 @@ export const Deliveries: React.FC = () => {
                       Equipo {t.group_number}
                     </Link>
                     {t.name && <span className="block text-xs text-ink-muted [overflow-wrap:anywhere]">{t.name}</span>}
+                    {t.members.length > 0 ? (
+                      <ul className="mt-2 space-y-0.5 text-xs text-ink-muted" aria-label={`Integrantes del Equipo ${t.group_number}`}>
+                        {t.members.map((m) => (
+                          <li key={m} className="[overflow-wrap:anywhere]">
+                            {m}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="mt-2 block text-xs italic text-ink-subtle">Sin integrantes</span>
+                    )}
                   </th>
                   {activities.map((a) => {
                     const d = byKey.get(`${t.id_project}-${a.id_activity}`);
                     return (
                       <td key={a.id_activity} className="px-1.5 py-1.5">
                         {d ? (
-                          <Cell d={d} onOpen={() => setOpen(d)} />
+                          <Cell d={d} comments={commentsBy.get(d.id_delivery) ?? []} onOpen={() => setOpen(d)} />
                         ) : (
                           <span className="block px-2.5 py-2 text-xs italic text-ink-subtle">Sin entrega</span>
                         )}
@@ -224,7 +284,14 @@ export const Deliveries: React.FC = () => {
         </div>
       )}
 
-      {open && <DeliveryModal delivery={open} onClose={() => setOpen(null)} onChanged={handleChanged} />}
+      {open && (
+        <DeliveryModal
+          delivery={open}
+          onClose={() => setOpen(null)}
+          onChanged={handleChanged}
+          onCommentsChanged={handleCommentsChanged}
+        />
+      )}
     </div>
   );
 };
