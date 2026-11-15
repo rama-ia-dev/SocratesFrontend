@@ -9,8 +9,17 @@
 import {
   AccessToken,
   ActivityCreate,
+  ActivityList,
   ActivityPublic,
   ActivityUpdate,
+  CommentKind,
+  DeliveryComment,
+  DeliveryCommentList,
+  DeliveryGrade,
+  DeliveryList,
+  DeliveryPublic,
+  GradeCategory,
+  SectionYearScore,
   CalendarClassBulkUpdate,
   CalendarClassUpdate,
   ClassAttendance,
@@ -2107,6 +2116,97 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  },
+
+  // ==========================================
+  // Entregas (SCRUM-59 a 62 y 590): las maneja el docente del curso lectivo o el administrador.
+  // Sin modo de prueba: necesitan el backend.
+  // ==========================================
+
+  // Actividades (instancias de entrega) de un curso lectivo
+  async getSectionYearActivities(id_section_year: number): Promise<ActivityList> {
+    return request<ActivityList>(`/section-years/${id_section_year}/activities?limit=100`);
+  },
+
+  // Las entregas de todos los equipos para una actividad. Solo staff del curso.
+  async getActivityDeliveries(id_activity: number): Promise<DeliveryPublic[]> {
+    const items: DeliveryPublic[] = [];
+    for (let offset = 0; ; offset += 100) {
+      const res = await request<DeliveryList>(`/activities/${id_activity}/deliveries?limit=100&offset=${offset}`);
+      items.push(...res.items);
+      if (items.length >= res.total || res.items.length === 0) return items;
+    }
+  },
+
+  // Las entregas de un equipo, por fecha de la actividad
+  async getProjectDeliveries(id_project: number): Promise<DeliveryPublic[]> {
+    const items: DeliveryPublic[] = [];
+    for (let offset = 0; ; offset += 100) {
+      const res = await request<DeliveryList>(`/projects/${id_project}/deliveries?limit=100&offset=${offset}`);
+      items.push(...res.items);
+      if (items.length >= res.total || res.items.length === 0) return items;
+    }
+  },
+
+  async getDelivery(id_delivery: number): Promise<DeliveryPublic> {
+    return request<DeliveryPublic>(`/deliveries/${id_delivery}`);
+  },
+
+  // Enlace a los documentos de la entrega (http o https; null lo borra)
+  async updateDeliveryLink(id_delivery: number, link: string | null): Promise<DeliveryPublic> {
+    return request<DeliveryPublic>(`/deliveries/${id_delivery}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ link }),
+    });
+  },
+
+  // Cambios de estado. 409 si la entrega no está en el estado que la acción necesita.
+  // submit: de Solicitada o Pendiente de modificación a Pendiente de aprobación (409 si la
+  // actividad pide enlace y no hay). withdraw: de Pendiente de aprobación a Solicitada.
+  // approve (final) y reject (Pendiente de modificación): desde Pendiente de aprobación.
+  async changeDeliveryStatus(
+    id_delivery: number,
+    action: 'submit' | 'withdraw' | 'approve' | 'reject'
+  ): Promise<DeliveryPublic> {
+    return request<DeliveryPublic>(`/deliveries/${id_delivery}/${action}`, { method: 'POST' });
+  },
+
+  // Conceptos para calificar, con su valor en el curso lectivo
+  async getSectionYearScores(id_section_year: number): Promise<SectionYearScore[]> {
+    const res = await request<{ items: SectionYearScore[] }>(`/section-years/${id_section_year}/scores`);
+    return res.items;
+  },
+
+  // Agrega una nota (queda en el historial). 409 si la entrega está aprobada.
+  async gradeDelivery(id_delivery: number, category: GradeCategory, id_score: number): Promise<DeliveryGrade> {
+    return request<DeliveryGrade>(`/deliveries/${id_delivery}/grades`, {
+      method: 'POST',
+      body: JSON.stringify({ category, id_score }),
+    });
+  },
+
+  // Devoluciones y anotaciones de una entrega, de la más nueva a la más vieja
+  async getDeliveryComments(id_delivery: number): Promise<DeliveryComment[]> {
+    const items: DeliveryComment[] = [];
+    for (let offset = 0; ; offset += 100) {
+      const res = await request<DeliveryCommentList>(
+        `/deliveries/${id_delivery}/comments?limit=100&offset=${offset}`
+      );
+      items.push(...res.items);
+      if (items.length >= res.total || res.items.length === 0) return items;
+    }
+  },
+
+  async createDeliveryComment(id_delivery: number, kind: CommentKind, content: string): Promise<DeliveryComment> {
+    return request<DeliveryComment>(`/deliveries/${id_delivery}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ kind, content }),
+    });
+  },
+
+  // Marca una devolución como corregida (final). 409 si ya lo estaba.
+  async correctDeliveryComment(id_delivery_comment: number): Promise<DeliveryComment> {
+    return request<DeliveryComment>(`/delivery-comments/${id_delivery_comment}/correct`, { method: 'POST' });
   },
 
   // Integrantes, docentes del curso lectivo o administrador cambian los datos del equipo

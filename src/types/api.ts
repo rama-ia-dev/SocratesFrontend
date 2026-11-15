@@ -578,3 +578,78 @@ export interface CalendarWithClasses {
   classes: CalendarClassPublic[];
   activities: ActivityPublic[];
 }
+
+export interface ActivityList {
+  items: (ActivityPublic & { link_required?: boolean })[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+// Entregas (SCRUM-59 a 62). Una por equipo y por actividad del calendario, creada sola.
+// Estados: requested (Solicitada) → pending_approval (entregada, espera revisión) → approved
+// (final) o pending_modification (se pidieron cambios); withdraw vuelve a requested.
+export type GradeCategory = 'activity' | 'follow_up';
+
+export interface DeliveryGrade {
+  id_delivery_grade: number;
+  id_delivery: number;
+  category: GradeCategory;
+  score: { id_score: number; code: string; name: string; value: number };
+  graded_at: string;
+}
+
+export interface DeliveryPublic {
+  id_delivery: number;
+  id_project: number;
+  id_activity: number;
+  id_section_year: number;
+  activity: ActivityPublic & { link_required?: boolean };
+  project: { id_project: number; group_number: number; name?: string | null };
+  status: StatusPublic;
+  link?: string | null;
+  submitted_at?: string | null;
+  updated_at?: string | null;
+  // Historial, de la más nueva a la más vieja, y la última de cada categoría
+  grades: DeliveryGrade[];
+  latest_grades: DeliveryGrade[];
+}
+
+export interface DeliveryList {
+  items: DeliveryPublic[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+// Conceptos con los que se califica, con el valor que tienen en el curso lectivo
+export interface SectionYearScore {
+  id_section_year_score: number;
+  id_score: number;
+  code: string;
+  name: string;
+  value: number;
+}
+
+// Comentario de una entrega: devolución para el equipo (feedback: Solicitado → Corregido) o
+// anotación interna del docente (annotation, sin estado que cambie). La 590 son las anotaciones.
+export type CommentKind = 'feedback' | 'annotation';
+
+export interface DeliveryComment {
+  id_delivery_comment: number;
+  id_delivery: number;
+  kind: CommentKind;
+  author: { id_professor: number; first_name: string; last_name: string };
+  content: string;
+  status: StatusPublic;
+  created_at: string;
+  updated_at: string;
+  corrected_at?: string | null;
+}
+
+export interface DeliveryCommentList {
+  items: DeliveryComment[];
+  total: number;
+  limit: number;
+  offset: number;
+}

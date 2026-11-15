@@ -12,6 +12,7 @@ import {
   BarChart3,
   Compass,
   FolderKanban,
+  ClipboardCheck,
 } from 'lucide-react';
 
 const greeting = () => {
@@ -59,6 +60,12 @@ export const Home: React.FC = () => {
           path: '/equipos',
           icon: FolderKanban,
         },
+        {
+          title: 'Entregas',
+          desc: 'Estado, notas y comentarios de cada equipo en cada entrega.',
+          path: '/entregas',
+          icon: ClipboardCheck,
+        },
       ];
     }
 
@@ -75,6 +82,12 @@ export const Home: React.FC = () => {
           desc: 'Equipos de sus comisiones y el proyecto de cada uno.',
           path: '/equipos',
           icon: FolderKanban,
+        },
+        {
+          title: 'Entregas',
+          desc: 'Estado, notas y comentarios de cada equipo en cada entrega.',
+          path: '/entregas',
+          icon: ClipboardCheck,
         },
       ];
     }
