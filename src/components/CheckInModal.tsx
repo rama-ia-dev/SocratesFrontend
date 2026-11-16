@@ -37,25 +37,51 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({ classInfo, onClose, 
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Último código rechazado por el backend (incorrecto, o toma cerrada o vencida): reenviarlo no
+  // tiene sentido, porque al reabrir la toma el docente genera un código nuevo
+  const [rejected, setRejected] = useState<string | null>(null);
+  // Resaltado breve del aviso cuando el error se repite: borde rojo (se ve aunque el sistema tenga
+  // las animaciones desactivadas) y, si están activas, una sacudida. Cambiar `flashKey` lo reinicia.
+  const [flash, setFlash] = useState(false);
+  const [flashKey, setFlashKey] = useState(0);
+  const flashTimer = useRef<number | undefined>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Se limpia también al cerrar: así, al volver a abrir, no se ve ni por un instante el error anterior
   useEffect(() => {
-    if (!classInfo) return;
     setCode('');
     setError(null);
     setSaving(false);
+    setRejected(null);
+    setFlash(false);
+    window.clearTimeout(flashTimer.current);
     // El foco va al código apenas se abre, para escribirlo directo
-    setTimeout(() => inputRef.current?.focus(), 0);
+    if (classInfo) setTimeout(() => inputRef.current?.focus(), 0);
   }, [classInfo]);
+
+  useEffect(() => () => window.clearTimeout(flashTimer.current), []);
 
   if (!classInfo) return null;
 
   const complete = /^\d{6}$/.test(code);
 
+  const flashError = () => {
+    window.clearTimeout(flashTimer.current);
+    setFlash(true);
+    setFlashKey((k) => k + 1);
+    flashTimer.current = window.setTimeout(() => setFlash(false), 700);
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!complete || saving) return;
-    setError(null);
+    // El mismo código rechazado otra vez: no se reenvía, solo se señala el error que ya está
+    if (error && code === rejected) {
+      flashError();
+      inputRef.current?.focus();
+      return;
+    }
+    // El aviso anterior queda visible mientras se envía, para que el cuadro no parpadee
     setSaving(true);
     try {
       await api.checkInAttendance(classInfo.id, code);
@@ -63,6 +89,9 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({ classInfo, onClose, 
       onDone(classInfo.id);
       onClose();
     } catch (err: any) {
+      // Ante un error de conexión o del servidor sí se puede reintentar con el mismo código
+      setRejected(err?.status === 409 || err?.status === 422 ? code : null);
+      if (error !== null) flashError();
       setError(errorMessage(err));
       setSaving(false);
     }
@@ -96,7 +125,14 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({ classInfo, onClose, 
           />
         </div>
 
-        {error && <Alert className="mt-4">{error}</Alert>}
+        {error && (
+          <Alert
+            key={flashKey}
+            className={`mt-4 transition-shadow ${flash ? 'shake ring-2 ring-danger-light' : ''}`}
+          >
+            {error}
+          </Alert>
+        )}
 
         <div className="mt-5 flex justify-end gap-3 pt-3 border-t border-line">
           <Button type="button" variant="outline" onClick={onClose}>
