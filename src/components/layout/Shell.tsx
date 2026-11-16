@@ -19,6 +19,7 @@ import {
   BarChart3,
   CalendarDays,
   UserCheck,
+  ClipboardCheck,
 } from 'lucide-react';
 
 interface NavItem {
@@ -91,6 +92,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
           ],
         },
         { label: 'Equipos de trabajo', path: '/equipos', icon: FolderKanban },
+        { label: 'Asistencia', path: '/asistencia', icon: ClipboardCheck },
       ];
     }
 
@@ -98,6 +100,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       return [
         { label: 'Estudiantes', path: '/estudiantes', icon: GraduationCap },
         { label: 'Equipos de trabajo', path: '/equipos', icon: FolderKanban },
+        { label: 'Asistencia', path: '/asistencia', icon: ClipboardCheck },
         { label: 'Calendario', path: '/calendario', icon: CalendarDays },
       ];
     }

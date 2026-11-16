@@ -12,6 +12,7 @@ import { Profile } from './pages/Profile';
 import { Sections } from './pages/Sections';
 import { ChairOverview } from './pages/ChairOverview';
 import { Calendar } from './pages/Calendar';
+import { TeamAttendancePage } from './pages/TeamAttendance';
 import { Professors } from './pages/Professors';
 import { Students } from './pages/Students';
 import { Projects } from './pages/Projects';
@@ -190,6 +191,16 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <ProjectDetail />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Asistencia de los equipos (super admin y profesor; el backend la limita al docente del curso) */}
+            <Route
+              path="/asistencia"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin', 'professor']}>
+                  <TeamAttendancePage />
                 </ProtectedRoute>
               }
             />
