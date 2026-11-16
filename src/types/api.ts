@@ -318,6 +318,15 @@ export interface StudentSectionYearPublic {
   year: number;
   id_section: number;
   section_name: string;
+  // registered (inscripción), attending (cursando) o finished_* (cursada terminada)
+  state: string;
+  status: StatusPublic;
+}
+
+// `POST /student-section-years`: inscribe a un alumno en un curso lectivo (solo administrador)
+export interface StudentSectionYearCreate {
+  id_student: number;
+  id_section_year: number;
 }
 
 export interface StudentSectionYearList {

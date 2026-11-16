@@ -1055,6 +1055,11 @@ export const Calendar: React.FC = () => {
                   <EventPlace ev={ev} />
                 </div>
               )}
+              {canTakeAttendance(ev) && presentCounts[ev.id] !== undefined && (
+                <div className="mt-2">
+                  <AttendanceTag present={presentCounts[ev.id]} />
+                </div>
+              )}
               {(canEdit(ev) || canTakeAttendance(ev)) && (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {canTakeAttendance(ev) && (
@@ -1062,9 +1067,6 @@ export const Calendar: React.FC = () => {
                       <ClipboardCheck className="w-3.5 h-3.5" aria-hidden />
                       Asistencia
                     </Button>
-                  )}
-                  {canTakeAttendance(ev) && presentCounts[ev.id] !== undefined && (
-                    <AttendanceTag present={presentCounts[ev.id]} />
                   )}
                   {canEdit(ev) && (
                     <>
