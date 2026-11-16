@@ -390,7 +390,7 @@ export const TeamAttendancePage: React.FC = () => {
                 const lowCount = members.filter(isLow).length;
                 return (
                   <section key={project.id_project} className="rounded-xl border border-line bg-white overflow-hidden">
-                    <header className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 border-b border-line">
+                    <header className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 bg-tint border-b border-accent-light">
                       <h2 className="text-[15px] font-semibold text-ink">
                         <Link to={`/equipos/${project.id_project}`} className="hover:text-primary hover:underline">
                           {teamLabel(project)}
