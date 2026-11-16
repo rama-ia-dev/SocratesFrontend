@@ -58,20 +58,27 @@ export const documentStates = (comments: DeliveryComment[]): Record<DocumentName
 
 // ---- Notas finales (solo en este navegador) ----
 
-export interface FinalGrades {
-  deliveries: string;
+// La nota de las entregas es del equipo; la de regularización y la del examen, de cada alumno
+export interface StudentFinals {
   regularization: string;
   exam: string;
 }
 
-export const EMPTY_FINALS: FinalGrades = { deliveries: '', regularization: '', exam: '' };
+export interface FinalGrades {
+  deliveries: string;
+  students: Record<number, StudentFinals>;
+}
 
-const finalsKey = (id_project: number) => `entregas-vista-previa-finales-${id_project}`;
+export const EMPTY_FINALS: FinalGrades = { deliveries: '', students: {} };
+export const EMPTY_STUDENT: StudentFinals = { regularization: '', exam: '' };
+
+const finalsKey = (id_project: number) => `entregas-vista-previa-notas-${id_project}`;
 
 export const readFinals = (id_project: number): FinalGrades => {
   try {
     const raw = localStorage.getItem(finalsKey(id_project));
-    return raw ? { ...EMPTY_FINALS, ...JSON.parse(raw) } : EMPTY_FINALS;
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed ? { deliveries: parsed.deliveries ?? '', students: parsed.students ?? {} } : EMPTY_FINALS;
   } catch {
     return EMPTY_FINALS;
   }

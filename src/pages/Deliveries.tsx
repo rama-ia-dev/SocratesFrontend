@@ -10,7 +10,7 @@ import { Badge } from '../components/ui/Badge';
 import { Alert } from '../components/ui/Alert';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { DeliveryModal } from '../components/DeliveryModal';
-import { FinalGradesModal } from '../components/FinalGradesModal';
+import { FinalGradesModal, type FinalsMember } from '../components/FinalGradesModal';
 import { formatDue, latestGrade, statusVariant } from '../lib/deliveries';
 import {
   DOCUMENTS,
@@ -33,12 +33,14 @@ interface Team {
   id_project: number;
   group_number: number;
   name?: string | null;
-  members: string[];
+  members: FinalsMember[];
 }
 
-// Integrantes, "Apellido, Nombre", en orden alfabético
-const memberNames = (members: ProjectMember[]) =>
-  members.map((m) => `${m.last_name}, ${m.first_name}`).sort((a, b) => a.localeCompare(b, 'es'));
+// Integrantes activos, "Apellido, Nombre", en orden alfabético
+const toMembers = (members: ProjectMember[]): FinalsMember[] =>
+  members
+    .map((m) => ({ id_student: m.id_student, name: `${m.last_name}, ${m.first_name}`, legajo: m.legajo }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'es'));
 
 // Estado de un documento en la tarjeta: punto de color y texto, sin pastilla, para que entre en una línea
 const DocState: React.FC<{ state: DocumentState }> = ({ state }) =>
@@ -57,6 +59,10 @@ const DocState: React.FC<{ state: DocumentState }> = ({ state }) =>
     </span>
   );
 
+// Cada tarjeta ocupa cuatro filas de la grilla y las comparte con las demás tarjetas de su fila
+// (subgrid): el título, la nota, los documentos y el pie quedan a la misma altura en todas.
+const CARD_ROWS = 'row-span-4 grid grid-rows-subgrid gap-y-2.5';
+
 /**
  * Una entrega de un equipo, en el orden de la planilla de notas de la cátedra: la nota de la
  * entrega, el estado de cada documento y los comentarios; el estado de la entrega va al final.
@@ -69,16 +75,20 @@ const DeliveryCard: React.FC<{
 }> = ({ activity, d, comments, onOpen }) => {
   const header = (
     <span className="block">
-      <span className="block text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{activity.title}</span>
+      <span className="block text-[13px] font-semibold text-ink line-clamp-2" title={activity.title}>
+        {activity.title}
+      </span>
       <span className="block text-xs text-ink-muted">{formatDue(activity.due_date, activity.due_time)}</span>
     </span>
   );
 
   if (!d) {
     return (
-      <div className="rounded-lg border border-dashed border-line px-3 py-2.5 space-y-2">
+      <div className={`${CARD_ROWS} rounded-lg border border-dashed border-line px-2.5 py-2.5`}>
         {header}
         <span className="block text-xs italic text-ink-subtle">Sin entrega</span>
+        <span />
+        <span />
       </div>
     );
   }
@@ -91,7 +101,7 @@ const DeliveryCard: React.FC<{
       type="button"
       onClick={onOpen}
       aria-label={`${activity.title}, Equipo ${d.project.group_number}: ${grade ? grade.score.name : 'sin nota'}, ${d.status.name}`}
-      className="w-full h-full flex flex-col justify-start text-left rounded-lg border border-line bg-white px-3 py-2.5 space-y-2.5 hover:border-accent-light hover:bg-tint focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/15 transition-colors cursor-pointer"
+      className={`${CARD_ROWS} text-left rounded-lg border border-line bg-white px-2.5 py-2.5 hover:border-accent-light hover:bg-tint focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/15 transition-colors cursor-pointer`}
     >
       {header}
       <span className="block">
@@ -104,7 +114,7 @@ const DeliveryCard: React.FC<{
       </span>
       <span className="block space-y-1 border-t border-line pt-2">
         {DOCUMENTS.map((doc) => (
-          <span key={doc} className="flex flex-wrap items-center justify-between gap-x-2 text-xs">
+          <span key={doc} className="flex flex-wrap items-center justify-between gap-x-1.5 text-xs">
             <span className="text-ink-muted" title={doc}>
               {DOCUMENT_SHORT[doc]}
             </span>
@@ -112,7 +122,7 @@ const DeliveryCard: React.FC<{
           </span>
         ))}
       </span>
-      <span className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2">
+      <span className="flex flex-col items-start gap-1.5 border-t border-line pt-2">
         <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
           <MessageSquare className="w-3.5 h-3.5" aria-hidden="true" />
           {comments.length === 0 ? 'Sin comentarios' : comments.length === 1 ? '1 comentario' : `${comments.length} comentarios`}
@@ -123,23 +133,52 @@ const DeliveryCard: React.FC<{
   );
 };
 
-const FinalsSummary: React.FC<{ finals: FinalGrades; onEdit: () => void }> = ({ finals, onEdit }) => {
-  const items: [string, string][] = [
-    ['Entregas', finals.deliveries],
-    ['Regularización', finals.regularization],
-    ['Examen', finals.exam],
-  ];
+/** Integrantes del equipo con su nota de regularización y de examen (una por alumno). */
+const MembersPanel: React.FC<{ team: Team; finals: FinalGrades; onEdit: () => void }> = ({ team, finals, onEdit }) => {
+  const any = Boolean(finals.deliveries) || Object.values(finals.students).some((s) => s.regularization || s.exam);
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
-      <span className="font-medium text-ink">Notas finales</span>
-      {items.map(([label, value]) => (
-        <span key={label} className="text-ink-muted">
-          {label}: {value ? <span className="font-semibold text-ink">{value}</span> : <span className="text-ink-subtle">—</span>}
-        </span>
-      ))}
-      <button type="button" onClick={onEdit} className="text-primary font-medium hover:underline cursor-pointer">
-        {items.some(([, v]) => v) ? 'Modificar' : 'Cargar'}
-      </button>
+    <div className="rounded-lg border border-line">
+      <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line">
+        <span className="text-xs font-semibold text-ink">Integrantes</span>
+        <button type="button" onClick={onEdit} className="text-xs text-primary font-medium hover:underline cursor-pointer">
+          {any ? 'Modificar' : 'Cargar notas'}
+        </button>
+      </div>
+      {team.members.length === 0 ? (
+        <p className="px-3 py-2.5 text-xs italic text-ink-subtle">Sin integrantes</p>
+      ) : (
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-ink-muted">
+              <th className="px-3 pt-2 pb-1 text-left font-medium">Integrante</th>
+              <th className="px-1 pt-2 pb-1 text-center font-medium" title="Regularización">
+                Reg.
+              </th>
+              <th className="pl-1 pr-3 pt-2 pb-1 text-center font-medium">Examen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {team.members.map((m) => {
+              const s = finals.students[m.id_student];
+              return (
+                <tr key={m.id_student}>
+                  <td className="px-3 py-1 text-ink [overflow-wrap:anywhere]">{m.name}</td>
+                  <td className="px-1 py-1 text-center tabular-nums">
+                    {s?.regularization ? <span className="font-semibold text-ink">{s.regularization}</span> : <span className="text-ink-subtle">—</span>}
+                  </td>
+                  <td className="pl-1 pr-3 py-1 text-center tabular-nums">
+                    {s?.exam ? <span className="font-semibold text-ink">{s.exam}</span> : <span className="text-ink-subtle">—</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+      <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-line text-xs">
+        <span className="text-ink-muted">Nota de las entregas del equipo</span>
+        {finals.deliveries ? <span className="font-semibold text-ink">{finals.deliveries}</span> : <span className="text-ink-subtle">—</span>}
+      </div>
     </div>
   );
 };
@@ -222,7 +261,7 @@ export const Deliveries: React.FC = () => {
             id_project: p.id_project,
             group_number: p.group_number,
             name: p.name,
-            members: memberNames(memberLists[i].items),
+            members: toMembers(memberLists[i].items),
           }))
           .sort((a, b) => a.group_number - b.group_number)
       );
@@ -323,12 +362,16 @@ export const Deliveries: React.FC = () => {
                   </h2>
                   {t.name && <span className="text-sm text-ink-muted [overflow-wrap:anywhere]">{t.name}</span>}
                 </div>
-                <p className="text-xs text-ink-muted [overflow-wrap:anywhere]">
-                  {t.members.length > 0 ? t.members.join(' · ') : <span className="italic">Sin integrantes</span>}
-                </p>
-                <FinalsSummary finals={finalsBy.get(t.id_project) ?? readFinals(t.id_project)} onEdit={() => setEditingFinals(t)} />
               </header>
-              <div className="p-3 sm:p-4 grid gap-3 grid-cols-[repeat(auto-fill,minmax(10rem,1fr))]">
+              {/* En pantalla ancha, los integrantes a la izquierda y las entregas a la derecha; si no, uno arriba del otro */}
+              <div className="p-3 sm:p-4 grid gap-4 xl:grid-cols-[15rem_1fr] xl:items-start">
+                <MembersPanel
+                  team={t}
+                  finals={finalsBy.get(t.id_project) ?? readFinals(t.id_project)}
+                  onEdit={() => setEditingFinals(t)}
+                />
+                {/* Tarjetas del mismo ancho; las filas de cada tarjeta se alinean con las de sus vecinas */}
+                <div className="grid gap-x-3 gap-y-3 grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(10.5rem,12.75rem))]">
                 {activities.map((a) => {
                   const d = byKey.get(`${t.id_project}-${a.id_activity}`);
                   return (
@@ -341,6 +384,7 @@ export const Deliveries: React.FC = () => {
                     />
                   );
                 })}
+                </div>
               </div>
             </section>
           ))}
@@ -360,6 +404,7 @@ export const Deliveries: React.FC = () => {
         <FinalGradesModal
           teamLabel={`Equipo ${editingFinals.group_number}`}
           id_project={editingFinals.id_project}
+          members={editingFinals.members}
           initial={finalsBy.get(editingFinals.id_project) ?? readFinals(editingFinals.id_project)}
           scores={scores}
           onClose={() => setEditingFinals(null)}
