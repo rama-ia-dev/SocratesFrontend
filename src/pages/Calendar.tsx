@@ -685,22 +685,21 @@ export const Calendar: React.FC = () => {
         </Alert>
       )}
 
-      {/* Alumno: aviso de las clases de hoy en las que todavía no registró su asistencia */}
+      {/* Alumno: aviso de las clases de hoy en las que todavía no registró su asistencia. En celular el
+          botón va debajo del texto para que este no quede en una columna angosta; desde sm, a la derecha. */}
       {pendingCheckIns.map((ev) => (
-        <Alert
-          key={ev.key}
-          tone="info"
-          className="mb-4"
-          action={
-            <Button size="sm" onClick={() => openCheckIn(ev)}>
+        <Alert key={ev.key} tone="info" className="mb-4">
+          <div className="flex flex-col items-start gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <p>
+              Hoy tiene clase de {ev.section_name}
+              {ev.start ? ` de ${ev.start}${ev.end ? ` a ${ev.end}` : ''}` : ''}. Cuando el docente habilite la
+              asistencia, ingrese el código que le dé.
+            </p>
+            <Button size="sm" className="shrink-0 sm:-my-1" onClick={() => openCheckIn(ev)}>
               <KeyRound className="w-3.5 h-3.5" aria-hidden />
               Registrar mi asistencia
             </Button>
-          }
-        >
-          Hoy tiene clase de {ev.section_name}
-          {ev.start ? ` de ${ev.start}${ev.end ? ` a ${ev.end}` : ''}` : ''}. Cuando el docente habilite la asistencia,
-          ingrese el código que le dé.
+          </div>
         </Alert>
       ))}
 
