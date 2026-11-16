@@ -11,6 +11,7 @@ import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/ui/Toast';
 import { TeamSizeModal } from '../components/TeamSizeModal';
 import { EditProjectModal } from '../components/EditProjectModal';
+import { DriveFolder } from '../components/DriveFolder';
 import { AddMemberModal } from '../components/AddMemberModal';
 import { MoveMemberModal } from '../components/MoveMemberModal';
 import { ChangeProjectStatusModal, statusOptions } from '../components/ChangeProjectStatusModal';
@@ -826,6 +827,17 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
           <Field label="Objetivo" value={project.objective} />
           <Field label="Problemática" value={project.problem} />
         </div>
+      )}
+
+      {!project.restricted && (
+        <DriveFolder
+          project={project}
+          canEdit={canManage && !isFinal}
+          onSaved={(_, removed) => {
+            success(removed ? `Se quitó el enlace a la carpeta del ${teamLabel(project)}` : `Se guardó el enlace a la carpeta del ${teamLabel(project)}`);
+            load(true);
+          }}
+        />
       )}
 
       <Members
