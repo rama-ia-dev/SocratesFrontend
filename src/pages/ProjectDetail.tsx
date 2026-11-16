@@ -608,7 +608,7 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
 
   if (state !== 'ok' || !project) {
     return (
-      <div className="max-w-4xl space-y-6">
+      <div className="space-y-6">
         {back}
         {state === 'loading' ? (
           <div className="space-y-4" aria-busy="true">
@@ -782,7 +782,7 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
     : [];
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="space-y-6">
       {back}
 
       <header>
@@ -815,6 +815,10 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
         <p className="mt-1 text-xs text-ink-subtle">{PRIVACY_HELP[project.privacy]}</p>
       </header>
 
+      {/* En pantallas anchas, dos columnas: el proyecto y su gente a la izquierda; la carpeta, las
+          tecnologías y las solicitudes a la derecha. En las angostas, una sola columna en ese orden. */}
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] xl:items-start">
+      <div className="min-w-0 space-y-6">
       {project.restricted ? (
         <EmptyState
           icon={<Lock className="w-5 h-5" />}
@@ -828,17 +832,6 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
           <Field label="Objetivo" value={project.objective} />
           <Field label="Problemática" value={project.problem} />
         </div>
-      )}
-
-      {!project.restricted && (
-        <DriveFolder
-          project={project}
-          canEdit={canManage && !isFinal}
-          onSaved={(_, removed) => {
-            success(removed ? `Se quitó el enlace a la carpeta del ${teamLabel(project)}` : `Se guardó el enlace a la carpeta del ${teamLabel(project)}`);
-            load(true);
-          }}
-        />
       )}
 
       <Members
@@ -870,6 +863,19 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
       />
 
       <Responsibles responsible={project.responsible ?? []} />
+      </div>
+
+      <div className="min-w-0 space-y-6">
+      {!project.restricted && (
+        <DriveFolder
+          project={project}
+          canEdit={canManage && !isFinal}
+          onSaved={(_, removed) => {
+            success(removed ? `Se quitó el enlace a la carpeta del ${teamLabel(project)}` : `Se guardó el enlace a la carpeta del ${teamLabel(project)}`);
+            load(true);
+          }}
+        />
+      )}
 
       <Technologies
         technologies={technologies}
@@ -880,6 +886,10 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
         onAdd={() => setIsTechOpen(true)}
         onRemove={handleRemoveTech}
       />
+
+      {requests && <Requests requests={requests} busyId={busyId} onDecide={handleDecide} />}
+      </div>
+      </div>
 
       {canManage && <ProjectDeliveries idProject={project.id_project} />}
 
@@ -900,8 +910,6 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
           }}
         />
       )}
-
-      {requests && <Requests requests={requests} busyId={busyId} onDecide={handleDecide} />}
 
       <ChangeProjectStatusModal
         project={project}
