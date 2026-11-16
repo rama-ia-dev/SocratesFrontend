@@ -1,15 +1,26 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
-import type { ActivityPublic, DeliveryComment, DeliveryPublic, ProjectMember } from '../types/api';
+import type { ActivityPublic, DeliveryComment, DeliveryPublic, ProjectMember, SectionYearScore } from '../types/api';
 import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
+import { Alert } from '../components/ui/Alert';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { DeliveryModal } from '../components/DeliveryModal';
-import { CATEGORY_LABEL, formatDue, latestGrade, statusVariant } from '../lib/deliveries';
+import { FinalGradesModal } from '../components/FinalGradesModal';
+import { formatDue, latestGrade, statusVariant } from '../lib/deliveries';
+import {
+  DOCUMENTS,
+  DOCUMENT_SHORT,
+  DOCUMENT_STATE_LABEL,
+  documentStates,
+  readFinals,
+  type DocumentState,
+  type FinalGrades,
+} from '../lib/deliveryDocs';
 import { CalendarX, ClipboardList, CloudOff, MessageSquare, RefreshCw, Users } from 'lucide-react';
 
 interface CourseOption {
@@ -29,58 +40,115 @@ interface Team {
 const memberNames = (members: ProjectMember[]) =>
   members.map((m) => `${m.last_name}, ${m.first_name}`).sort((a, b) => a.localeCompare(b, 'es'));
 
+// Estado de un documento en la tarjeta: punto de color y texto, sin pastilla, para que entre en una línea
+const DocState: React.FC<{ state: DocumentState }> = ({ state }) =>
+  state === 'none' ? (
+    <span className="text-ink-subtle" aria-label={DOCUMENT_STATE_LABEL.none}>
+      —
+    </span>
+  ) : (
+    <span
+      className={`inline-flex items-center gap-1 whitespace-nowrap font-medium ${
+        state === 'corrected' ? 'text-success' : 'text-warning'
+      }`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${state === 'corrected' ? 'bg-success-vivid' : 'bg-warning-vivid'}`} aria-hidden="true" />
+      {DOCUMENT_STATE_LABEL[state]}
+    </span>
+  );
+
 /**
- * Una celda de la planilla, en el orden de la planilla de notas de la cátedra: primero la nota de
- * la entrega, después la de seguimiento y el último comentario; el estado va al final.
+ * Una entrega de un equipo, en el orden de la planilla de notas de la cátedra: la nota de la
+ * entrega, el estado de cada documento y los comentarios; el estado de la entrega va al final.
  */
-const Cell: React.FC<{ d: DeliveryPublic; comments: DeliveryComment[]; onOpen: () => void }> = ({
-  d,
-  comments,
-  onOpen,
-}) => {
-  const activity = latestGrade(d, 'activity');
-  const followUp = latestGrade(d, 'follow_up');
-  const last = comments[0];
+const DeliveryCard: React.FC<{
+  activity: ActivityPublic;
+  d?: DeliveryPublic;
+  comments: DeliveryComment[];
+  onOpen: () => void;
+}> = ({ activity, d, comments, onOpen }) => {
+  const header = (
+    <span className="block">
+      <span className="block text-[13px] font-semibold text-ink [overflow-wrap:anywhere]">{activity.title}</span>
+      <span className="block text-xs text-ink-muted">{formatDue(activity.due_date, activity.due_time)}</span>
+    </span>
+  );
+
+  if (!d) {
+    return (
+      <div className="rounded-lg border border-dashed border-line px-3 py-2.5 space-y-2">
+        {header}
+        <span className="block text-xs italic text-ink-subtle">Sin entrega</span>
+      </div>
+    );
+  }
+
+  const grade = latestGrade(d, 'activity');
+  const docs = documentStates(comments);
+
   return (
     <button
       type="button"
       onClick={onOpen}
-      aria-label={`Entrega ${d.activity.title} del Equipo ${d.project.group_number}: ${
-        activity ? `${CATEGORY_LABEL.activity} ${activity.score.name}, ` : ''
-      }${d.status.name}`}
-      className="w-full h-full text-left rounded-lg px-2.5 py-2 hover:bg-tint focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/15 transition-colors cursor-pointer space-y-1.5"
+      aria-label={`${activity.title}, Equipo ${d.project.group_number}: ${grade ? grade.score.name : 'sin nota'}, ${d.status.name}`}
+      className="w-full h-full flex flex-col justify-start text-left rounded-lg border border-line bg-white px-3 py-2.5 space-y-2.5 hover:border-accent-light hover:bg-tint focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/15 transition-colors cursor-pointer"
     >
+      {header}
       <span className="block">
-        <span className="block text-xs text-ink-muted">{CATEGORY_LABEL.activity}</span>
-        {activity ? (
-          <span className="block text-sm font-semibold text-ink">{activity.score.name}</span>
+        <span className="block text-xs text-ink-muted">Nota de la entrega</span>
+        {grade ? (
+          <span className="block text-sm font-semibold text-ink">{grade.score.name}</span>
         ) : (
           <span className="block text-sm italic text-ink-subtle">Sin nota</span>
         )}
       </span>
-      {followUp && (
-        <span className="block text-xs text-ink-muted">
-          {CATEGORY_LABEL.follow_up}: <span className="font-medium text-ink">{followUp.score.name}</span>
-        </span>
-      )}
-      {last && (
-        <span className="flex gap-1.5 text-xs text-ink-muted">
-          <MessageSquare className="w-3.5 h-3.5 mt-px shrink-0" aria-hidden="true" />
-          <span className="min-w-0">
-            <span className="line-clamp-2 [overflow-wrap:anywhere]">{last.content}</span>
-            {comments.length > 1 && <span className="text-ink-subtle">y {comments.length - 1} más</span>}
+      <span className="block space-y-1 border-t border-line pt-2">
+        {DOCUMENTS.map((doc) => (
+          <span key={doc} className="flex flex-wrap items-center justify-between gap-x-2 text-xs">
+            <span className="text-ink-muted" title={doc}>
+              {DOCUMENT_SHORT[doc]}
+            </span>
+            <DocState state={docs[doc]} />
           </span>
+        ))}
+      </span>
+      <span className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2">
+        <span className="inline-flex items-center gap-1 text-xs text-ink-muted">
+          <MessageSquare className="w-3.5 h-3.5" aria-hidden="true" />
+          {comments.length === 0 ? 'Sin comentarios' : comments.length === 1 ? '1 comentario' : `${comments.length} comentarios`}
         </span>
-      )}
-      <Badge variant={statusVariant(d.status.code)}>{d.status.name}</Badge>
+        <Badge variant={statusVariant(d.status.code)}>{d.status.name}</Badge>
+      </span>
     </button>
   );
 };
 
+const FinalsSummary: React.FC<{ finals: FinalGrades; onEdit: () => void }> = ({ finals, onEdit }) => {
+  const items: [string, string][] = [
+    ['Entregas', finals.deliveries],
+    ['Regularización', finals.regularization],
+    ['Examen', finals.exam],
+  ];
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
+      <span className="font-medium text-ink">Notas finales</span>
+      {items.map(([label, value]) => (
+        <span key={label} className="text-ink-muted">
+          {label}: {value ? <span className="font-semibold text-ink">{value}</span> : <span className="text-ink-subtle">—</span>}
+        </span>
+      ))}
+      <button type="button" onClick={onEdit} className="text-primary font-medium hover:underline cursor-pointer">
+        {items.some(([, v]) => v) ? 'Modificar' : 'Cargar'}
+      </button>
+    </div>
+  );
+};
+
 /**
- * Entregas de un curso lectivo (SCRUM-59 a 61 y 590), con la forma de la planilla de notas de la
- * cátedra: una fila por equipo, con sus integrantes, y una columna por cada entrega del calendario.
- * Cada celda abre la entrega para registrarla, cambiar su estado, calificarla y comentarla.
+ * Entregas de un curso lectivo (SCRUM-59 a 61 y 590), con el contenido de la planilla de notas de
+ * la cátedra: un bloque por equipo, con sus integrantes y sus notas finales, y una tarjeta por
+ * cada entrega del calendario. Las tarjetas se acomodan al ancho de la pantalla: en una pantalla
+ * ancha quedan alineadas por entrega entre equipos y en el celular, una debajo de la otra.
  * Docentes del curso y administrador.
  */
 export const Deliveries: React.FC = () => {
@@ -93,9 +161,12 @@ export const Deliveries: React.FC = () => {
   const [byKey, setByKey] = useState<Map<string, DeliveryPublic>>(new Map());
   // Comentarios de cada entrega, del más nuevo al más viejo
   const [commentsBy, setCommentsBy] = useState<Map<number, DeliveryComment[]>>(new Map());
+  const [finalsBy, setFinalsBy] = useState<Map<number, FinalGrades>>(new Map());
+  const [scores, setScores] = useState<SectionYearScore[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [open, setOpen] = useState<DeliveryPublic | null>(null);
+  const [editingFinals, setEditingFinals] = useState<Team | null>(null);
   const requestId = useRef(0);
 
   // Cursos: los del docente o, para el administrador, todos. Arranca en el más nuevo.
@@ -157,6 +228,7 @@ export const Deliveries: React.FC = () => {
       );
       setByKey(map);
       setCommentsBy(comments);
+      setFinalsBy(new Map(projects.items.map((p) => [p.id_project, readFinals(p.id_project)])));
     } catch {
       if (current === requestId.current) setLoadError(true);
     } finally {
@@ -168,6 +240,15 @@ export const Deliveries: React.FC = () => {
     fetchSheet();
   }, [fetchSheet]);
 
+  // Conceptos del curso lectivo, para la nota final de las entregas
+  useEffect(() => {
+    if (!course) return;
+    api
+      .getSectionYearScores(Number(course))
+      .then((items) => setScores([...items].sort((a, b) => b.value - a.value)))
+      .catch(() => setScores([]));
+  }, [course]);
+
   const handleChanged = useCallback((d: DeliveryPublic) => {
     setByKey((prev) => new Map(prev).set(`${d.id_project}-${d.id_activity}`, d));
   }, []);
@@ -178,7 +259,13 @@ export const Deliveries: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Entregas" subtitle="Notas, comentarios y estado de cada equipo en cada entrega del curso lectivo" />
+      <PageHeader title="Entregas" subtitle="Nota, documentos y comentarios de cada equipo en cada entrega del curso lectivo" />
+
+      <Alert tone="info">
+        Vista previa para el equipo: el estado de cada documento sale de las devoluciones que lo nombran, y las notas
+        finales se guardan solo en este navegador. Falta que el backend guarde el documento de cada devolución y las
+        notas finales.
+      </Alert>
 
       <div className="w-full sm:max-w-sm">
         <Select
@@ -224,63 +311,39 @@ export const Deliveries: React.FC = () => {
       ) : teams.length === 0 ? (
         <EmptyState icon={<Users className="w-5 h-5" />} message="Este curso lectivo no tiene equipos de trabajo" />
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-line bg-white">
-          <table className="w-full table-fixed border-collapse text-sm" style={{ minWidth: `${144 + activities.length * 190}px` }}>
-            <colgroup>
-              <col className="w-36 sm:w-52" />
-              {activities.map((a) => (
-                <col key={a.id_activity} />
-              ))}
-            </colgroup>
-            <thead>
-              <tr className="border-b border-line bg-canvas">
-                <th scope="col" className="sticky left-0 z-10 bg-canvas px-3 sm:px-4 py-3 text-left font-medium text-ink-muted">
-                  Equipo
-                </th>
-                {activities.map((a) => (
-                  <th key={a.id_activity} scope="col" className="px-3 py-3 text-left align-bottom">
-                    <span className="block font-medium text-ink [overflow-wrap:anywhere]">{a.title}</span>
-                    <span className="block text-xs font-normal text-ink-muted">{formatDue(a.due_date, a.due_time)}</span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {teams.map((t) => (
-                <tr key={t.id_project} className="border-b border-line last:border-b-0 align-top">
-                  <th scope="row" className="sticky left-0 z-10 bg-white px-3 sm:px-4 py-3 text-left font-normal">
-                    <Link to={`/equipos/${t.id_project}`} className="font-medium text-ink hover:text-primary hover:underline">
+        <div className="space-y-4">
+          {teams.map((t) => (
+            <section key={t.id_project} className="rounded-xl border border-line bg-white overflow-hidden">
+              <header className="px-4 sm:px-5 py-3 bg-tint border-b border-accent-light space-y-1.5">
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <h2 className="text-[15px] font-semibold text-ink">
+                    <Link to={`/equipos/${t.id_project}`} className="hover:text-primary hover:underline">
                       Equipo {t.group_number}
                     </Link>
-                    {t.name && <span className="block text-xs text-ink-muted [overflow-wrap:anywhere]">{t.name}</span>}
-                    {t.members.length > 0 ? (
-                      <ul className="mt-2 space-y-0.5 text-xs text-ink-muted" aria-label={`Integrantes del Equipo ${t.group_number}`}>
-                        {t.members.map((m) => (
-                          <li key={m} className="[overflow-wrap:anywhere]">
-                            {m}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <span className="mt-2 block text-xs italic text-ink-subtle">Sin integrantes</span>
-                    )}
-                  </th>
-                  {activities.map((a) => {
-                    const d = byKey.get(`${t.id_project}-${a.id_activity}`);
-                    return (
-                      <td key={a.id_activity} className="px-1.5 py-1.5">
-                        {d ? (
-                          <Cell d={d} comments={commentsBy.get(d.id_delivery) ?? []} onOpen={() => setOpen(d)} />
-                        ) : (
-                          <span className="block px-2.5 py-2 text-xs italic text-ink-subtle">Sin entrega</span>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </h2>
+                  {t.name && <span className="text-sm text-ink-muted [overflow-wrap:anywhere]">{t.name}</span>}
+                </div>
+                <p className="text-xs text-ink-muted [overflow-wrap:anywhere]">
+                  {t.members.length > 0 ? t.members.join(' · ') : <span className="italic">Sin integrantes</span>}
+                </p>
+                <FinalsSummary finals={finalsBy.get(t.id_project) ?? readFinals(t.id_project)} onEdit={() => setEditingFinals(t)} />
+              </header>
+              <div className="p-3 sm:p-4 grid gap-3 grid-cols-[repeat(auto-fill,minmax(10rem,1fr))]">
+                {activities.map((a) => {
+                  const d = byKey.get(`${t.id_project}-${a.id_activity}`);
+                  return (
+                    <DeliveryCard
+                      key={a.id_activity}
+                      activity={a}
+                      d={d}
+                      comments={d ? commentsBy.get(d.id_delivery) ?? [] : []}
+                      onOpen={() => d && setOpen(d)}
+                    />
+                  );
+                })}
+              </div>
+            </section>
+          ))}
         </div>
       )}
 
@@ -290,6 +353,17 @@ export const Deliveries: React.FC = () => {
           onClose={() => setOpen(null)}
           onChanged={handleChanged}
           onCommentsChanged={handleCommentsChanged}
+        />
+      )}
+
+      {editingFinals && (
+        <FinalGradesModal
+          teamLabel={`Equipo ${editingFinals.group_number}`}
+          id_project={editingFinals.id_project}
+          initial={finalsBy.get(editingFinals.id_project) ?? readFinals(editingFinals.id_project)}
+          scores={scores}
+          onClose={() => setEditingFinals(null)}
+          onSaved={(f) => setFinalsBy((prev) => new Map(prev).set(editingFinals.id_project, f))}
         />
       )}
     </div>

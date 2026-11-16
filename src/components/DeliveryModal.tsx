@@ -9,6 +9,15 @@ import { Input, fieldClasses } from './ui/Input';
 import { Select } from './ui/Select';
 import { useToast } from './ui/Toast';
 import {
+  DOCUMENTS,
+  DOCUMENT_STATE_LABEL,
+  documentStates,
+  splitComment,
+  withDocument,
+  type DocumentName,
+} from '../lib/deliveryDocs';
+import {
+  CATEGORY_HELP,
   CATEGORY_LABEL,
   deliveryError,
   formatDateTime,
@@ -141,6 +150,7 @@ export const DeliveryModal: React.FC<{
   const [comments, setComments] = useState<DeliveryComment[] | null>(null);
   const [commentsFailed, setCommentsFailed] = useState(false);
   const [kind, setKind] = useState<CommentKind>('feedback');
+  const [doc, setDoc] = useState<DocumentName | ''>('');
   const [content, setContent] = useState('');
   const [contentError, setContentError] = useState<string | null>(null);
 
@@ -168,7 +178,7 @@ export const DeliveryModal: React.FC<{
     }
     setContentError(null);
     run('comment', async () => {
-      const c = await api.createDeliveryComment(delivery.id_delivery, kind, text);
+      const c = await api.createDeliveryComment(delivery.id_delivery, kind, withDocument(doc, text));
       setComments((prev) => [c, ...(prev ?? [])]);
       setContent('');
       success(kind === 'feedback' ? 'Se registró la devolución para el equipo' : 'Se registró la anotación interna');
@@ -349,6 +359,7 @@ export const DeliveryModal: React.FC<{
                     key={c}
                     id={`grade-${c}`}
                     label={CATEGORY_LABEL[c]}
+                    helperText={CATEGORY_HELP[c]}
                     value={picked[c]}
                     disabled={scores === null || busy !== null}
                     onChange={(e) => setPicked((p) => ({ ...p, [c]: e.target.value }))}
@@ -368,11 +379,50 @@ export const DeliveryModal: React.FC<{
           )}
         </section>
 
+        {/* Documentos de la entrega (vista previa: el estado sale de las devoluciones que los nombran) */}
+        <section className="space-y-2 border-t border-line pt-4">
+          <SectionTitle>Documentos</SectionTitle>
+          <p className="text-ink-muted">
+            Con una devolución pendiente, el documento queda "Con devolución"; cuando todas sus devoluciones se marcan
+            como corregidas, queda "Corregido".
+          </p>
+          {comments === null ? (
+            <div className="h-16 rounded-lg bg-fill-neutral animate-pulse" aria-busy="true" />
+          ) : (
+            <ul className="divide-y divide-line rounded-lg border border-line">
+              {DOCUMENTS.map((d) => {
+                const state = documentStates(comments)[d];
+                return (
+                  <li key={d} className="flex items-center justify-between gap-3 px-3.5 py-2">
+                    <span>{d}</span>
+                    {state === 'none' ? (
+                      <span className="text-xs text-ink-subtle">{DOCUMENT_STATE_LABEL.none}</span>
+                    ) : (
+                      <Badge variant={state === 'corrected' ? 'public' : 'protected'}>{DOCUMENT_STATE_LABEL[state]}</Badge>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
         {/* Comentarios (SCRUM-590 y devoluciones al equipo) */}
         <section className="space-y-3 border-t border-line pt-4">
           <SectionTitle>Comentarios</SectionTitle>
           <div className="space-y-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Select
+                id="comment-document"
+                label="Documento"
+                value={doc}
+                disabled={busy !== null}
+                onChange={(e) => setDoc(e.target.value as DocumentName | '')}
+                options={[
+                  { value: '', label: 'Toda la entrega' },
+                  ...DOCUMENTS.map((d) => ({ value: d, label: d })),
+                ]}
+              />
               <Select
                 id="comment-kind"
                 label="Tipo"
@@ -421,18 +471,21 @@ export const DeliveryModal: React.FC<{
             <p className="italic text-ink-subtle">Todavía no hay comentarios en esta entrega</p>
           ) : (
             <ul className="space-y-2">
-              {comments.map((c) => (
+              {comments.map((c) => {
+                const { document, text } = splitComment(c.content);
+                return (
                 <li key={c.id_delivery_comment} className="rounded-lg border border-line px-3.5 py-3 space-y-1.5">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-muted">
                     <Badge variant={c.kind === 'annotation' ? 'professor' : 'neutral'}>
                       {c.kind === 'annotation' ? 'Anotación interna' : 'Devolución'}
                     </Badge>
-                    {c.kind === 'feedback' && <span>{c.status.name}</span>}
+                    <span className="font-medium text-ink">{document ?? 'Toda la entrega'}</span>
+                    {c.kind === 'feedback' && <span>· {c.status.name}</span>}
                     <span>
                       · {c.author.first_name} {c.author.last_name} · {formatDateTime(c.created_at)}
                     </span>
                   </div>
-                  <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{c.content}</p>
+                  <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{text}</p>
                   {c.kind === 'feedback' && c.status.code === 'requested' && (
                     <button
                       type="button"
@@ -444,7 +497,8 @@ export const DeliveryModal: React.FC<{
                     </button>
                   )}
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </section>

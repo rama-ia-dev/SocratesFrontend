@@ -4,8 +4,14 @@ import type { BadgeProps } from '../components/ui/Badge';
 // Entregas (SCRUM-59 a 62 y 590). Los nombres de los estados y de los conceptos son los del backend.
 
 export const CATEGORY_LABEL: Record<GradeCategory, string> = {
-  activity: 'Actividad',
-  follow_up: 'Seguimiento',
+  activity: 'Nota de la entrega',
+  follow_up: 'Seguimiento del avance',
+};
+
+// Qué mide cada nota (la de seguimiento no es el documento "Planificación y seguimiento")
+export const CATEGORY_HELP: Record<GradeCategory, string> = {
+  activity: 'La nota de la entrega completa.',
+  follow_up: 'Cómo viene avanzando el proyecto en esta entrega.',
 };
 
 export const statusVariant = (code: string): BadgeProps['variant'] => {
