@@ -60,7 +60,7 @@ const normalize = (text: string) =>
 const matchesStudent = (s: AttendanceStudent, q: string) =>
   normalize(`${s.last_name} ${s.first_name}`).includes(q) || String(s.legajo).startsWith(q);
 
-const teamLabel = (t: Team) => `Grupo ${t.group_number}${t.name ? ` · ${t.name}` : ''}`;
+const teamLabel = (t: Team) => `Equipo ${t.group_number}${t.name ? ` · ${t.name}` : ''}`;
 
 // Se pueden marcar los que cursan y todavía no figuran presentes
 const markable = (s: AttendanceStudent) => s.state === 'attending' && !s.present;
@@ -262,8 +262,8 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ classInfo, onC
       const res = await api.markAttendanceBulk(classInfo.id, ids);
       success(
         res.created === 1
-          ? `Se marcó presente a 1 integrante del grupo ${team.group_number}`
-          : `Se marcó presentes a ${res.created} integrantes del grupo ${team.group_number}`
+          ? `Se marcó presente a 1 integrante del Equipo ${team.group_number}`
+          : `Se marcó presentes a ${res.created} integrantes del Equipo ${team.group_number}`
       );
       await load(classInfo.id, true);
     } catch (err: any) {
