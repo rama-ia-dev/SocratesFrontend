@@ -319,7 +319,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         </header>
 
         {/* Contenido principal de la página */}
-        <main className="flex-1 px-4 py-6 sm:px-8 sm:py-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 min-w-0 px-4 py-6 sm:px-8 sm:py-8 xl:px-10 w-full">
           {children}
         </main>
       </div>
