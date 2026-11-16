@@ -157,9 +157,11 @@ export const TeamAttendancePage: React.FC = () => {
 
   // El rango se aplica solo cuando está completo y ordenado
   const rangeError = from && to && from > to ? 'La fecha "Hasta" no puede ser anterior a "Desde".' : null;
+  // El backend pide las dos fechas o ninguna: con una sola se espera a que se complete la otra
+  const missingDate = Boolean(from) !== Boolean(to);
   const range = useMemo(
-    () => (rangeError ? null : { from: from || undefined, to: to || undefined }),
-    [from, to, rangeError]
+    () => (rangeError || missingDate ? null : { from: from || undefined, to: to || undefined }),
+    [from, to, rangeError, missingDate]
   );
 
   // Equipos del curso lectivo con la asistencia de sus integrantes. Una respuesta vieja se descarta.
@@ -294,6 +296,7 @@ export const TeamAttendancePage: React.FC = () => {
               onChange={(e) => setFrom(e.target.value)}
               min={yearFilter ? `${yearFilter}-01-01` : undefined}
               max={yearFilter ? `${yearFilter}-12-31` : undefined}
+              helperText={!from && to ? 'Ingrese también esta fecha para filtrar.' : undefined}
             />
             <DateField
               label="Hasta"
@@ -303,6 +306,7 @@ export const TeamAttendancePage: React.FC = () => {
               min={yearFilter ? `${yearFilter}-01-01` : undefined}
               max={yearFilter ? `${yearFilter}-12-31` : undefined}
               error={rangeError ?? undefined}
+              helperText={from && !to ? 'Ingrese también esta fecha para filtrar.' : undefined}
             />
           </div>
 
