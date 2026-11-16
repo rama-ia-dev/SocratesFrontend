@@ -15,6 +15,7 @@ import {
   CalendarClassUpdate,
   ClassAttendance,
   AttendancePublic,
+  AttendanceBulkResult,
   CalendarBulkLoad,
   CalendarBulkLoadReport,
   CalendarClassCreate,
@@ -1992,6 +1993,20 @@ export const api = {
       `/calendar-classes/${id_calendar_class}/attendance/students/${id_student_section_year}`,
       { method: 'POST' }
     );
+  },
+
+  // Marcar presentes a varios alumnos a mano (1 a 200), por ejemplo un equipo completo. Todo o nada:
+  // 422 si alguno no existe o no está cursando (`attending`) el curso lectivo de la clase.
+  async markAttendanceBulk(id_calendar_class: number, id_students: number[]): Promise<AttendanceBulkResult> {
+    if (USE_MOCK) {
+      await delay();
+      return { requested: id_students.length, created: id_students.length, already_present: 0, items: [] };
+    }
+
+    return request<AttendanceBulkResult>(`/calendar-classes/${id_calendar_class}/attendance/bulk`, {
+      method: 'POST',
+      body: JSON.stringify({ id_students }),
+    });
   },
 
   // Quitar la asistencia de un alumno (404 si no estaba marcado)
