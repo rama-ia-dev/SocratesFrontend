@@ -1086,7 +1086,7 @@ export const Calendar: React.FC = () => {
           ))}
         </ul>
         {/* En celular los botones van apilados a lo ancho ("Cerrar" abajo) para no salirse del modal */}
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3 pt-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end sm:gap-3 pt-2">
           {detail && canRegisterOn(detail.date) && (
             <Button variant="outline" onClick={() => openRegister(detail.date)}>
               <Plus className="w-4 h-4" aria-hidden />
