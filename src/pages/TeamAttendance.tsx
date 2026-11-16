@@ -33,6 +33,8 @@ interface Course {
 interface TeamAttendance {
   project: ProjectPublic;
   members: ProjectAttendanceMember[];
+  // Asistencia del equipo completo (asistencias sobre clases de todos sus integrantes)
+  percentage: number | null;
 }
 
 const normalize = (s: string) =>
@@ -174,10 +176,10 @@ export const TeamAttendancePage: React.FC = () => {
         Promise.all(
           projects
             .sort((a, b) => a.group_number - b.group_number)
-            .map(async (project) => ({
-              project,
-              members: (await api.getProjectAttendance(project.id_project, range)).items,
-            }))
+            .map(async (project) => {
+              const { items, statistics } = await api.getProjectAttendance(project.id_project, range);
+              return { project, members: items, percentage: statistics.attendance_percentage };
+            })
         )
       )
       .then((result) => {
@@ -384,21 +386,35 @@ export const TeamAttendancePage: React.FC = () => {
             />
           ) : (
             <div className="space-y-4" aria-busy={loading}>
-              {visibleTeams.map(({ project, members }) => {
+              {visibleTeams.map(({ project, members, percentage }) => {
                 const lowCount = members.filter(isLow).length;
                 return (
                   <section key={project.id_project} className="rounded-xl border border-line bg-white overflow-hidden">
-                    <header className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 border-b border-line">
+                    <header className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 bg-tint border-b border-accent-light">
                       <h2 className="text-[15px] font-semibold text-ink">
                         <Link to={`/equipos/${project.id_project}`} className="hover:text-primary hover:underline">
                           {teamLabel(project)}
                         </Link>
                       </h2>
-                      {lowCount > 0 && (
-                        <span className="text-xs font-medium text-danger">
-                          {lowCount === 1 ? '1 integrante' : `${lowCount} integrantes`} con menos del {LOW_ATTENDANCE} %
-                        </span>
-                      )}
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                        {lowCount > 0 && (
+                          <span className="font-medium text-danger">
+                            {lowCount === 1 ? '1 integrante' : `${lowCount} integrantes`} con menos del {LOW_ATTENDANCE} %
+                          </span>
+                        )}
+                        {percentage !== null && (
+                          <span className="text-ink-muted">
+                            Asistencia del equipo:{' '}
+                            <span
+                              className={`font-semibold tabular-nums ${
+                                percentage < LOW_ATTENDANCE ? 'text-danger' : 'text-success'
+                              }`}
+                            >
+                              {formatPct(percentage)}
+                            </span>
+                          </span>
+                        )}
+                      </div>
                     </header>
 
                     {members.length === 0 ? (
