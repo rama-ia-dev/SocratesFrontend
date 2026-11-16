@@ -351,6 +351,15 @@ export interface ProjectAttendanceMember extends ProjectMember {
   attendance: AttendanceStats | null;
 }
 
+// Agregado de los integrantes filtrados: asistencias sobre clases computadas de todos ellos
+export interface ProjectAttendanceStats {
+  members_total: number;
+  members_with_attendance: number;
+  attended_classes: number;
+  total_classes: number;
+  attendance_percentage: number | null;
+}
+
 export interface ProjectAttendanceList {
   id_project: number;
   id_section_year: number;
@@ -358,6 +367,7 @@ export interface ProjectAttendanceList {
   id_section: number;
   section_name: string;
   group_number: number;
+  statistics: ProjectAttendanceStats;
   items: ProjectAttendanceMember[];
   total: number;
   limit: number;

@@ -1990,6 +1990,13 @@ export const api = {
         id_section: project?.id_section ?? 0,
         section_name: project?.section_name ?? '',
         group_number: project?.group_number ?? 0,
+        statistics: {
+          members_total: 0,
+          members_with_attendance: 0,
+          attended_classes: 0,
+          total_classes: 0,
+          attendance_percentage: null,
+        },
         items: [],
         total: 0,
         limit: 100,
