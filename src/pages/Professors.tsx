@@ -4,6 +4,7 @@ import type { ProfessorPublic, ProfessorSectionYearPublic, UserListItem } from '
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { Select } from '../components/ui/Select';
 import { Badge } from '../components/ui/Badge';
 import { Table, TableHeader, TableRow, TableHead, TableCell, InitialsAvatar } from '../components/ui/Table';
 import { Pagination } from '../components/ui/Pagination';
@@ -80,6 +81,8 @@ export const Professors: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  // El backend devuelve a todos con role=professor (el administrador también es docente)
+  const [roleFilter, setRoleFilter] = useState<'professor' | 'super_admin'>('professor');
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   // null mientras llegan; si no se pueden leer, la columna lo dice y el resto de la lista se muestra igual
@@ -103,7 +106,7 @@ export const Professors: React.FC = () => {
     setIsLoading(true);
     setLoadError(false);
     try {
-      const res = await api.getUsers({ role: 'professor', q: query || null, limit: PAGE_SIZE, offset });
+      const res = await api.getUsers({ role: roleFilter, q: query || null, limit: PAGE_SIZE, offset });
       if (current !== requestId.current) return;
       setProfessors(res.items);
       setTotal(res.total);
@@ -112,7 +115,7 @@ export const Professors: React.FC = () => {
     } finally {
       if (current === requestId.current) setIsLoading(false);
     }
-  }, [query, offset]);
+  }, [query, offset, roleFilter]);
 
   const fetchAssignments = useCallback(() => {
     setAssignmentsError(false);
@@ -146,7 +149,7 @@ export const Professors: React.FC = () => {
         }
       />
 
-      <div className="w-full sm:max-w-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl">
         <Input
           type="text"
           aria-label="Buscar docentes"
@@ -158,6 +161,18 @@ export const Professors: React.FC = () => {
             setOffset(0);
           }}
           leftIcon={<Search className="w-4 h-4" />}
+        />
+        <Select
+          aria-label="Rol"
+          value={roleFilter}
+          onChange={(e) => {
+            setRoleFilter(e.target.value as 'professor' | 'super_admin');
+            setOffset(0);
+          }}
+          options={[
+            { value: 'professor', label: 'Todos los roles' },
+            { value: 'super_admin', label: 'Solo administradores' },
+          ]}
         />
       </div>
 
