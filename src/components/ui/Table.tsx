@@ -5,7 +5,9 @@ export const Table: React.FC<{ children: React.ReactNode; className?: string }> 
   className = '',
 }) => {
   return (
-    <div className="w-full overflow-x-auto rounded-xl border border-line bg-white">
+    // relative: los textos ocultos para lectores de pantalla (sr-only) se posicionan dentro de la
+    // tabla; sin esto quedan respecto de la página y la ensanchan en pantallas angostas
+    <div className="relative w-full overflow-x-auto rounded-xl border border-line bg-white">
       <table className={`w-full text-left border-collapse text-sm text-ink ${className}`}>
         {children}
       </table>
