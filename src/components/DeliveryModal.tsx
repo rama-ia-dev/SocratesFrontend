@@ -446,7 +446,7 @@ export const DeliveryModal: React.FC<{
           })}
         </section>
 
-        {/* Documentos de la entrega (vista previa: el estado sale de las devoluciones que los nombran) */}
+        {/* Documentos de la entrega: el estado sale de las devoluciones que los nombran */}
         <section className="space-y-2 border-t border-line pt-4">
           <SectionTitle>Documentos</SectionTitle>
           <p className="text-ink-muted">

@@ -301,9 +301,8 @@ export const Deliveries: React.FC = () => {
       <PageHeader title="Entregas" subtitle="Nota, documentos y comentarios de cada equipo en cada entrega del curso lectivo" />
 
       <Alert tone="info">
-        Vista previa para el equipo: el estado de cada documento sale de las devoluciones que lo nombran, y las notas
-        finales se guardan solo en este navegador. Falta que el backend guarde el documento de cada devolución y las
-        notas finales.
+        Las notas finales de cada equipo (la nota de las entregas, la de regularización y la de examen) se guardan, por
+        el momento, solo en este navegador.
       </Alert>
 
       <div className="w-full sm:max-w-sm">

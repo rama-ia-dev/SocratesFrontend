@@ -19,7 +19,7 @@ export interface FinalsMember {
  * Notas finales de un equipo, como en la planilla de la cátedra: la de todas las entregas es del
  * equipo (un concepto que pone el docente, no se calcula); la de regularización y la del examen,
  * de cada integrante.
- * VISTA PREVIA: se guardan solo en este navegador hasta que el backend tenga dónde guardarlas.
+ * Provisorio: se guardan solo en este navegador hasta que el backend tenga dónde guardarlas.
  */
 export const FinalGradesModal: React.FC<{
   teamLabel: string;
@@ -72,7 +72,7 @@ export const FinalGradesModal: React.FC<{
   return (
     <Modal isOpen onClose={onClose} title={`Notas finales · ${teamLabel}`} maxWidth="lg">
       <form onSubmit={save} className="space-y-5" noValidate>
-        <p className="text-sm text-ink-muted">Vista previa: estas notas se guardan solo en este navegador.</p>
+        <p className="text-sm text-ink-muted">Por el momento, estas notas se guardan solo en este navegador.</p>
         <div className="sm:max-w-xs">
           <Select
             id="final-deliveries"
