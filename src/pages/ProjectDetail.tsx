@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRightLeft, CloudOff, Lock, Mail, Pencil, Plus, RefreshCw, SearchX, ShieldCheck, ShieldOff, UserPlus, X } from 'lucide-react';
 import { api } from '../lib/api';
 import type { MyProject, ProjectMember, ProjectOverview, SectionYearPublic, TechnologyPublic } from '../types/api';
@@ -344,6 +344,9 @@ const Requests: React.FC<{
 export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) => {
   const params = useParams();
   const id = projectId ?? params.id;
+  // Si se abrió desde Equipos de trabajo, "Volver" regresa a la lista con sus filtros (y con el botón
+  // del Tablero de la cátedra si se venía de ahí); si no, a la lista sin filtros
+  const backTarget = useLocation().state as { listUrl?: string; listState?: unknown } | null;
   const [project, setProject] = useState<ProjectOverview | null>(null);
   const [sectionYear, setSectionYear] = useState<SectionYearPublic | null>(null);
   const [state, setState] = useState<LoadState>('loading');
@@ -533,7 +536,8 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
 
   const back = projectId === undefined && (
     <Link
-      to="/equipos"
+      to={backTarget?.listUrl ?? '/equipos'}
+      state={backTarget?.listState}
       className="inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-primary transition-colors duration-150"
     >
       <ArrowLeft className="w-4 h-4" />

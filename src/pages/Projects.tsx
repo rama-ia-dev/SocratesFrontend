@@ -183,6 +183,16 @@ export const Projects: React.FC = () => {
   };
   const hasFilters = Boolean(year || section || privacy || searchQuery.trim());
 
+  // Al abrir un equipo, el detalle recibe a dónde volver: la lista con el año y la comisión elegidos
+  // y, si se había llegado desde el Tablero de la cátedra, el botón para volver a él
+  const listParams = new URLSearchParams();
+  if (year) listParams.set('anio', year);
+  if (section) listParams.set('comision', section);
+  const detailState = {
+    listUrl: `/equipos${listParams.toString() ? `?${listParams}` : ''}`,
+    listState: fromChair ? { fromChair } : undefined,
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -363,11 +373,12 @@ export const Projects: React.FC = () => {
             </TableHeader>
             <tbody>
               {projects.map((p) => (
-                <TableRow key={p.id_project} onClick={() => navigate(`/equipos/${p.id_project}`)}>
+                <TableRow key={p.id_project} onClick={() => navigate(`/equipos/${p.id_project}`, { state: detailState })}>
                   {/* Toda la fila abre el detalle; el enlace del equipo lo hace alcanzable con el teclado */}
                   <TableCell className="font-semibold text-ink whitespace-nowrap">
                     <Link
                       to={`/equipos/${p.id_project}`}
+                      state={detailState}
                       onClick={(e) => e.stopPropagation()}
                       aria-label={`Ver ${teamLabel(p)} de ${p.section_name} ${p.year}`}
                       className="rounded-sm hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
