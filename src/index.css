@@ -101,6 +101,14 @@ html:has(.auth-page) {
 .row-highlight > td:last-child::after { border-right: 2px solid var(--color-primary); }
 .pop-in { animation: pop-in 140ms cubic-bezier(0.22, 1, 0.36, 1); }
 
+/* Error que se repite (por ejemplo, el mismo código incorrecto): una sacudida corta para que se note */
+@keyframes shake {
+  0%, 100% { transform: none; }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+.shake { animation: shake 320ms ease-in-out; }
+
 /* ---- Pantallas sin sesión: entradas animadas, borde de luz y brillo del botón ---- */
 @keyframes enter-up {
   from { opacity: 0; transform: translateY(14px); }
