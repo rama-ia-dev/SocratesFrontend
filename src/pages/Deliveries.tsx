@@ -364,14 +364,16 @@ export const Deliveries: React.FC = () => {
                 </div>
               </header>
               {/* En pantalla ancha, los integrantes a la izquierda y las entregas a la derecha; si no, uno arriba del otro */}
-              <div className="p-3 sm:p-4 grid gap-4 xl:grid-cols-[15rem_1fr] xl:items-start">
+              <div className="p-3 sm:p-4 grid gap-4 xl:grid-cols-[15rem_minmax(0,1fr)] xl:items-start">
                 <MembersPanel
                   team={t}
                   finals={finalsBy.get(t.id_project) ?? readFinals(t.id_project)}
                   onEdit={() => setEditingFinals(t)}
                 />
-                {/* Tarjetas del mismo ancho; las filas de cada tarjeta se alinean con las de sus vecinas */}
-                <div className="grid gap-x-3 gap-y-3 grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(10.5rem,12.75rem))]">
+                {/* Todas las entregas en una sola fila, en orden, con scroll horizontal propio; las tarjetas
+                    tienen el mismo ancho y sus filas se alinean con las de sus vecinas */}
+                <div className="min-w-0 overflow-x-auto p-1 -m-1 pb-2">
+                <div className="grid grid-flow-col auto-cols-[13.25rem] grid-rows-[repeat(4,auto)] gap-x-3 w-max">
                 {activities.map((a) => {
                   const d = byKey.get(`${t.id_project}-${a.id_activity}`);
                   return (
@@ -384,6 +386,7 @@ export const Deliveries: React.FC = () => {
                     />
                   );
                 })}
+                </div>
                 </div>
               </div>
             </section>
