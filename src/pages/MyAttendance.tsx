@@ -134,21 +134,22 @@ export const MyAttendancePage: React.FC = () => {
       {header}
 
       <div className="space-y-4">
-        {/* Clases de hoy en las que todavía no registró su asistencia */}
+        {/* Clases de hoy en las que todavía no registró su asistencia. Igual que en el calendario: en
+            celular el botón va debajo del texto para que este no quede en una columna angosta; desde sm,
+            a la derecha. */}
         {pendingToday.map((c) => (
-          <Alert
-            key={c.id}
-            tone="info"
-            action={
-              <Button size="sm" onClick={() => setCheckInClass(c)}>
+          <Alert key={c.id} tone="info">
+            <div className="flex flex-col items-start gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <p>
+                Hoy tiene clase de {c.section_name}
+                {c.start ? ` de ${c.start}${c.end ? ` a ${c.end}` : ''}` : ''}. Cuando el docente habilite la
+                asistencia, ingrese el código que le dé.
+              </p>
+              <Button size="sm" className="shrink-0 sm:-my-1" onClick={() => setCheckInClass(c)}>
                 <KeyRound className="w-3.5 h-3.5" aria-hidden />
                 Registrar mi asistencia
               </Button>
-            }
-          >
-            Hoy tiene clase de {c.section_name}
-            {c.start ? ` de ${c.start}${c.end ? ` a ${c.end}` : ''}` : ''}. Cuando el docente habilite la asistencia,
-            ingrese el código que le dé.
+            </div>
           </Alert>
         ))}
 
