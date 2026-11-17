@@ -54,10 +54,16 @@ export const DeliveryModal: React.FC<{
 
   const team = `Equipo ${delivery.project.group_number}`;
   const code = delivery.status.code;
-  const isApproved = code === 'approved';
-  // Mientras está solicitada el equipo todavía no presentó nada: no se califica ni se hacen
-  // devoluciones; solo se pueden dejar anotaciones internas
-  const awaiting = code === 'requested';
+  // Solo se evalúa (notas, devoluciones nuevas, marcar como corregida) cuando el equipo presentó y la
+  // entrega espera la revisión. En los demás estados se puede mirar y dejar anotaciones internas.
+  const awaiting = code !== 'pending_approval';
+  // Por qué no se puede evaluar ahora, según el estado
+  const lockedReason =
+    code === 'requested'
+      ? 'Se califica y se hacen devoluciones cuando el equipo presente la entrega.'
+      : code === 'pending_modification'
+        ? 'Las notas y las devoluciones se pueden cambiar cuando el equipo vuelva a presentar la entrega corregida.'
+        : 'La entrega está aprobada: las notas y las devoluciones ya no se pueden cambiar.';
 
   const apply = (d: DeliveryPublic) => {
     setDelivery(d);
@@ -111,6 +117,7 @@ export const DeliveryModal: React.FC<{
 
   // ---- Estado ----
   const [confirmApprove, setConfirmApprove] = useState(false);
+  const [confirmReject, setConfirmReject] = useState(false);
   const linkMissing = Boolean(delivery.activity.link_required) && !delivery.link;
 
   const changeStatus = (action: 'submit' | 'withdraw' | 'approve' | 'reject', message: string) =>
@@ -118,6 +125,7 @@ export const DeliveryModal: React.FC<{
       const d = await api.changeDeliveryStatus(delivery.id_delivery, action);
       apply(d);
       setConfirmApprove(false);
+      setConfirmReject(false);
       success(message);
     });
 
@@ -303,14 +311,16 @@ export const DeliveryModal: React.FC<{
             </div>
           )}
           {code === 'pending_approval' &&
-            (confirmApprove ? (
-              <Alert
-                tone="warning"
-                action={
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="ghost" onClick={() => setConfirmApprove(false)} disabled={busy !== null}>
-                      Volver
-                    </Button>
+            (confirmApprove || confirmReject ? (
+              // El texto arriba y los botones abajo: en celular no entran al costado
+              <Alert tone="warning">
+                <p>
+                  {confirmApprove
+                    ? 'Aprobar es definitivo: la entrega no vuelve a cambiar de estado, y ya no se van a poder cambiar las notas ni escribir devoluciones nuevas. Revise que las notas estén cargadas antes de aprobarla.'
+                    : 'Al pedir modificaciones, el equipo tiene que corregir la entrega. Hasta que la vuelva a presentar y usted la registre como entregada, no se van a poder cambiar las notas ni escribir devoluciones.'}
+                </p>
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  {confirmApprove ? (
                     <Button
                       size="sm"
                       onClick={() => changeStatus('approve', `Se aprobó la entrega del ${team}`)}
@@ -318,22 +328,34 @@ export const DeliveryModal: React.FC<{
                     >
                       Aprobar
                     </Button>
-                  </div>
-                }
-              >
-                Aprobar es definitivo: la entrega no vuelve a cambiar de estado y no admite notas nuevas. Cargue las notas antes de aprobarla.
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => changeStatus('reject', `Se pidieron modificaciones al ${team}`)}
+                      isLoading={busy === 'reject'}
+                    >
+                      Pedir modificaciones
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setConfirmApprove(false);
+                      setConfirmReject(false);
+                    }}
+                    disabled={busy !== null}
+                  >
+                    Volver
+                  </Button>
+                </div>
               </Alert>
             ) : (
               <div className="flex flex-wrap gap-2">
                 <Button onClick={() => setConfirmApprove(true)} disabled={busy !== null || comments === null || pendingFeedback > 0}>
                   Aprobar
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => changeStatus('reject', `Se pidieron modificaciones al ${team}`)}
-                  isLoading={busy === 'reject'}
-                  disabled={busy !== null && busy !== 'reject'}
-                >
+                <Button variant="outline" onClick={() => setConfirmReject(true)} disabled={busy !== null}>
                   Pedir modificaciones
                 </Button>
                 <Button
@@ -360,9 +382,9 @@ export const DeliveryModal: React.FC<{
           <SectionTitle>Notas</SectionTitle>
           {scoresFailed ? (
             <p className="text-ink-muted">No se pudieron cargar los conceptos para calificar.</p>
-          ) : isApproved || awaiting ? (
+          ) : awaiting ? (
             <ul className="space-y-1">
-              {awaiting && <li className="text-ink-muted">Se califica cuando el equipo presente la entrega.</li>}
+              <li className="text-ink-muted">{lockedReason}</li>
               {CATEGORIES.map((c) => (
                 <li key={c}>
                   <span className="text-ink-muted">{CATEGORY_LABEL[c]}:</span>{' '}
@@ -454,7 +476,7 @@ export const DeliveryModal: React.FC<{
                 ]}
                 helperText={
                   awaiting
-                    ? 'Las devoluciones se escriben cuando el equipo presente la entrega.'
+                    ? lockedReason
                     : commentKind === 'annotation'
                       ? 'Nota interna de los docentes del curso y el administrador.'
                       : 'Queda pendiente hasta que se marque como corregida.'

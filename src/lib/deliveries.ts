@@ -21,12 +21,16 @@ export const statusVariant = (code: string): BadgeProps['variant'] => {
   return 'neutral';
 };
 
-// Qué significa cada estado, en una línea, para quien maneja la entrega
+// Qué significa cada estado para el docente: en qué etapa está la entrega, qué puede hacer ahora y qué sigue
 export const statusHelp = (code: string): string => {
-  if (code === 'requested') return 'El equipo todavía no entregó.';
-  if (code === 'pending_approval') return 'El equipo entregó y la entrega espera su revisión.';
-  if (code === 'pending_modification') return 'Se pidieron modificaciones: el equipo tiene que volver a entregar.';
-  if (code === 'approved') return 'La entrega está aprobada. Es definitivo: no cambia de estado ni admite notas nuevas.';
+  if (code === 'requested')
+    return 'El equipo todavía no presentó esta entrega. Cuando la presente, toque "Registrar como entregada": recién ahí se pueden poner notas y escribir devoluciones.';
+  if (code === 'pending_approval')
+    return 'El equipo presentó la entrega y está esperando su revisión. Ahora puede poner las notas, escribir devoluciones y marcar como corregidas las que el equipo ya resolvió. Mientras haya devoluciones sin corregir, puede pedirle modificaciones al equipo. Solo se puede aprobar cuando todas las devoluciones estén corregidas.';
+  if (code === 'pending_modification')
+    return 'Se le pidieron modificaciones al equipo y está corrigiendo la entrega. Mientras tanto no se pueden cambiar las notas ni escribir devoluciones. Cuando el equipo avise que terminó de corregir, toque "Registrar como entregada": la entrega vuelve a quedar pendiente de aprobación y podrá revisar si las correcciones están bien.';
+  if (code === 'approved')
+    return 'La entrega está aprobada. Es definitivo: ya no se pueden cambiar las notas ni escribir devoluciones nuevas.';
   return '';
 };
 
