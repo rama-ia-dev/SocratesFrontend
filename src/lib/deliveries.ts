@@ -43,6 +43,10 @@ export const formatDue = (date: string, time?: string | null) => {
   return `${d}/${m}/${y}${time ? ` ${time.slice(0, 5)}` : ''}`;
 };
 
+// Fecha sola, "27/04/2026"
+export const formatDate = (iso: string) =>
+  new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
 export const formatDateTime = (iso: string) =>
   new Date(iso).toLocaleString('es-AR', {
     day: '2-digit',

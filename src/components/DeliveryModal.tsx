@@ -20,6 +20,7 @@ import {
   CATEGORY_HELP,
   CATEGORY_LABEL,
   deliveryError,
+  formatDate,
   formatDateTime,
   formatDue,
   isValidLink,
@@ -418,6 +419,27 @@ export const DeliveryModal: React.FC<{
               )}
             </>
           )}
+          {/* Historial: cuando una nota se cambió, se ven todas las que tuvo, en orden y con su fecha */}
+          {CATEGORIES.map((c) => {
+            const history = delivery.grades
+              .filter((g) => g.category === c)
+              .sort((a, b) => a.graded_at.localeCompare(b.graded_at));
+            if (history.length < 2) return null;
+            return (
+              <p key={c} className="text-xs text-ink-muted">
+                <span className="font-medium">Historial de {CATEGORY_LABEL[c].toLowerCase()}:</span>{' '}
+                {history.map((g, i) => (
+                  // Cada nota con su fecha no se parte; la línea se corta entre una nota y la siguiente
+                  <React.Fragment key={g.id_delivery_grade}>
+                    {i > 0 && ' → '}
+                    <span className="whitespace-nowrap">
+                      {g.score.name} ({formatDate(g.graded_at)})
+                    </span>
+                  </React.Fragment>
+                ))}
+              </p>
+            );
+          })}
         </section>
 
         {/* Documentos de la entrega (vista previa: el estado sale de las devoluciones que los nombran) */}
