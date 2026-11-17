@@ -55,6 +55,9 @@ export const DeliveryModal: React.FC<{
   const team = `Equipo ${delivery.project.group_number}`;
   const code = delivery.status.code;
   const isApproved = code === 'approved';
+  // Mientras está solicitada el equipo todavía no presentó nada: no se califica ni se hacen
+  // devoluciones; solo se pueden dejar anotaciones internas
+  const awaiting = code === 'requested';
 
   const apply = (d: DeliveryPublic) => {
     setDelivery(d);
@@ -153,6 +156,10 @@ export const DeliveryModal: React.FC<{
   const [doc, setDoc] = useState<DocumentName | ''>('');
   const [content, setContent] = useState('');
   const [contentError, setContentError] = useState<string | null>(null);
+  // Solicitada: solo anotaciones internas
+  const commentKind: CommentKind = awaiting ? 'annotation' : kind;
+  // Devoluciones sin corregir: mientras haya alguna, la entrega no se puede aprobar
+  const pendingFeedback = (comments ?? []).filter((c) => c.kind === 'feedback' && c.status.code === 'requested').length;
 
   const loadComments = useCallback(() => {
     setCommentsFailed(false);
@@ -178,10 +185,10 @@ export const DeliveryModal: React.FC<{
     }
     setContentError(null);
     run('comment', async () => {
-      const c = await api.createDeliveryComment(delivery.id_delivery, kind, withDocument(doc, text));
+      const c = await api.createDeliveryComment(delivery.id_delivery, commentKind, withDocument(doc, text));
       setComments((prev) => [c, ...(prev ?? [])]);
       setContent('');
-      success(kind === 'feedback' ? 'Se registró la devolución para el equipo' : 'Se registró la anotación interna');
+      success(commentKind === 'feedback' ? 'Se registró la devolución para el equipo' : 'Se registró la anotación interna');
     });
   };
 
@@ -318,7 +325,7 @@ export const DeliveryModal: React.FC<{
               </Alert>
             ) : (
               <div className="flex flex-wrap gap-2">
-                <Button onClick={() => setConfirmApprove(true)} disabled={busy !== null}>
+                <Button onClick={() => setConfirmApprove(true)} disabled={busy !== null || comments === null || pendingFeedback > 0}>
                   Aprobar
                 </Button>
                 <Button
@@ -337,6 +344,13 @@ export const DeliveryModal: React.FC<{
                 >
                   Volver a Solicitada
                 </Button>
+                {pendingFeedback > 0 && (
+                  <p className="w-full text-xs text-warning font-medium">
+                    {pendingFeedback === 1
+                      ? 'Queda 1 devolución sin corregir: márquela como corregida para poder aprobar la entrega.'
+                      : `Quedan ${pendingFeedback} devoluciones sin corregir: márquelas como corregidas para poder aprobar la entrega.`}
+                  </p>
+                )}
               </div>
             ))}
         </section>
@@ -346,8 +360,9 @@ export const DeliveryModal: React.FC<{
           <SectionTitle>Notas</SectionTitle>
           {scoresFailed ? (
             <p className="text-ink-muted">No se pudieron cargar los conceptos para calificar.</p>
-          ) : isApproved ? (
+          ) : isApproved || awaiting ? (
             <ul className="space-y-1">
+              {awaiting && <li className="text-ink-muted">Se califica cuando el equipo presente la entrega.</li>}
               {CATEGORIES.map((c) => (
                 <li key={c}>
                   <span className="text-ink-muted">{CATEGORY_LABEL[c]}:</span>{' '}
@@ -430,17 +445,19 @@ export const DeliveryModal: React.FC<{
               <Select
                 id="comment-kind"
                 label="Tipo"
-                value={kind}
-                disabled={busy !== null}
+                value={commentKind}
+                disabled={busy !== null || awaiting}
                 onChange={(e) => setKind(e.target.value as CommentKind)}
                 options={[
-                  { value: 'feedback', label: 'Devolución para el equipo' },
+                  ...(awaiting ? [] : [{ value: 'feedback', label: 'Devolución para el equipo' }]),
                   { value: 'annotation', label: 'Anotación interna' },
                 ]}
                 helperText={
-                  kind === 'annotation'
-                    ? 'Nota interna de los docentes del curso y el administrador.'
-                    : 'Queda pendiente hasta que se marque como corregida.'
+                  awaiting
+                    ? 'Las devoluciones se escriben cuando el equipo presente la entrega.'
+                    : commentKind === 'annotation'
+                      ? 'Nota interna de los docentes del curso y el administrador.'
+                      : 'Queda pendiente hasta que se marque como corregida.'
                 }
               />
             </div>
@@ -495,6 +512,7 @@ export const DeliveryModal: React.FC<{
                   <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{text}</p>
                   {c.kind === 'feedback' &&
                     c.status.code === 'requested' &&
+                    !awaiting &&
                     (confirmCorrect === c.id_delivery_comment ? (
                       // El texto arriba y los botones abajo: en celular no entran al costado
                       <Alert tone="warning">
