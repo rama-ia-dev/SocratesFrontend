@@ -429,10 +429,12 @@ export const DeliveryModal: React.FC<{
               <p key={c} className="text-xs text-ink-muted">
                 <span className="font-medium">Historial de {CATEGORY_LABEL[c].toLowerCase()}:</span>{' '}
                 {history.map((g, i) => (
-                  // Cada nota con su fecha no se parte; la línea se corta entre una nota y la siguiente
+                  // Cada nota con su fecha no se parte, y la flecha va pegada a la nota que sigue: la
+                  // línea se corta antes de la flecha, nunca la deja sola al final
                   <React.Fragment key={g.id_delivery_grade}>
-                    {i > 0 && ' → '}
+                    {i > 0 && ' '}
                     <span className="whitespace-nowrap">
+                      {i > 0 && '→ '}
                       {g.score.name} ({formatDate(g.graded_at)})
                     </span>
                   </React.Fragment>
