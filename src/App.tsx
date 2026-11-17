@@ -15,6 +15,7 @@ import { Calendar } from './pages/Calendar';
 import { TeamAttendancePage } from './pages/TeamAttendance';
 import { MyAttendancePage } from './pages/MyAttendance';
 import { Professors } from './pages/Professors';
+import { Deliveries } from './pages/Deliveries';
 import { Students } from './pages/Students';
 import { Projects } from './pages/Projects';
 import { ProjectDetail } from './pages/ProjectDetail';
@@ -177,6 +178,16 @@ export default function App() {
                 lista única de Usuarios se separó en Docentes y Estudiantes */}
             <Route path="/estudiantes/nuevo" element={<Navigate to="/estudiantes" replace />} />
             <Route path="/usuarios" element={<Navigate to="/docentes" replace />} />
+
+            {/* Entregas de cada equipo (SCRUM-59 a 61 y 590): docentes del curso y administrador */}
+            <Route
+              path="/entregas"
+              element={
+                <ProtectedRoute allowedRoles={['superadmin', 'professor']}>
+                  <Deliveries />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Equipos de trabajo (todos los roles; el backend filtra por privacidad) */}
             <Route

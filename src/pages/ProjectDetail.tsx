@@ -16,6 +16,7 @@ import { AddMemberModal } from '../components/AddMemberModal';
 import { MoveMemberModal } from '../components/MoveMemberModal';
 import { ChangeProjectStatusModal, statusOptions } from '../components/ChangeProjectStatusModal';
 import { RegisterTechnologiesModal } from '../components/RegisterTechnologiesModal';
+import { ProjectDeliveries } from '../components/ProjectDeliveries';
 import { useAuth } from '../context/AuthContext';
 import { PRIVACY_HELP, PRIVACY_LABEL, STATUS_VARIANT, studentEmail, teamLabel } from '../lib/projects';
 
@@ -893,6 +894,8 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
       {requests && <Requests requests={requests} busyId={busyId} onDecide={handleDecide} />}
       </div>
       </div>
+
+      {canManage && <ProjectDeliveries idProject={project.id_project} />}
 
       {isTechOpen && technologies && (
         <RegisterTechnologiesModal
