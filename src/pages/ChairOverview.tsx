@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import {
   ProfessorSectionYearPublic,
@@ -33,40 +34,28 @@ type ProjectWithStatus = ProjectPublic & {
   status?: { code: string; name: string };
 };
 
-// Etapas en las que se agrupan los estados de un proyecto
-type Stage = 'uninsured' | 'developing' | 'approved' | 'cancelled';
-
-const STAGE_LABELS: Record<Stage, string> = {
-  uninsured: 'Sin asegurar',
-  developing: 'En desarrollo',
-  approved: 'Aprobados',
-  cancelled: 'Cancelados',
-};
-
-// Estados que forman la etapa "En desarrollo", en el orden de la máquina de estados
-// (nombres abreviados para que entren en la celda)
-const DEVELOPING_STATUSES: { code: string; name: string }[] = [
-  { code: 'in_idea', name: 'En idea' },
-  { code: 'in_progress', name: 'En proceso' },
-  { code: 'pending_approval', name: 'Pendiente' },
-  { code: 'rejected', name: 'Rechazado' },
+// Etapas del proceso de un equipo, en el orden de la máquina de estados del backend, con un nombre
+// que se entiende solo y la explicación que se ve al pasar el mouse por el encabezado. Los equipos
+// sin asegurar (todavía armándose) no se muestran: la profesora pidió no detallarlos.
+const STAGE_COLUMNS: { code: string; label: string; help: string }[] = [
+  { code: 'in_idea', label: 'Definiendo la idea', help: 'El equipo ya está conformado y está definiendo la idea del proyecto.' },
+  { code: 'in_progress', label: 'Desarrollando', help: 'El equipo está desarrollando el proyecto.' },
+  { code: 'pending_approval', label: 'Esperando aprobación', help: 'El equipo presentó el proyecto y espera la aprobación del docente.' },
+  { code: 'rejected', label: 'Rehaciendo (rechazado)', help: 'El docente rechazó el proyecto y el equipo lo está rehaciendo.' },
+  { code: 'approved', label: 'Aprobados', help: 'El docente aprobó el proyecto.' },
+  { code: 'cancelled', label: 'Cancelados', help: 'El proyecto se canceló.' },
 ];
 
-const stageOf = (project: ProjectWithStatus): Stage => {
-  // Los datos simulados no traen estado: se usa la marca de grupo asegurado
-  const code = project.status?.code ?? (project.is_secured ? 'in_idea' : 'uninsured');
-  if (code === 'uninsured') return 'uninsured';
-  if (code === 'approved') return 'approved';
-  if (code === 'cancelled') return 'cancelled';
-  return 'developing';
-};
+// Los datos simulados no traen estado: se usa la marca de equipo asegurado
+const statusCodeOf = (project: ProjectWithStatus): string =>
+  project.status?.code ?? (project.is_secured ? 'in_idea' : 'uninsured');
 
-// Fila de la tabla: el curso lectivo con sus docentes, sus grupos por etapa y sus alumnos
+// Fila de la tabla: el curso lectivo con sus docentes, sus equipos por etapa y sus alumnos
 type ChairRow = SectionYearWithLimits & {
   professors: { id_professor: number; first_name: string; last_name: string }[];
   project_count: number;
-  stages: Record<Stage, number>;
-  developing_detail: Record<string, number>;
+  // Cantidad de equipos por código de estado
+  status_counts: Record<string, number>;
 };
 
 type Summary = {
@@ -141,18 +130,44 @@ async function fetchAll<T>(
 export const ChairOverview: React.FC = () => {
   const { error: toastError } = useToast();
 
-  const [yearFilter, setYearFilter] = useState<string>(String(currentYear));
-  const [sectionFilter, setSectionFilter] = useState<string>('');
+  // Los filtros y la página viven también en la URL (/catedra?anio=2025&comision=3&pagina=2), así al
+  // volver desde Equipos de trabajo, con el link o con "Atrás", se ve lo mismo que antes. Sin
+  // parámetros arranca en el año actual. "Todos los años" se guarda como anio=todos.
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [yearFromUrl] = useState(() => searchParams.get('anio'));
+  const [yearFilter, setYearFilter] = useState<string>(() =>
+    yearFromUrl === null ? String(currentYear) : yearFromUrl === 'todos' ? '' : yearFromUrl
+  );
+  const [sectionFilter, setSectionFilter] = useState<string>(() => searchParams.get('comision') ?? '');
   const [allSections, setAllSections] = useState<SectionPublic[]>([]);
   // Todos los cursos lectivos, para armar las opciones de los filtros
   const [allSectionYears, setAllSectionYears] = useState<SectionYearPublic[]>([]);
 
   const [rows, setRows] = useState<ChairRow[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [offset, setOffset] = useState(0);
+  const [offset, setOffset] = useState(() => {
+    const page = Number(searchParams.get('pagina'));
+    return Number.isInteger(page) && page > 1 ? (page - 1) * PAGE_SIZE : 0;
+  });
   const [loading, setLoading] = useState(true);
 
-  // Alumnos en grupos de cada curso lectivo de la página visible
+  useEffect(() => {
+    const params = new URLSearchParams({ anio: yearFilter || 'todos' });
+    if (sectionFilter) params.set('comision', sectionFilter);
+    if (offset > 0) params.set('pagina', String(offset / PAGE_SIZE + 1));
+    // replace: cambiar un filtro no agrega una entrada al historial
+    // Si la URL ya coincide no se toca (también corrige una URL sin parámetros, por ejemplo al volver
+    // a hacer clic en el menú estando en la pantalla)
+    if (params.toString() !== location.search.replace(/^\?/, '')) setSearchParams(params, { replace: true });
+  }, [yearFilter, sectionFilter, offset, location.search, setSearchParams]);
+
+  // Una página que ya no existe (por ejemplo, de una URL vieja) vuelve a la primera
+  useEffect(() => {
+    if (!loading && offset > 0 && offset >= rows.length) setOffset(0);
+  }, [loading, offset, rows.length]);
+
+  // Alumnos en equipos de cada curso lectivo de la página visible
   const [studentCounts, setStudentCounts] = useState<Record<number, number>>({});
 
   // Alumnos inscriptos sin equipo de cada curso lectivo del listado (todas las páginas, para el total)
@@ -171,8 +186,9 @@ export const ChairOverview: React.FC = () => {
     fetchAll<SectionYearPublic>((o) => api.getSectionYears({ limit: 100, offset: o }))
       .then((items) => {
         setAllSectionYears(items);
-        // Si el año actual todavía no tiene cursos lectivos, se muestran todos los años
-        if (!items.some((sy) => sy.year === currentYear)) setYearFilter('');
+        // Si el año actual todavía no tiene cursos lectivos, se muestran todos los años (salvo que el
+        // año haya llegado en la URL)
+        if (yearFromUrl === null && !items.some((sy) => sy.year === currentYear)) setYearFilter('');
       })
       .catch(() => setAllSectionYears([]));
   }, []);
@@ -213,20 +229,10 @@ export const ChairOverview: React.FC = () => {
 
       const built = sectionYears.map((sy): ChairRow => {
         const syProjects = projects.filter((p) => p.id_section_year === sy.id_section_year);
-        const stages: Record<Stage, number> = {
-          uninsured: 0,
-          developing: 0,
-          approved: 0,
-          cancelled: 0,
-        };
-        const developingDetail: Record<string, number> = {};
+        const statusCounts: Record<string, number> = {};
         for (const p of syProjects) {
-          const stage = stageOf(p);
-          stages[stage] += 1;
-          if (stage === 'developing') {
-            const code = p.status?.code ?? 'in_idea';
-            developingDetail[code] = (developingDetail[code] ?? 0) + 1;
-          }
+          const code = statusCodeOf(p);
+          statusCounts[code] = (statusCounts[code] ?? 0) + 1;
         }
         return {
           ...sy,
@@ -237,9 +243,10 @@ export const ChairOverview: React.FC = () => {
               first_name: a.professor_first_name,
               last_name: a.professor_last_name,
             })),
-          project_count: syProjects.length,
-          stages,
-          developing_detail: developingDetail,
+          // Solo los equipos asegurados (ya conformados): los que todavía se están armando no cuentan,
+          // así el total coincide con la suma de las etapas
+          project_count: syProjects.length - (statusCounts.uninsured ?? 0),
+          status_counts: statusCounts,
         };
       });
 
@@ -247,11 +254,11 @@ export const ChairOverview: React.FC = () => {
       setSummary({
         section_years: built.length,
         projects: built.reduce((acc, r) => acc + r.project_count, 0),
-        approved: built.reduce((acc, r) => acc + r.stages.approved, 0),
+        approved: built.reduce((acc, r) => acc + (r.status_counts.approved ?? 0), 0),
         without_professors: built.filter((r) => r.professors.length === 0).length,
       });
     } catch {
-      toastError('Error al cargar el estado de la cátedra');
+      toastError('Error al cargar el tablero de la cátedra');
       setRows([]);
       setSummary(null);
     } finally {
@@ -268,7 +275,7 @@ export const ChairOverview: React.FC = () => {
   // Cursos lectivos cuyos alumnos ya se contaron (o se están contando) para el listado actual
   const counted = useRef<{ rows: ChairRow[]; ids: Set<number> }>({ rows: [], ids: new Set() });
 
-  // La cantidad de alumnos en grupos se consulta solo para la página visible. Con cada listado
+  // La cantidad de alumnos en equipos se consulta solo para la página visible. Con cada listado
   // nuevo se vuelve a contar, pero se sigue mostrando el número anterior hasta que llega el nuevo.
   useEffect(() => {
     if (counted.current.rows !== rows) counted.current = { rows, ids: new Set() };
@@ -354,29 +361,25 @@ export const ChairOverview: React.FC = () => {
   const withoutTeamTotal = rows.reduce((acc, r) => acc + (withoutTeam[r.id_section_year]?.length ?? 0), 0);
   const detailStudents = detailRow ? withoutTeam[detailRow.id_section_year] ?? [] : [];
 
-  // Grupos aprobados sobre los grupos que siguen vigentes (sin contar cancelados). Un grupo
+  // Equipos aprobados sobre los equipos que siguen vigentes (sin contar cancelados). Un equipo
   // rechazado sigue vigente: rehace la propuesta hasta aprobar.
   const progressOf = (row: ChairRow): number | null => {
-    const active = row.project_count - row.stages.cancelled;
-    return active > 0 ? Math.round((row.stages.approved / active) * 100) : null;
+    const active = row.project_count - (row.status_counts.cancelled ?? 0);
+    return active > 0 ? Math.round(((row.status_counts.approved ?? 0) / active) * 100) : null;
   };
 
-  // Color de la barra de grupos aprobados: rojo hasta 33 %, amarillo hasta 66 % y verde desde 67 %
+  // Color de la barra de equipos aprobados: rojo hasta 33 %, amarillo hasta 66 % y verde desde 67 %
   const progressColor = (progress: number): string => {
     if (progress < 34) return 'bg-danger-vivid';
     if (progress < 67) return 'bg-warning-vivid';
     return 'bg-success-vivid';
   };
 
-  // Estados de la etapa "En desarrollo" que tienen al menos un grupo
-  const developingStatusesOf = (row: ChairRow) =>
-    DEVELOPING_STATUSES.filter((s) => (row.developing_detail[s.code] ?? 0) > 0);
-
   return (
     <div>
       <PageHeader
-        title="Estado de la cátedra"
-        subtitle="Panorama de los cursos lectivos: docentes, grupos, aprobados y alumnos sin equipo"
+        title="Tablero de la cátedra"
+        subtitle="Panorama de los cursos lectivos: docentes, equipos por etapa, aprobados y alumnos sin equipo"
       />
 
       <div className="space-y-4">
@@ -428,8 +431,8 @@ export const ChairOverview: React.FC = () => {
           <dl className="grid grid-cols-2 lg:grid-cols-5 rounded-xl border border-line bg-white divide-line max-lg:[&>div:nth-child(-n+4)]:border-b lg:divide-x max-lg:[&>div:nth-child(odd):not(:last-child)]:border-r max-lg:[&>div:last-child]:col-span-2">
             {[
               { label: 'Cursos lectivos', value: summary.section_years, alert: false },
-              { label: 'Grupos', value: summary.projects, alert: false },
-              { label: 'Grupos aprobados', value: summary.approved, alert: false },
+              { label: 'Cantidad de equipos', value: summary.projects, alert: false },
+              { label: 'Equipos aprobados', value: summary.approved, alert: false },
               {
                 label: 'Cursos sin docentes',
                 value: summary.without_professors,
@@ -482,24 +485,23 @@ export const ChairOverview: React.FC = () => {
             <EmptyState
               icon={<BarChart3 className="w-5 h-5" />}
               message="Todavía no hay cursos lectivos"
-              description="El estado de la cátedra aparece cuando se registra el primer curso lectivo en Comisiones."
+              description="El tablero de la cátedra aparece cuando se registra el primer curso lectivo en Comisiones."
             />
           )
         ) : (
           <>
             {/* Anchos fijos por columna: al filtrar, la tabla no cambia de forma */}
-            <Table className="table-fixed min-w-[1440px]">
+            <Table className="table-fixed min-w-[1600px]">
               <colgroup>
                 <col className="w-[120px]" />
                 <col className="w-[64px]" />
                 <col className="w-[150px]" />
                 <col className="w-[260px]" />
-                <col className="w-[80px]" />
                 <col className="w-[100px]" />
-                <col className="w-[150px]" />
+                {STAGE_COLUMNS.map((s) => (
+                  <col key={s.code} className="w-[104px]" />
+                ))}
                 <col className="w-[96px]" />
-                <col className="w-[100px]" />
-                <col className="w-[100px]" />
                 <col className="w-[100px]" />
                 <col className="w-[120px]" />
               </colgroup>
@@ -507,17 +509,30 @@ export const ChairOverview: React.FC = () => {
                 <tr>
                   <TableHead>Comisión</TableHead>
                   <TableHead>Año</TableHead>
-                  <TableHead>Grupos aprobados (%)</TableHead>
+                  <TableHead>Equipos aprobados (%)</TableHead>
                   <TableHead>Docentes</TableHead>
-                  <TableHead className="text-center">Grupos</TableHead>
-                  {(Object.keys(STAGE_LABELS) as Stage[]).map((stage) => (
-                    <TableHead key={stage} className="text-center">
-                      {STAGE_LABELS[stage]}
+                  <TableHead className="text-center leading-tight">
+                    <span
+                      title="Equipos asegurados (ya conformados). Los que todavía se están armando no se cuentan."
+                      className="cursor-help underline decoration-dotted decoration-ink-faint underline-offset-4"
+                    >
+                      Cantidad de equipos
+                    </span>
+                  </TableHead>
+                  {/* Etapas del proceso: la explicación de cada una se ve al pasar el mouse */}
+                  {STAGE_COLUMNS.map((s) => (
+                    <TableHead key={s.code} className="text-center leading-tight">
+                      <span
+                        title={s.help}
+                        className="cursor-help underline decoration-dotted decoration-ink-faint underline-offset-4"
+                      >
+                        {s.label}
+                      </span>
                     </TableHead>
                   ))}
-                  <TableHead className="text-center">Alumnos en grupos</TableHead>
+                  <TableHead className="text-center">Alumnos en equipos</TableHead>
                   <TableHead className="text-center">Alumnos sin equipo</TableHead>
-                  <TableHead className="text-center">Cupo de integrantes por grupo</TableHead>
+                  <TableHead className="text-center">Cupo de integrantes por equipo</TableHead>
                 </tr>
               </TableHeader>
               <tbody>
@@ -527,13 +542,22 @@ export const ChairOverview: React.FC = () => {
                   const noTeam = withoutTeam[row.id_section_year];
                   return (
                     <TableRow key={row.id_section_year}>
-                      <TableCell className="font-medium text-ink">
-                        {row.section_name}
+                      <TableCell className="font-medium">
+                        {/* Abre Equipos de trabajo filtrada por el año y la comisión de la fila */}
+                        <Link
+                          to={`/equipos?anio=${row.year}&comision=${row.id_section}`}
+                          // Equipos de trabajo muestra "Volver al Tablero" con esta dirección (y sus filtros)
+                          state={{ fromChair: location.pathname + location.search }}
+                          title={`Ver los equipos de ${row.section_name} ${row.year}`}
+                          className="text-primary underline decoration-dotted underline-offset-4 hover:decoration-solid rounded focus-visible:outline-2 focus-visible:outline-primary"
+                        >
+                          {row.section_name}
+                        </Link>
                       </TableCell>
                       <TableCell className="text-ink-muted tabular-nums">{row.year}</TableCell>
                       <TableCell>
                         {progress === null ? (
-                          <span className="text-xs text-ink-faint">Sin grupos</span>
+                          <span className="text-xs text-ink-faint">Sin equipos</span>
                         ) : (
                           <div className="flex items-center gap-2 min-w-28">
                             <div
@@ -542,7 +566,7 @@ export const ChairOverview: React.FC = () => {
                               aria-valuenow={progress}
                               aria-valuemin={0}
                               aria-valuemax={100}
-                              aria-label={`Grupos aprobados de ${row.section_name} ${row.year}`}
+                              aria-label={`Equipos aprobados de ${row.section_name} ${row.year}`}
                             >
                               <div
                                 className={`h-full ${progressColor(progress)}`}
@@ -577,38 +601,17 @@ export const ChairOverview: React.FC = () => {
                       <TableCell className="text-center font-semibold tabular-nums">
                         {row.project_count}
                       </TableCell>
-                      {(Object.keys(STAGE_LABELS) as Stage[]).map((stage) => (
-                        <TableCell
-                          key={stage}
-                          className={`text-center tabular-nums ${
-                            row.stages[stage] === 0 ? 'text-ink-faint' : ''
-                          }`}
-                        >
-                          {stage === 'developing' && row.stages.developing > 0 ? (
-                            <div className="flex flex-col items-center gap-0.5 font-sans text-xs whitespace-nowrap">
-                              {developingStatusesOf(row).map((s) => (
-                                <span key={s.code}>
-                                  {s.name}:{' '}
-                                  <span className="font-semibold tabular-nums">
-                                    {row.developing_detail[s.code]}
-                                  </span>
-                                </span>
-                              ))}
-                              {/* Con más de un estado, se suma el total de la etapa */}
-                              {developingStatusesOf(row).length > 1 && (
-                                <span className="mt-0.5 pt-0.5 border-t border-line text-ink-muted">
-                                  Total:{' '}
-                                  <span className="font-semibold tabular-nums text-ink">
-                                    {row.stages.developing}
-                                  </span>
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            row.stages[stage]
-                          )}
-                        </TableCell>
-                      ))}
+                      {STAGE_COLUMNS.map((s) => {
+                        const count = row.status_counts[s.code] ?? 0;
+                        return (
+                          <TableCell
+                            key={s.code}
+                            className={`text-center tabular-nums ${count === 0 ? 'text-ink-faint' : ''}`}
+                          >
+                            {count}
+                          </TableCell>
+                        );
+                      })}
                       <TableCell className="text-center tabular-nums">
                         {students ?? '…'}
                       </TableCell>
@@ -674,7 +677,7 @@ export const ChairOverview: React.FC = () => {
                   {st.pending
                     .map(
                       (p) =>
-                        `Grupo ${p.group_number}${p.section_name ? ` de ${p.section_name}` : ''}${p.project_name ? ` (${p.project_name})` : ''}`
+                        `Equipo ${p.group_number}${p.section_name ? ` de ${p.section_name}` : ''}${p.project_name ? ` (${p.project_name})` : ''}`
                     )
                     .join(', ')}
                 </p>
