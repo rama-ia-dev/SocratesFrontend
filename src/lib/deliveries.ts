@@ -24,13 +24,13 @@ export const statusVariant = (code: string): BadgeProps['variant'] => {
 // Qué significa cada estado para el docente: en qué etapa está la entrega, qué puede hacer ahora y qué sigue
 export const statusHelp = (code: string): string => {
   if (code === 'requested')
-    return 'El equipo todavía no presentó esta entrega. Cuando la presente, toque "Registrar como entregada" para poder escribir notas y devoluciones.';
+    return 'El equipo todavía no presentó esta entrega. Una vez presentada, debe registrarse mediante "Registrar como entregada" para habilitar la carga de notas y devoluciones.';
   if (code === 'pending_approval')
-    return 'El equipo presentó la entrega y está esperando su revisión. Ahora puede escribir notas, devoluciones y marcar como corregidas aquellas que el equipo ya resolvió. Mientras haya devoluciones sin corregir, puede pedirle modificaciones al equipo. Solo se puede aprobar cuando todas las devoluciones estén corregidas.';
+    return 'El equipo presentó la entrega y se encuentra a la espera de su revisión. En esta etapa es posible cargar notas, escribir devoluciones y marcar como corregidas aquellas que el equipo ya resolvió. Mientras existan devoluciones sin corregir, es posible solicitar modificaciones al equipo. La entrega solo puede aprobarse cuando todas las devoluciones estén corregidas.';
   if (code === 'pending_modification')
-    return 'Se le pidieron modificaciones al equipo y actualmente se encuentra trabajando en las devoluciones. Cuando el equipo avise que terminó de corregir, toque "Registrar como entregada": la entrega vuelve a quedar pendiente de aprobación y podrá marcar como corregidas aquellas devoluciones que considere.';
+    return 'Se le solicitaron modificaciones al equipo, que actualmente se encuentra trabajando en las devoluciones. Cuando el equipo informe que finalizó las correcciones, la entrega debe registrarse mediante "Registrar como entregada": vuelve a quedar pendiente de aprobación y es posible marcar como corregidas las devoluciones que correspondan.';
   if (code === 'approved')
-    return 'La entrega está aprobada. Es definitivo: ya no se pueden cambiar las notas ni escribir devoluciones nuevas.';
+    return 'La entrega está aprobada. La aprobación es definitiva: no es posible modificar las notas ni escribir devoluciones nuevas.';
   return '';
 };
 

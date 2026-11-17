@@ -80,13 +80,13 @@ export const FinalGradesModal: React.FC<{
             value={deliveries}
             onChange={(e) => setDeliveries(e.target.value)}
             options={[{ value: '', label: 'Sin nota' }, ...scores.map((s) => ({ value: s.name, label: s.name }))]}
-            helperText="La pone el docente mirando todas las entregas; no se calcula."
+            helperText="La asigna el docente a partir de todas las entregas; no se calcula automáticamente."
           />
         </div>
 
         <div>
           <h4 className="text-sm font-semibold text-ink">Notas de cada integrante</h4>
-          <p className="text-xs text-ink-muted mt-0.5">Del 1 al 10. Una vacía queda sin nota.</p>
+          <p className="text-xs text-ink-muted mt-0.5">Las notas van del 1 al 10. Un campo vacío queda sin nota.</p>
           {members.length === 0 ? (
             <p className="mt-2 text-sm italic text-ink-subtle">El equipo no tiene integrantes.</p>
           ) : (
@@ -112,7 +112,7 @@ export const FinalGradesModal: React.FC<{
               </tbody>
             </table>
           )}
-          {invalid && <p className="mt-2 text-xs font-medium text-danger">Revise las notas marcadas: van del 1 al 10.</p>}
+          {invalid && <p className="mt-2 text-xs font-medium text-danger">Las notas marcadas deben estar entre 1 y 10.</p>}
         </div>
 
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">

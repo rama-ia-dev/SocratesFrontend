@@ -60,7 +60,7 @@ export const ProjectDeliveries: React.FC<{ idProject: number }> = ({ idProject }
         ) : (
           <ul className="divide-y divide-line -mx-2">
             {deliveries.map((d) => {
-              const grades = (['activity', 'follow_up'] as const)
+              const grades = (['activity'] as const)
                 .map((c) => {
                   const g = latestGrade(d, c);
                   return g ? `${CATEGORY_LABEL[c]}: ${g.score.name}` : null;

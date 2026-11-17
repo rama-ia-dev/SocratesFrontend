@@ -30,7 +30,9 @@ import {
 } from '../lib/deliveries';
 import { ExternalLink } from 'lucide-react';
 
-const CATEGORIES: GradeCategory[] = ['activity', 'follow_up'];
+// Solo la nota de la entrega: el seguimiento del avance se dejó de mostrar (Rama, 17/11), porque el
+// avance ya se sigue con las devoluciones de cada documento y el historial de la nota
+const CATEGORIES: GradeCategory[] = ['activity'];
 const MAX_COMMENT = 2000;
 
 const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -61,10 +63,10 @@ export const DeliveryModal: React.FC<{
   // Por qué no se puede evaluar ahora, según el estado
   const lockedReason =
     code === 'requested'
-      ? 'Se califica y se hacen devoluciones cuando el equipo presente la entrega.'
+      ? 'La carga de notas y devoluciones se habilita cuando el equipo presenta la entrega.'
       : code === 'pending_modification'
-        ? 'Las notas y las devoluciones se pueden cambiar cuando el equipo vuelva a presentar la entrega corregida.'
-        : 'La entrega está aprobada: las notas y las devoluciones ya no se pueden cambiar.';
+        ? 'Las notas y las devoluciones podrán modificarse cuando el equipo vuelva a presentar la entrega corregida.'
+        : 'La entrega está aprobada: las notas y las devoluciones no pueden modificarse.';
 
   const apply = (d: DeliveryPublic) => {
     setDelivery(d);
@@ -317,8 +319,8 @@ export const DeliveryModal: React.FC<{
               <Alert tone="warning">
                 <p>
                   {confirmApprove
-                    ? 'Aprobar es definitivo: la entrega no vuelve a cambiar de estado, y ya no se van a poder cambiar las notas ni escribir devoluciones nuevas. Revise que las notas estén cargadas antes de aprobarla.'
-                    : 'Al pedir modificaciones, el equipo tiene que corregir la entrega. Hasta que la vuelva a presentar y usted la registre como entregada, no se van a poder cambiar las notas ni escribir devoluciones.'}
+                    ? 'La aprobación es definitiva: la entrega no podrá cambiar de estado y no será posible modificar las notas ni escribir devoluciones nuevas. Antes de aprobarla, se recomienda verificar que las notas estén cargadas.'
+                    : 'Al solicitar modificaciones, el equipo deberá corregir la entrega. Hasta que vuelva a presentarla y se registre como entregada, no será posible modificar las notas ni escribir devoluciones.'}
                 </p>
                 <div className="mt-2.5 flex flex-wrap gap-2">
                   {confirmApprove ? (
@@ -370,8 +372,8 @@ export const DeliveryModal: React.FC<{
                 {pendingFeedback > 0 && (
                   <p className="w-full text-xs text-warning font-medium">
                     {pendingFeedback === 1
-                      ? 'Queda 1 devolución sin corregir: márquela como corregida para poder aprobar la entrega.'
-                      : `Quedan ${pendingFeedback} devoluciones sin corregir: márquelas como corregidas para poder aprobar la entrega.`}
+                      ? 'Queda 1 devolución sin corregir. Para aprobar la entrega, todas las devoluciones deben estar marcadas como corregidas.'
+                      : `Quedan ${pendingFeedback} devoluciones sin corregir. Para aprobar la entrega, todas las devoluciones deben estar marcadas como corregidas.`}
                   </p>
                 )}
               </div>
@@ -448,8 +450,8 @@ export const DeliveryModal: React.FC<{
         <section className="space-y-2 border-t border-line pt-4">
           <SectionTitle>Documentos</SectionTitle>
           <p className="text-ink-muted">
-            Con una devolución pendiente, el documento queda "Con devolución"; cuando todas sus devoluciones se marcan
-            como corregidas, queda "Corregido".
+            Un documento con devoluciones sin corregir figura como "Con devolución"; cuando todas sus devoluciones están
+            corregidas, figura como "Corregido".
           </p>
           {comments === null ? (
             <div className="h-16 rounded-lg bg-fill-neutral animate-pulse" aria-busy="true" />
@@ -563,8 +565,9 @@ export const DeliveryModal: React.FC<{
                       // El texto arriba y los botones abajo: en celular no entran al costado
                       <Alert tone="warning">
                         <p>
-                          Marcarla como corregida es definitivo: no vuelve a quedar solicitada ni se puede editar. Si
-                          después hace falta pedir otra corrección, escriba una devolución nueva.
+                          Marcar la devolución como corregida es una acción definitiva: no podrá volver al estado
+                          Solicitado ni editarse. Si fuera necesario solicitar otra corrección, deberá registrarse una
+                          devolución nueva.
                         </p>
                         <div className="mt-2.5 flex flex-wrap gap-2">
                           <Button
