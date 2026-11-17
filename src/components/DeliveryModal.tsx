@@ -185,7 +185,11 @@ export const DeliveryModal: React.FC<{
     });
   };
 
+  // Marcar como corregida es definitivo: se confirma en la misma devolución antes de hacerlo
+  const [confirmCorrect, setConfirmCorrect] = useState<number | null>(null);
+
   const markCorrected = (c: DeliveryComment) => {
+    setConfirmCorrect(null);
     setBusy(`correct-${c.id_delivery_comment}`);
     setError(null);
     api
@@ -489,16 +493,38 @@ export const DeliveryModal: React.FC<{
                     </span>
                   </div>
                   <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{text}</p>
-                  {c.kind === 'feedback' && c.status.code === 'requested' && (
-                    <button
-                      type="button"
-                      onClick={() => markCorrected(c)}
-                      disabled={busy !== null}
-                      className="text-xs text-primary font-medium hover:underline cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      Marcar como corregida
-                    </button>
-                  )}
+                  {c.kind === 'feedback' &&
+                    c.status.code === 'requested' &&
+                    (confirmCorrect === c.id_delivery_comment ? (
+                      // El texto arriba y los botones abajo: en celular no entran al costado
+                      <Alert tone="warning">
+                        <p>
+                          Marcarla como corregida es definitivo: no vuelve a quedar solicitada ni se puede editar. Si
+                          después hace falta pedir otra corrección, escriba una devolución nueva.
+                        </p>
+                        <div className="mt-2.5 flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => markCorrected(c)}
+                            isLoading={busy === `correct-${c.id_delivery_comment}`}
+                          >
+                            Marcar como corregida
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setConfirmCorrect(null)} disabled={busy !== null}>
+                            Volver
+                          </Button>
+                        </div>
+                      </Alert>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmCorrect(c.id_delivery_comment)}
+                        disabled={busy !== null}
+                        className="text-xs text-primary font-medium hover:underline cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Marcar como corregida
+                      </button>
+                    ))}
                 </li>
                 );
               })}
