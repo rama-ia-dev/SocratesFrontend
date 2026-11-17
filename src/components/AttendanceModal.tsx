@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCheck, KeyRound, RefreshCw, Search, Users } from 'lucide-react';
 import { api } from '../lib/api';
 import { fetchAll } from '../lib/pagination';
@@ -96,7 +96,8 @@ const clockText = (iso: string) => {
 };
 
 const codeErrorMessage = (err: any, opening: boolean): string => {
-  if (err?.status === 403) return 'Solo un docente del curso lectivo o el administrador puede habilitar la asistencia.';
+  if (err?.status === 403)
+    return `Solo un docente del curso lectivo o el administrador puede ${opening ? 'habilitar' : 'cerrar'} la asistencia con código.`;
   if (err?.status === 404) return opening ? 'La clase ya no existe. Recargue la página.' : 'La asistencia con código ya estaba cerrada.';
   return opening
     ? 'No se pudo habilitar la asistencia con código. Intente de nuevo.'
@@ -256,6 +257,14 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ classInfo, onC
       clearInterval(poll);
     };
   }, [classInfo, codeOpen, load]);
+
+  // Cuando el código vence, la lista se actualiza una última vez: así aparecen los alumnos que lo
+  // ingresaron después de la última actualización automática
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (wasOpen.current && !codeOpen && classInfo) load(classInfo.id, true);
+    wasOpen.current = codeOpen;
+  }, [codeOpen, classInfo, load]);
 
   if (!classInfo) return null;
 
@@ -597,7 +606,7 @@ const CodePanel: React.FC<{
             Generar código nuevo
           </Button>
           <Button variant="outline" size="sm" onClick={onClose} isLoading={busy === 'close'} disabled={busy !== null}>
-            Cerrar
+            Cerrar asistencia con código
           </Button>
         </div>
       </div>
