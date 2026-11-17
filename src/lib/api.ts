@@ -689,7 +689,7 @@ export const api = {
   // Users (Solo super admin)
   // ==========================================
   async getUsers(params: {
-    role?: 'student' | 'professor' | null;
+    role?: 'student' | 'professor' | 'super_admin' | null;
     q?: string | null;
     limit?: number;
     offset?: number;
@@ -708,7 +708,9 @@ export const api = {
       }
 
       let filtered = [...mockDB.users];
-      if (params.role) {
+      if (params.role === 'super_admin') {
+        filtered = filtered.filter((u) => u.is_super_admin);
+      } else if (params.role) {
         filtered = filtered.filter((u) => u.role === params.role);
       }
       if (params.q && params.q.trim()) {

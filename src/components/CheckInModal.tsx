@@ -134,7 +134,8 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({ classInfo, onClose, 
           </Alert>
         )}
 
-        <div className="mt-5 flex justify-end gap-3 pt-3 border-t border-line">
+        {/* En celular los botones van apilados a lo ancho, con "Cancelar" abajo, para no salirse del modal */}
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3 pt-3 border-t border-line">
           <Button type="button" variant="outline" onClick={onClose}>
             Cancelar
           </Button>

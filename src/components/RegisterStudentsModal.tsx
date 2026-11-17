@@ -48,11 +48,12 @@ const FOOTER = 'flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3 
  * Registrar estudiantes (SCRUM-97, SCRUM-609): un diálogo con dos pestañas, Individual y Desde Excel.
  * Los alumnos quedan inscriptos en el curso lectivo elegido: el docente elige entre los suyos y el
  * administrador entre todos. `onRegistered` recibe el alumno creado en el registro individual
- * (para resaltarlo en la lista) y `null` después de una carga desde Excel.
+ * y el curso lectivo en el que quedó inscripto (para resaltarlo en la lista), y `null` después de
+ * una carga desde Excel.
  */
 export const RegisterStudentsModal: React.FC<{
   onClose: () => void;
-  onRegistered: (created: StudentPublic | null) => void;
+  onRegistered: (created: StudentPublic | null, idSectionYear?: number) => void;
 }> = ({ onClose, onRegistered }) => {
   const { success } = useToast();
   const { user } = useAuth();
@@ -130,7 +131,7 @@ export const RegisterStudentsModal: React.FC<{
         id_section_year: Number(course),
       });
       success('Estudiante registrado. Recibirá un correo de bienvenida');
-      onRegistered(created);
+      onRegistered(created, Number(course));
     } catch (err: any) {
       // POST /students responde el legajo repetido como 422 con la lista de filas ({row, legajo, detail})
       const rows = Array.isArray(err.detail) ? err.detail : err.errors;

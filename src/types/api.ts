@@ -104,6 +104,19 @@ export interface StudentListItem {
   email: string;
   enrollment_year: number;
   groups: StudentGroup[];
+  // Cursos lectivos del alumno (SCRUM-602): inscripción y cursada vienen como filas separadas
+  section_years?: StudentSectionYearSummary[];
+}
+
+export interface StudentSectionYearSummary {
+  id_student_section_year: number;
+  id_section_year: number;
+  year: number;
+  id_section: number;
+  section_name: string;
+  // registered (inscripción), attending (cursando) o finished_* (cursada terminada)
+  state: string;
+  status?: { code: string; name: string };
 }
 
 export interface StudentList {
@@ -265,6 +278,8 @@ export interface ProjectPublic {
   description?: string | null;
   objective?: string | null;
   problem?: string | null;
+  // Carpeta de Drive con toda la documentación del equipo (SCRUM-49); null si no se registró
+  drive_folder_url?: string | null;
   min_members?: number;
   max_members?: number;
   is_secured?: boolean;
@@ -304,6 +319,7 @@ export interface ProjectUpdate {
   description?: string | null;
   objective?: string | null;
   problem?: string | null;
+  drive_folder_url?: string | null;
   privacy?: ProjectPrivacy;
 }
 

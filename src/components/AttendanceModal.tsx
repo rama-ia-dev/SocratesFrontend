@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCheck, KeyRound, RefreshCw, Search, Users } from 'lucide-react';
 import { api } from '../lib/api';
 import { fetchAll } from '../lib/pagination';
@@ -60,7 +60,7 @@ const normalize = (text: string) =>
 const matchesStudent = (s: AttendanceStudent, q: string) =>
   normalize(`${s.last_name} ${s.first_name}`).includes(q) || String(s.legajo).startsWith(q);
 
-const teamLabel = (t: Team) => `Grupo ${t.group_number}${t.name ? ` · ${t.name}` : ''}`;
+const teamLabel = (t: Team) => `Equipo ${t.group_number}${t.name ? ` · ${t.name}` : ''}`;
 
 // Se pueden marcar los que cursan y todavía no figuran presentes
 const markable = (s: AttendanceStudent) => s.state === 'attending' && !s.present;
@@ -96,7 +96,8 @@ const clockText = (iso: string) => {
 };
 
 const codeErrorMessage = (err: any, opening: boolean): string => {
-  if (err?.status === 403) return 'Solo un docente del curso lectivo o el administrador puede habilitar la asistencia.';
+  if (err?.status === 403)
+    return `Solo un docente del curso lectivo o el administrador puede ${opening ? 'habilitar' : 'cerrar'} la asistencia con código.`;
   if (err?.status === 404) return opening ? 'La clase ya no existe. Recargue la página.' : 'La asistencia con código ya estaba cerrada.';
   return opening
     ? 'No se pudo habilitar la asistencia con código. Intente de nuevo.'
@@ -257,6 +258,14 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ classInfo, onC
     };
   }, [classInfo, codeOpen, load]);
 
+  // Cuando el código vence, la lista se actualiza una última vez: así aparecen los alumnos que lo
+  // ingresaron después de la última actualización automática
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (wasOpen.current && !codeOpen && classInfo) load(classInfo.id, true);
+    wasOpen.current = codeOpen;
+  }, [codeOpen, classInfo, load]);
+
   if (!classInfo) return null;
 
   // El código se habilita solo el día de la clase
@@ -348,8 +357,8 @@ export const AttendanceModal: React.FC<AttendanceModalProps> = ({ classInfo, onC
       const res = await api.markAttendanceBulk(classInfo.id, ids);
       success(
         res.created === 1
-          ? `Se marcó presente a 1 integrante del grupo ${team.group_number}`
-          : `Se marcó presentes a ${res.created} integrantes del grupo ${team.group_number}`
+          ? `Se marcó presente a 1 integrante del Equipo ${team.group_number}`
+          : `Se marcó presentes a ${res.created} integrantes del Equipo ${team.group_number}`
       );
       await load(classInfo.id, true);
     } catch (err: any) {
@@ -597,7 +606,7 @@ const CodePanel: React.FC<{
             Generar código nuevo
           </Button>
           <Button variant="outline" size="sm" onClick={onClose} isLoading={busy === 'close'} disabled={busy !== null}>
-            Cerrar
+            Cerrar asistencia con código
           </Button>
         </div>
       </div>

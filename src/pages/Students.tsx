@@ -24,6 +24,7 @@ import { useToast } from '../components/ui/Toast';
 import { RegisterStudentsModal } from '../components/RegisterStudentsModal';
 import { EnrollStudentModal } from '../components/EnrollStudentModal';
 import { useHighlight } from '../lib/useHighlight';
+import { byCourse, courseLabel } from '../lib/courses';
 import { Search, SearchX, Plus, RefreshCw, Edit2, Trash2, CloudOff, GraduationCap, CalendarPlus } from 'lucide-react';
 
 const PAGE_SIZE = 10;
@@ -40,8 +41,15 @@ const allStudents = async (params: Parameters<typeof api.getStudents>[0]): Promi
 
 const getId = (s: StudentListItem) => s.id_student;
 
-// El alumno recién registrado todavía no integra ningún equipo
-const fromCreated = (s: StudentPublic): StudentListItem => ({
+interface CourseOption {
+  id_section_year: number;
+  label: string;
+  year: number;
+  section_name: string;
+}
+
+// El alumno recién registrado todavía no integra ningún equipo: queda inscripto en el curso elegido
+const fromCreated = (s: StudentPublic, course?: CourseOption): StudentListItem => ({
   id_student: s.id_student,
   first_name: s.first_name,
   last_name: s.last_name,
@@ -49,12 +57,21 @@ const fromCreated = (s: StudentPublic): StudentListItem => ({
   email: s.email,
   enrollment_year: s.enrollment_year,
   groups: [],
+  section_years: course
+    ? [
+        {
+          id_student_section_year: 0,
+          id_section_year: course.id_section_year,
+          year: course.year,
+          id_section: 0,
+          section_name: course.section_name,
+          state: 'registered',
+          // Mismo nombre que da el backend a la inscripción
+          status: { code: 'registered', name: 'Anotado' },
+        },
+      ]
+    : [],
 });
-
-interface CourseOption {
-  id_section_year: number;
-  label: string;
-}
 
 // Consultar estudiantes (SCRUM-99): GET /students. El docente común ve a los alumnos de sus
 // cursos lectivos (inscriptos, tengan equipo o no, y los que están en un equipo de esos cursos),
@@ -85,10 +102,20 @@ export const Students: React.FC = () => {
     if (!user) return;
     const load = user.is_super_admin
       ? api.getSectionYears({ limit: 100 }).then((r) =>
-          r.items.map((sy) => ({ id_section_year: sy.id_section_year, label: `${sy.section_name} (${sy.year})` }))
+          r.items.map((sy) => ({
+            id_section_year: sy.id_section_year,
+            label: courseLabel(sy),
+            year: sy.year,
+            section_name: sy.section_name,
+          }))
         )
       : api.getProfessorSectionYears({ id_professor: user.id_user, limit: 100 }).then((r) =>
-          r.items.map((a) => ({ id_section_year: a.id_section_year, label: `${a.section_name} (${a.year})` }))
+          r.items.map((a) => ({
+            id_section_year: a.id_section_year,
+            label: courseLabel(a),
+            year: a.year,
+            section_name: a.section_name,
+          }))
         );
     load.then(setCourses).catch(() => setCourses([]));
   }, [user]);
@@ -242,13 +269,14 @@ export const Students: React.FC = () => {
       ) : (
         <>
           {/* Anchos fijos por columna: al filtrar, la tabla no cambia de forma */}
-          <Table className="table-fixed min-w-[960px]">
+          <Table className="table-fixed min-w-[1080px]">
             <colgroup>
-              <col className="w-[10%]" />
-              <col className="w-[24%]" />
-              <col className="w-[24%]" />
-              <col className="w-[11%]" />
-              <col className="w-[31%]" />
+              <col className="w-[9%]" />
+              <col className="w-[20%]" />
+              <col className="w-[20%]" />
+              <col className="w-[9%]" />
+              <col className="w-[16%]" />
+              <col className="w-[26%]" />
               <col className="w-16" />
             </colgroup>
             <TableHeader>
@@ -257,6 +285,7 @@ export const Students: React.FC = () => {
                 <TableHead>Apellido y nombre</TableHead>
                 <TableHead>Correo de ingreso</TableHead>
                 <TableHead>Año de ingreso</TableHead>
+                <TableHead>Curso lectivo</TableHead>
                 <TableHead>Equipo</TableHead>
                 <TableHead className="sticky right-0 bg-canvas">
                   <span className="sr-only">Acciones</span>
@@ -279,6 +308,20 @@ export const Students: React.FC = () => {
                     <span className="block truncate" title={st.email}>{st.email}</span>
                   </TableCell>
                   <TableCell className="text-ink-muted tabular-nums">{st.enrollment_year}</TableCell>
+                  <TableCell>
+                    {byCourse(st.section_years ?? []).length === 0 ? (
+                      <span className="text-xs italic text-ink-subtle">Sin curso lectivo</span>
+                    ) : (
+                      <ul className="space-y-1">
+                        {byCourse(st.section_years ?? []).map((c) => (
+                          <li key={c.id_section_year}>
+                            <span className="block text-sm text-ink">{courseLabel(c)}</span>
+                            {c.status && <span className="block text-xs text-ink-muted">{c.status.name}</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {st.groups.length === 0 ? (
                       <span className="text-xs italic text-ink-subtle">Sin equipo</span>
@@ -342,9 +385,9 @@ export const Students: React.FC = () => {
       {isRegistering && (
         <RegisterStudentsModal
           onClose={() => setIsRegistering(false)}
-          onRegistered={(created) => {
+          onRegistered={(created, idSectionYear) => {
             setIsRegistering(false);
-            if (created) highlight(fromCreated(created));
+            if (created) highlight(fromCreated(created, courses.find((c) => c.id_section_year === idSectionYear)));
             fetchStudents();
           }}
         />
