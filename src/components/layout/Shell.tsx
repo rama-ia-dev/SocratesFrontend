@@ -79,7 +79,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     if (user.is_super_admin) {
       return [
         { label: 'Comisiones', path: '/comisiones', icon: Layers },
-        { label: 'Estado de la cátedra', path: '/catedra', icon: BarChart3 },
+        { label: 'Tablero de la cátedra', path: '/catedra', icon: BarChart3 },
         { label: 'Calendario', path: '/calendario', icon: CalendarDays },
         // Usuarios agrupa las dos pantallas de personas: Docentes y Estudiantes (SCRUM-609)
         {

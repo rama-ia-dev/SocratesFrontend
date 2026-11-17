@@ -133,7 +133,7 @@ export default function App() {
               }
             />
 
-            {/* Estado de la cátedra (Solo super admin) */}
+            {/* Tablero de la cátedra (Solo super admin) */}
             <Route
               path="/catedra"
               element={
