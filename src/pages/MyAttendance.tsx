@@ -20,6 +20,10 @@ const METHOD_LABELS: Record<AttendanceMethod, string> = {
 };
 
 const WEEKDAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+const MONTHS = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
 const pad2 = (n: number) => String(n).padStart(2, '0');
 const localIso = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const dateText = (iso: string) => {
@@ -104,6 +108,15 @@ export const MyAttendancePage: React.FC = () => {
   );
   const course = courses.find((c) => c.id_section_year === courseId) ?? null;
   const history = (data?.items ?? []).filter((a) => a.id_section_year === courseId);
+  // Agrupado por mes; el backend ya las devuelve de la más nueva a la más vieja
+  const historyByMonth: { month: string; items: typeof history }[] = [];
+  for (const a of history) {
+    const month = a.date.slice(0, 7);
+    const last = historyByMonth[historyByMonth.length - 1];
+    if (last?.month === month) last.items.push(a);
+    else historyByMonth.push({ month, items: [a] });
+  }
+  const monthLabel = (month: string) => MONTHS[Number(month.slice(5, 7)) - 1];
 
   const header = <PageHeader title="Mi asistencia" subtitle="Su porcentaje de asistencia y las clases en las que figura presente" />;
 
@@ -200,17 +213,32 @@ export const MyAttendancePage: React.FC = () => {
                           : `${stats.total_classes - stats.attended_classes} faltas`}
                       </span>
                     </div>
-                    <div
-                      className="mt-3 h-2.5 rounded-full bg-line-neutral overflow-hidden"
-                      role="progressbar"
-                      aria-valuenow={pct}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-label="Porcentaje de asistencia"
-                    >
-                      <div className={`h-full ${low ? 'bg-danger-vivid' : 'bg-success-vivid'}`} style={{ width: `${pct}%` }} />
+                    {/* Barra con una marca en el mínimo, para ver de un vistazo cuánto falta o sobra */}
+                    <div className="relative mt-3 pb-5">
+                      <div
+                        className="h-2.5 rounded-full bg-line-neutral overflow-hidden"
+                        role="progressbar"
+                        aria-valuenow={pct}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`Porcentaje de asistencia (mínimo ${MIN_ATTENDANCE} %)`}
+                      >
+                        <div className={`h-full ${low ? 'bg-danger-vivid' : 'bg-success-vivid'}`} style={{ width: `${pct}%` }} />
+                      </div>
+                      <div
+                        className="absolute -top-1 h-[18px] w-0.5 -translate-x-1/2 rounded-full bg-ink"
+                        style={{ left: `${MIN_ATTENDANCE}%` }}
+                        aria-hidden
+                      />
+                      <span
+                        className="absolute bottom-0 -translate-x-1/2 text-[11px] font-medium text-ink-muted tabular-nums whitespace-nowrap"
+                        style={{ left: `${MIN_ATTENDANCE}%` }}
+                        aria-hidden
+                      >
+                        Mínimo {MIN_ATTENDANCE} %
+                      </span>
                     </div>
-                    <p className={`mt-3 text-sm ${low ? 'text-danger' : 'text-ink-muted'}`}>
+                    <p className={`mt-2 text-sm ${low ? 'text-danger' : 'text-ink-muted'}`}>
                       {low ? `Está por debajo del mínimo del ${MIN_ATTENDANCE} %. ` : ''}
                       {marginText(stats.attended_classes, stats.total_classes)}
                     </p>
@@ -240,32 +268,56 @@ export const MyAttendancePage: React.FC = () => {
                           <TableHead>Registrada</TableHead>
                         </TableRow>
                       </TableHeader>
-                      <tbody>
-                        {history.map((a) => (
-                          <TableRow key={a.id_attendance}>
-                            <TableCell className="tabular-nums whitespace-nowrap">{dateText(a.date)}</TableCell>
-                            <TableCell className="font-medium text-ink [overflow-wrap:anywhere]">{a.title || 'Clase'}</TableCell>
-                            <TableCell className="text-ink-muted tabular-nums whitespace-nowrap">
-                              {hhmm(a.start_time)} a {hhmm(a.end_time)}
-                            </TableCell>
-                            <TableCell className="text-ink-muted">{METHOD_LABELS[a.method] ?? a.method}</TableCell>
-                          </TableRow>
-                        ))}
-                      </tbody>
+                      {/* Un grupo por mes, con su encabezado (como el listado del calendario) */}
+                      {historyByMonth.map((g) => (
+                        <tbody key={g.month}>
+                          <tr className="bg-canvas border-y border-line">
+                            <th colSpan={4} scope="colgroup" className="px-4 py-2 text-left text-xs font-semibold text-navy">
+                              {monthLabel(g.month)}{' '}
+                              <span className="font-normal text-ink-muted">
+                                · {g.items.length === 1 ? '1 clase' : `${g.items.length} clases`}
+                              </span>
+                            </th>
+                          </tr>
+                          {g.items.map((a) => (
+                            <TableRow key={a.id_attendance}>
+                              <TableCell className="tabular-nums whitespace-nowrap">{dateText(a.date)}</TableCell>
+                              <TableCell className="font-medium text-ink [overflow-wrap:anywhere]">{a.title || 'Clase'}</TableCell>
+                              <TableCell className="text-ink-muted tabular-nums whitespace-nowrap">
+                                {hhmm(a.start_time)} a {hhmm(a.end_time)}
+                              </TableCell>
+                              <TableCell className="text-ink-muted">{METHOD_LABELS[a.method] ?? a.method}</TableCell>
+                            </TableRow>
+                          ))}
+                        </tbody>
+                      ))}
                     </Table>
                   </div>
 
-                  {/* Celular: una fila por clase */}
-                  <ul className="md:hidden divide-y divide-line rounded-xl border border-line bg-white">
-                    {history.map((a) => (
-                      <li key={a.id_attendance} className="px-4 py-3">
-                        <p className="text-sm font-medium text-ink [overflow-wrap:anywhere]">{a.title || 'Clase'}</p>
-                        <p className="text-xs text-ink-muted tabular-nums">
-                          {dateText(a.date)} · {hhmm(a.start_time)} a {hhmm(a.end_time)} · {METHOD_LABELS[a.method] ?? a.method}
-                        </p>
-                      </li>
+                  {/* Celular: un subtítulo por mes y una fila por clase */}
+                  <div className="md:hidden space-y-5">
+                    {historyByMonth.map((g) => (
+                      <div key={g.month}>
+                        <h3 className="text-xs font-semibold text-navy">
+                          {monthLabel(g.month)}{' '}
+                          <span className="font-normal text-ink-muted">
+                            · {g.items.length === 1 ? '1 clase' : `${g.items.length} clases`}
+                          </span>
+                        </h3>
+                        <ul className="mt-2 divide-y divide-line rounded-xl border border-line bg-white">
+                          {g.items.map((a) => (
+                            <li key={a.id_attendance} className="px-4 py-3">
+                              <p className="text-sm font-medium text-ink [overflow-wrap:anywhere]">{a.title || 'Clase'}</p>
+                              <p className="text-xs text-ink-muted tabular-nums">
+                                {dateText(a.date)} · {hhmm(a.start_time)} a {hhmm(a.end_time)} ·{' '}
+                                {METHOD_LABELS[a.method] ?? a.method}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </>
               )}
             </section>
