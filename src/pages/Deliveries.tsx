@@ -177,7 +177,7 @@ const MembersPanel: React.FC<{ team: Team; finals: FinalGrades; onEdit: () => vo
       )}
       <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-line text-xs">
         <span className="text-ink-muted">Nota de las entregas del equipo</span>
-        {finals.deliveries ? <span className="font-semibold text-ink">{finals.deliveries}</span> : <span className="text-ink-subtle">—</span>}
+        {finals.deliveries ? <span className="shrink-0 whitespace-nowrap font-semibold text-ink">{finals.deliveries}</span> : <span className="text-ink-subtle">—</span>}
       </div>
     </div>
   );
