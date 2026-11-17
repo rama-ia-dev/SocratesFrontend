@@ -238,9 +238,9 @@ export const Projects: React.FC = () => {
       )}
 
       {/* Años y comisiones pueden ser muchos: desplegables. La privacidad tiene tres: a la vista */}
-      <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+      <div className="flex flex-col xl:flex-row xl:items-center gap-3">
         <div
-          className={`grid grid-cols-1 gap-3 shrink-0 ${isStudent ? 'sm:w-[320px]' : 'sm:grid-cols-3 lg:w-[660px]'}`}
+          className={`grid grid-cols-1 gap-3 shrink-0 ${isStudent ? 'sm:w-[320px]' : 'sm:grid-cols-3 xl:w-[660px]'}`}
         >
           <Input
             type="text"

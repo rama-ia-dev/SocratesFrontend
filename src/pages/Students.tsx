@@ -269,7 +269,7 @@ export const Students: React.FC = () => {
       ) : (
         <>
           {/* Anchos fijos por columna: al filtrar, la tabla no cambia de forma */}
-          <Table className="table-fixed min-w-[1080px]">
+          <Table className="table-fixed min-w-[1000px]">
             <colgroup>
               <col className="w-[9%]" />
               <col className="w-[20%]" />
