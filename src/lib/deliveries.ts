@@ -24,11 +24,11 @@ export const statusVariant = (code: string): BadgeProps['variant'] => {
 // Qué significa cada estado para el docente: en qué etapa está la entrega, qué puede hacer ahora y qué sigue
 export const statusHelp = (code: string): string => {
   if (code === 'requested')
-    return 'El equipo todavía no presentó esta entrega. Cuando la presente, toque "Registrar como entregada": recién ahí se pueden poner notas y escribir devoluciones.';
+    return 'El equipo todavía no presentó esta entrega. Cuando la presente, toque "Registrar como entregada" para poder escribir notas y devoluciones.';
   if (code === 'pending_approval')
-    return 'El equipo presentó la entrega y está esperando su revisión. Ahora puede poner las notas, escribir devoluciones y marcar como corregidas las que el equipo ya resolvió. Mientras haya devoluciones sin corregir, puede pedirle modificaciones al equipo. Solo se puede aprobar cuando todas las devoluciones estén corregidas.';
+    return 'El equipo presentó la entrega y está esperando su revisión. Ahora puede escribir notas, devoluciones y marcar como corregidas aquellas que el equipo ya resolvió. Mientras haya devoluciones sin corregir, puede pedirle modificaciones al equipo. Solo se puede aprobar cuando todas las devoluciones estén corregidas.';
   if (code === 'pending_modification')
-    return 'Se le pidieron modificaciones al equipo y está corrigiendo la entrega. Mientras tanto no se pueden cambiar las notas ni escribir devoluciones. Cuando el equipo avise que terminó de corregir, toque "Registrar como entregada": la entrega vuelve a quedar pendiente de aprobación y podrá revisar si las correcciones están bien.';
+    return 'Se le pidieron modificaciones al equipo y está corrigiendo la entrega. Durante esta etapa no se pueden cambiar las notas ni escribir devoluciones. Cuando el equipo avise que terminó de corregir, toque "Registrar como entregada": la entrega vuelve a quedar pendiente de aprobación y podrá marcar como corregidas aquellas devoluciones que considere.';
   if (code === 'approved')
     return 'La entrega está aprobada. Es definitivo: ya no se pueden cambiar las notas ni escribir devoluciones nuevas.';
   return '';
