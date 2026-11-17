@@ -13,6 +13,7 @@ import { Sections } from './pages/Sections';
 import { ChairOverview } from './pages/ChairOverview';
 import { Calendar } from './pages/Calendar';
 import { TeamAttendancePage } from './pages/TeamAttendance';
+import { MyAttendancePage } from './pages/MyAttendance';
 import { Professors } from './pages/Professors';
 import { Deliveries } from './pages/Deliveries';
 import { Students } from './pages/Students';
@@ -134,7 +135,7 @@ export default function App() {
               }
             />
 
-            {/* Estado de la cátedra (Solo super admin) */}
+            {/* Tablero de la cátedra (Solo super admin) */}
             <Route
               path="/catedra"
               element={
@@ -212,6 +213,16 @@ export default function App() {
               element={
                 <ProtectedRoute allowedRoles={['superadmin', 'professor']}>
                   <TeamAttendancePage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Mi asistencia (Solo alumnos) */}
+            <Route
+              path="/mi-asistencia"
+              element={
+                <ProtectedRoute allowedRoles={['student']}>
+                  <MyAttendancePage />
                 </ProtectedRoute>
               }
             />

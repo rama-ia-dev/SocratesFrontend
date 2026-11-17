@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { CloudOff, FolderKanban, Plus, RefreshCw, Search, SearchX } from 'lucide-react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, CloudOff, FolderKanban, Plus, RefreshCw, Search, SearchX } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import type { ProjectPrivacy, ProjectPublic, SectionYearPublic } from '../types/api';
@@ -83,8 +83,13 @@ export const Projects: React.FC = () => {
   const [loadError, setLoadError] = useState(false);
 
   const [sectionYears, setSectionYears] = useState<SectionYearPublic[]>([]);
-  const [year, setYear] = useState('');
-  const [section, setSection] = useState('');
+  // El año y la comisión pueden llegar en la URL (por ejemplo, desde el Tablero de la cátedra:
+  // /equipos?anio=2026&comision=3); sin parámetros, arrancan vacíos como siempre
+  const [searchParams] = useSearchParams();
+  // Dirección del Tablero de la cátedra (con sus filtros) cuando se llegó desde ahí
+  const fromChair = (useLocation().state as { fromChair?: string } | null)?.fromChair;
+  const [year, setYear] = useState(() => searchParams.get('anio') ?? '');
+  const [section, setSection] = useState(() => searchParams.get('comision') ?? '');
   const [privacy, setPrivacy] = useState<ProjectPrivacy | ''>('');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -178,20 +183,44 @@ export const Projects: React.FC = () => {
   };
   const hasFilters = Boolean(year || section || privacy || searchQuery.trim());
 
+  // Al abrir un equipo, el detalle recibe a dónde volver: la lista con el año y la comisión elegidos
+  // y, si se había llegado desde el Tablero de la cátedra, el botón para volver a él
+  const listParams = new URLSearchParams();
+  if (year) listParams.set('anio', year);
+  if (section) listParams.set('comision', section);
+  const detailState = {
+    listUrl: `/equipos${listParams.toString() ? `?${listParams}` : ''}`,
+    listState: fromChair ? { fromChair } : undefined,
+  };
+
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Equipos de trabajo"
-        subtitle={isStudent ? 'Equipos de su curso lectivo y su proyecto' : 'Equipos de cada comisión y su proyecto'}
-        action={
-          isProfessor ? (
-            <Button variant="primary" onClick={() => setIsCreateOpen(true)}>
-              <Plus className="w-4 h-4 mr-1.5" />
-              Crear equipos de trabajo
-            </Button>
-          ) : undefined
-        }
-      />
+      <div>
+        {/* Si se llegó desde el Tablero de la cátedra, se puede volver con sus filtros */}
+        {fromChair && (
+          <Link
+            to={fromChair}
+            // Resaltado (no gris como los otros "Volver"): es la única salida hacia el tablero y
+            // tiene que verse enseguida
+            className="mb-4 flex w-fit items-center gap-1.5 rounded-lg border border-tint-strong bg-tint px-3 py-1.5 text-sm font-medium text-primary hover:bg-tint-strong hover:text-primary-hover transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            <ArrowLeft className="w-4 h-4" aria-hidden />
+            Volver al Tablero de la cátedra
+          </Link>
+        )}
+        <PageHeader
+          title="Equipos de trabajo"
+          subtitle={isStudent ? 'Equipos de su curso lectivo y su proyecto' : 'Equipos de cada comisión y su proyecto'}
+          action={
+            isProfessor ? (
+              <Button variant="primary" onClick={() => setIsCreateOpen(true)}>
+                <Plus className="w-4 h-4 mr-1.5" />
+                Crear equipos de trabajo
+              </Button>
+            ) : undefined
+          }
+        />
+      </div>
 
       {canFilterMine && (
         <SegmentedControl
@@ -344,11 +373,12 @@ export const Projects: React.FC = () => {
             </TableHeader>
             <tbody>
               {projects.map((p) => (
-                <TableRow key={p.id_project} onClick={() => navigate(`/equipos/${p.id_project}`)}>
+                <TableRow key={p.id_project} onClick={() => navigate(`/equipos/${p.id_project}`, { state: detailState })}>
                   {/* Toda la fila abre el detalle; el enlace del equipo lo hace alcanzable con el teclado */}
                   <TableCell className="font-semibold text-ink whitespace-nowrap">
                     <Link
                       to={`/equipos/${p.id_project}`}
+                      state={detailState}
                       onClick={(e) => e.stopPropagation()}
                       aria-label={`Ver ${teamLabel(p)} de ${p.section_name} ${p.year}`}
                       className="rounded-sm hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"

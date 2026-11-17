@@ -37,8 +37,8 @@ export const Home: React.FC = () => {
           icon: Layers,
         },
         {
-          title: 'Estado de la cátedra',
-          desc: 'Docentes, grupos por etapa y aprobados de cada curso lectivo.',
+          title: 'Tablero de la cátedra',
+          desc: 'Docentes, equipos por etapa y aprobados de cada curso lectivo.',
           path: '/catedra',
           icon: BarChart3,
         },
