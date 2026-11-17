@@ -28,7 +28,7 @@ export const statusHelp = (code: string): string => {
   if (code === 'pending_approval')
     return 'El equipo presentó la entrega y está esperando su revisión. Ahora puede escribir notas, devoluciones y marcar como corregidas aquellas que el equipo ya resolvió. Mientras haya devoluciones sin corregir, puede pedirle modificaciones al equipo. Solo se puede aprobar cuando todas las devoluciones estén corregidas.';
   if (code === 'pending_modification')
-    return 'Se le pidieron modificaciones al equipo y está corrigiendo la entrega. Durante esta etapa no se pueden cambiar las notas ni escribir devoluciones. Cuando el equipo avise que terminó de corregir, toque "Registrar como entregada": la entrega vuelve a quedar pendiente de aprobación y podrá marcar como corregidas aquellas devoluciones que considere.';
+    return 'Se le pidieron modificaciones al equipo y actualmente se encuentra trabajando en las devoluciones. Cuando el equipo avise que terminó de corregir, toque "Registrar como entregada": la entrega vuelve a quedar pendiente de aprobación y podrá marcar como corregidas aquellas devoluciones que considere.';
   if (code === 'approved')
     return 'La entrega está aprobada. Es definitivo: ya no se pueden cambiar las notas ni escribir devoluciones nuevas.';
   return '';
