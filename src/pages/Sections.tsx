@@ -52,7 +52,8 @@ export const Sections: React.FC = () => {
     toastErrorRef.current = toastError;
   }, [toastError]);
 
-  const [activeTab, setActiveTab] = useState<'sections' | 'years'>('sections');
+  // Se abre en Cursos lectivos, que es lo que más se usa; la comisión es un dato del curso lectivo
+  const [activeTab, setActiveTab] = useState<'sections' | 'years'>('years');
 
   // ==========================================
   // Pestaña Comisiones
@@ -545,8 +546,8 @@ export const Sections: React.FC = () => {
       <div role="tablist" aria-label="Secciones de comisiones" className="flex items-center gap-6 border-b border-line mb-6">
         {(
           [
-            ['sections', 'Comisiones'],
             ['years', 'Cursos lectivos'],
+            ['sections', 'Comisiones'],
           ] as const
         ).map(([tab, label]) => (
           <button
