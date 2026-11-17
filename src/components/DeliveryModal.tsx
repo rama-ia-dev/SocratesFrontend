@@ -480,7 +480,10 @@ export const DeliveryModal: React.FC<{
                       {c.kind === 'annotation' ? 'Anotación interna' : 'Devolución'}
                     </Badge>
                     <span className="font-medium text-ink">{document ?? 'Toda la entrega'}</span>
-                    {c.kind === 'feedback' && <span>· {c.status.name}</span>}
+                    {/* El estado de la devolución con el mismo color que el documento: pendiente en amarillo, corregida en verde */}
+                    {c.kind === 'feedback' && (
+                      <Badge variant={c.status.code === 'corrected' ? 'public' : 'protected'}>{c.status.name}</Badge>
+                    )}
                     <span>
                       · {c.author.first_name} {c.author.last_name} · {formatDateTime(c.created_at)}
                     </span>
