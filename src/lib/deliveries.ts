@@ -5,13 +5,13 @@ import type { BadgeProps } from '../components/ui/Badge';
 
 export const CATEGORY_LABEL: Record<GradeCategory, string> = {
   activity: 'Nota de la entrega',
-  follow_up: 'Seguimiento del avance',
+  follow_up: 'Seguimiento',
 };
 
 // Qué mide cada nota (la de seguimiento no es el documento "Planificación y seguimiento")
 export const CATEGORY_HELP: Record<GradeCategory, string> = {
   activity: 'La nota de la entrega completa.',
-  follow_up: 'Cómo viene avanzando el proyecto en esta entrega.',
+  follow_up: 'Nota conceptual opcional sobre cómo viene trabajando el equipo en aspectos generales, entrega tras entrega.',
 };
 
 export const statusVariant = (code: string): BadgeProps['variant'] => {

@@ -30,9 +30,9 @@ import {
 } from '../lib/deliveries';
 import { ExternalLink } from 'lucide-react';
 
-// Solo la nota de la entrega: el seguimiento del avance se dejó de mostrar (Rama, 17/11), porque el
-// avance ya se sigue con las devoluciones de cada documento y el historial de la nota
-const CATEGORIES: GradeCategory[] = ['activity'];
+// La nota de la entrega y el seguimiento (opcional): cómo viene trabajando el equipo en general,
+// entrega tras entrega, como pidió la profesora
+const CATEGORIES: GradeCategory[] = ['activity', 'follow_up'];
 const MAX_COMMENT = 2000;
 
 const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
