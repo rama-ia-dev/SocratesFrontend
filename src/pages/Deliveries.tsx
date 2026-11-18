@@ -36,7 +36,7 @@ interface Team {
   members: FinalsMember[];
 }
 
-// Integrantes activos, "Apellido, Nombre", en orden alfabético
+// Integrantes del equipo, "Apellido, Nombre", en orden alfabético
 const toMembers = (members: ProjectMember[]): FinalsMember[] =>
   members
     .map((m) => ({ id_student: m.id_student, name: `${m.last_name}, ${m.first_name}`, legajo: m.legajo }))
@@ -247,11 +247,14 @@ export const Deliveries: React.FC = () => {
       const acts = actList.items.sort(
         (a, b) => a.due_date.localeCompare(b.due_date) || a.id_activity - b.id_activity
       );
-      // El listado de equipos no trae los integrantes: se piden los activos de cada equipo
+      // El listado de equipos no trae los integrantes: se piden los de cada equipo. Al aprobarse el
+      // equipo, sus integrantes pasan a "finalizado"; al cancelarse, a "abandonó"
+      const memberStatuses = (code?: string) =>
+        code === 'cancelled' ? ['active', 'finished', 'abandoned'] : ['active', 'finished'];
       const [deliveryLists, commentLists, memberLists] = await Promise.all([
         Promise.all(acts.map((a) => api.getActivityDeliveries(a.id_activity))),
         Promise.all(acts.map((a) => api.getActivityComments(a.id_activity))),
-        Promise.all(projects.items.map((p) => api.getProjectMembers(p.id_project, ['active']))),
+        Promise.all(projects.items.map((p) => api.getProjectMembers(p.id_project, memberStatuses(p.status?.code)))),
       ]);
       if (current !== requestId.current) return;
       const map = new Map<string, DeliveryPublic>();
