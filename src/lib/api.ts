@@ -2349,6 +2349,21 @@ export const api = {
     });
   },
 
+  // Cambiar la comisión de una inscripción (SCRUM-610), solo el administrador. Solo inscripciones:
+  // una cursada no se mueve (409), y tampoco si su última cursada terminó aprobada (409).
+  async moveEnrollment(id_student_section_year: number, id_section_year: number): Promise<StudentSectionYearPublic> {
+    return request<StudentSectionYearPublic>(`/student-section-years/${id_student_section_year}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ id_section_year }),
+    });
+  },
+
+  // Quitar una inscripción cargada por error (SCRUM-610), solo el administrador. Una cursada no se
+  // quita desde acá (409).
+  async deleteEnrollment(id_student_section_year: number): Promise<void> {
+    return request<void>(`/student-section-years/${id_student_section_year}`, { method: 'DELETE' });
+  },
+
   // El jefe del grupo acepta (active) o rechaza (rejected) una solicitud para sumarse
   async decideMembership(
     id_project: number,
