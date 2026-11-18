@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRightLeft, CloudOff, Lock, Mail, Pencil, Plus, RefreshCw, SearchX, ShieldCheck, ShieldOff, UserPlus, X } from 'lucide-react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, ArrowRightLeft, CloudOff, Lock, Mail, Pencil, Plus, RefreshCw, SearchX, ShieldCheck, ShieldOff, Trash2, UserPlus, X } from 'lucide-react';
 import { api } from '../lib/api';
 import type { MyProject, ProjectMember, ProjectOverview, SectionYearPublic, TechnologyPublic } from '../types/api';
 import { Alert } from '../components/ui/Alert';
@@ -285,6 +285,24 @@ const uninsureError = (err: any): string => {
   return detail || 'No se pudo desasegurar el equipo';
 };
 
+// Eliminar el equipo (SCRUM-104). El backend solo elimina un equipo sin asegurar que nunca tuvo
+// integrantes ni solicitudes para sumarse, y sin entregas con enlace o notas
+const deleteProjectError = (err: any): string => {
+  const detail = String(err.message || '');
+  if (err.status === 409 && detail.includes('uninsured'))
+    return 'El equipo ya está asegurado: solo puede eliminarse un equipo sin asegurar.';
+  if (err.status === 409 && detail.includes('students'))
+    return 'El equipo tuvo integrantes o solicitudes para sumarse, y ese historial se conserva: no puede eliminarse.';
+  if (err.status === 409 && detail.includes('delivery'))
+    return 'El equipo tiene entregas con enlace o notas cargadas: no puede eliminarse.';
+  if (err.status === 403) return 'Solo los docentes del curso lectivo y el administrador pueden eliminar el equipo.';
+  if (err.status === 404) return 'El equipo ya no existe: puede que otro usuario lo haya eliminado.';
+  return detail || 'No se pudo eliminar el equipo.';
+};
+
+// Todos los estados de una membresía: el backend cuenta cualquiera de ellos al eliminar
+const ALL_MEMBERSHIP_CODES = ['active', 'finished', 'pending_approval', 'rejected', 'abandoned', 'expelled'];
+
 // Solicitudes para sumarse (SCRUM-24): las ve y las decide solo el jefe del grupo
 const Requests: React.FC<{
   requests: ProjectMember[];
@@ -395,6 +413,13 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
   const [isJoinOpen, setIsJoinOpen] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [joinErrorText, setJoinErrorText] = useState<string | null>(null);
+  // Eliminar el equipo (SCRUM-104). `historyCount`: membresías de cualquier estado (null mientras se
+  // cuentan, 'error' si no se pudieron contar)
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [historyCount, setHistoryCount] = useState<number | null | 'error'>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteErrorText, setDeleteErrorText] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   // `keep`: recarga después de una acción, sin vaciar la pantalla mientras llegan los datos nuevos
   const load = useCallback(async (keep = false) => {
@@ -610,6 +635,34 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
     }
   };
 
+  // Al abrir la confirmación se cuenta el historial del equipo: si tuvo integrantes o solicitudes, el
+  // backend no lo elimina y el diálogo lo explica en lugar de ofrecer eliminar
+  const openDelete = () => {
+    if (!project) return;
+    setDeleteErrorText(null);
+    setHistoryCount(null);
+    setIsDeleteOpen(true);
+    api
+      .getProjectMembers(project.id_project, ALL_MEMBERSHIP_CODES)
+      .then((r) => setHistoryCount(r.total))
+      .catch(() => setHistoryCount('error'));
+  };
+
+  const handleDelete = async () => {
+    if (!project) return;
+    setIsDeleting(true);
+    setDeleteErrorText(null);
+    try {
+      await api.deleteProject(project.id_project);
+      success(`Se eliminó el ${teamLabel(project)} de ${project.section_name} (${project.year})`);
+      setIsDeleteOpen(false);
+      navigate(backTarget?.listUrl ?? '/equipos', { state: backTarget?.listState });
+    } catch (err: any) {
+      setDeleteErrorText(deleteProjectError(err));
+      setIsDeleting(false);
+    }
+  };
+
   if (state !== 'ok' || !project) {
     return (
       <div className="space-y-6">
@@ -664,6 +717,9 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
   const canEdit = (canManage || iAmMember) && !isFinal && !project.restricted;
   // Cambiar el estado (SCRUM-27): los docentes del curso y el administrador, con el equipo asegurado
   const canChangeStatus = canManage && statusOptions(project.status?.code).length > 0;
+  // Eliminar (SCRUM-104): los docentes del curso y el administrador, con el equipo sin asegurar y sin
+  // integrantes. Si tuvo integrantes o solicitudes, lo explica el diálogo
+  const canDelete = canManage && project.status?.code === 'uninsured' && project.members.length === 0;
   const memberAction =
     canTransfer || canExpel
       ? (m: ProjectMember) =>
@@ -796,7 +852,7 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
           {project.status && (
             <Badge variant={STATUS_VARIANT[project.status.code] ?? 'neutral'}>{project.status.name}</Badge>
           )}
-          {(canEdit || canChangeStatus) && (
+          {(canEdit || canChangeStatus || canDelete) && (
             <div className="flex flex-wrap gap-2 sm:ml-auto">
               {canChangeStatus && (
                 <Button size="sm" variant="outline" onClick={() => setIsStatusOpen(true)}>
@@ -808,6 +864,12 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
                 <Button size="sm" variant="outline" onClick={() => setIsEditOpen(true)}>
                   <Pencil className="w-4 h-4 mr-1.5" />
                   Modificar datos
+                </Button>
+              )}
+              {canDelete && (
+                <Button size="sm" variant="ghostDanger" onClick={openDelete}>
+                  <Trash2 className="w-4 h-4 mr-1.5" />
+                  Eliminar equipo
                 </Button>
               )}
             </div>
@@ -1071,6 +1133,42 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
           <Button type="button" onClick={handleJoin} isLoading={isJoining}>
             {hasLeader ? 'Pedir sumarse' : 'Sumarse como jefe'}
           </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isDeleteOpen}
+        onClose={() => !isDeleting && setIsDeleteOpen(false)}
+        title="Eliminar el equipo"
+      >
+        {deleteErrorText && <Alert className="mb-4">{deleteErrorText}</Alert>}
+        {historyCount === null ? (
+          <div className="h-12 rounded-lg bg-fill-neutral animate-pulse" aria-busy="true" />
+        ) : typeof historyCount === 'number' && historyCount > 0 ? (
+          <p className="text-sm text-ink">
+            El {teamLabel(project)} no puede eliminarse: tuvo integrantes o solicitudes para sumarse, y el sistema
+            conserva ese historial. Solo puede eliminarse un equipo que nunca tuvo integrantes.
+          </p>
+        ) : (
+          <div className="space-y-2 text-sm text-ink">
+            <p>
+              ¿Eliminar el {teamLabel(project)} de {project.section_name} ({project.year})? La acción no puede
+              deshacerse.
+            </p>
+            <p className="text-ink-muted">
+              Su número queda libre y puede volver a usarse al crear un equipo nuevo.
+            </p>
+          </div>
+        )}
+        <div className="flex justify-end gap-3 pt-3 mt-4 border-t border-line">
+          <Button type="button" variant="outline" onClick={() => setIsDeleteOpen(false)} disabled={isDeleting}>
+            {typeof historyCount === 'number' && historyCount > 0 ? 'Cerrar' : 'Cancelar'}
+          </Button>
+          {historyCount !== null && !(typeof historyCount === 'number' && historyCount > 0) && (
+            <Button type="button" variant="destructive" onClick={handleDelete} isLoading={isDeleting}>
+              Eliminar equipo
+            </Button>
+          )}
         </div>
       </Modal>
 
