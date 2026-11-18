@@ -2248,6 +2248,10 @@ export const api = {
     });
   },
 
+  async deleteDeliveryGrade(id_delivery: number, id_delivery_grade: number): Promise<void> {
+    await request<void>(`/deliveries/${id_delivery}/grades/${id_delivery_grade}`, { method: 'DELETE' });
+  },
+
   // Devoluciones y anotaciones de una entrega, de la más nueva a la más vieja
   async getDeliveryComments(id_delivery: number): Promise<DeliveryComment[]> {
     const items: DeliveryComment[] = [];

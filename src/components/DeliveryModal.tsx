@@ -131,6 +131,7 @@ export const DeliveryModal: React.FC<{
   // ---- Estado ----
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [confirmReject, setConfirmReject] = useState(false);
+  const [confirmWithdraw, setConfirmWithdraw] = useState(false);
   const linkMissing = Boolean(delivery.activity.link_required) && !delivery.link;
 
   const changeStatus = (action: 'submit' | 'withdraw' | 'approve' | 'reject', message: string) =>
@@ -140,10 +141,16 @@ export const DeliveryModal: React.FC<{
       if (action === 'approve' && code === 'pending_modification') {
         await api.changeDeliveryStatus(delivery.id_delivery, 'submit');
       }
+      // Volver a Solicitada deshace un registro hecho por error: la entrega no conserva notas
+      if (action === 'withdraw') {
+        for (const g of delivery.grades) await api.deleteDeliveryGrade(delivery.id_delivery, g.id_delivery_grade);
+      }
       const d = await api.changeDeliveryStatus(delivery.id_delivery, action);
       apply(d);
+      if (action === 'withdraw') setPicked({ activity: '', follow_up: '' });
       setConfirmApprove(false);
       setConfirmReject(false);
+      setConfirmWithdraw(false);
       success(message);
     });
 
@@ -186,6 +193,8 @@ export const DeliveryModal: React.FC<{
   const commentKind: CommentKind = canWriteFeedback ? kind : 'annotation';
   // Devoluciones sin corregir: mientras haya alguna, la entrega no se puede aprobar
   const pendingFeedback = (comments ?? []).filter((c) => c.kind === 'feedback' && c.status.code === 'requested').length;
+  // Volver a Solicitada deshace un registro hecho por error: con devoluciones ya no corresponde
+  const hasFeedback = (comments ?? []).some((c) => c.kind === 'feedback');
 
   const loadComments = useCallback(() => {
     setCommentsFailed(false);
@@ -329,13 +338,17 @@ export const DeliveryModal: React.FC<{
             </div>
           )}
           {(reviewing || correcting) &&
-            (confirmApprove || confirmReject ? (
+            (confirmApprove || confirmReject || confirmWithdraw ? (
               // El texto arriba y los botones abajo: en celular no entran al costado
               <Alert tone="warning">
                 <p>
                   {confirmApprove
                     ? 'La aprobación es definitiva: la entrega no podrá cambiar de estado y no será posible modificar las notas ni escribir devoluciones nuevas. Antes de aprobarla, se recomienda verificar que las notas estén cargadas.'
-                    : 'Al solicitar modificaciones, el equipo deberá presentar las correcciones en los documentos de la entrega siguiente. En esta entrega no será posible escribir devoluciones nuevas; sí será posible marcar como corregidas las devoluciones resueltas y modificar las notas.'}
+                    : confirmReject
+                    ? 'Al solicitar modificaciones, el equipo deberá presentar las correcciones en los documentos de la entrega siguiente. En esta entrega no será posible escribir devoluciones nuevas; sí será posible marcar como corregidas las devoluciones resueltas y modificar las notas.'
+                    : delivery.grades.length > 0
+                    ? 'La entrega volverá al estado Solicitada y se eliminarán las notas cargadas.'
+                    : 'La entrega volverá al estado Solicitada.'}
                 </p>
                 <div className="mt-2.5 flex flex-wrap gap-2">
                   {confirmApprove ? (
@@ -346,13 +359,21 @@ export const DeliveryModal: React.FC<{
                     >
                       Aprobar
                     </Button>
-                  ) : (
+                  ) : confirmReject ? (
                     <Button
                       size="sm"
                       onClick={() => changeStatus('reject', `Se pidieron modificaciones al ${team}`)}
                       isLoading={busy === 'reject'}
                     >
                       Pedir modificaciones
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => changeStatus('withdraw', 'La entrega volvió a Solicitada')}
+                      isLoading={busy === 'withdraw'}
+                    >
+                      Volver a Solicitada
                     </Button>
                   )}
                   <Button
@@ -361,6 +382,7 @@ export const DeliveryModal: React.FC<{
                     onClick={() => {
                       setConfirmApprove(false);
                       setConfirmReject(false);
+                      setConfirmWithdraw(false);
                     }}
                     disabled={busy !== null}
                   >
@@ -384,9 +406,8 @@ export const DeliveryModal: React.FC<{
                     </Button>
                     <Button
                       variant="ghost"
-                      onClick={() => changeStatus('withdraw', 'La entrega volvió a Solicitada')}
-                      isLoading={busy === 'withdraw'}
-                      disabled={busy !== null && busy !== 'withdraw'}
+                      onClick={() => setConfirmWithdraw(true)}
+                      disabled={busy !== null || comments === null || hasFeedback}
                     >
                       Volver a Solicitada
                     </Button>
@@ -396,6 +417,9 @@ export const DeliveryModal: React.FC<{
                   <p className="w-full text-xs text-ink-muted">
                     Para pedir modificaciones, la entrega debe tener al menos una devolución sin corregir.
                   </p>
+                )}
+                {reviewing && hasFeedback && (
+                  <p className="w-full text-xs text-ink-muted">Una entrega con devoluciones no puede volver a Solicitada.</p>
                 )}
                 {pendingFeedback > 0 && (
                   <p className="w-full text-xs text-warning font-medium">
