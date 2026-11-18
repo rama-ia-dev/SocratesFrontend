@@ -209,8 +209,8 @@ export const EnrollStudentModal: React.FC<{
                             />
                           ) : (
                             <p>
-                              Se quitará la inscripción en {courseLabel(c)}. Esta acción corresponde a una inscripción
-                              cargada por error y no puede deshacerse.
+                              Se quitará la inscripción del estudiante en {courseLabel(c)}. La acción no puede
+                              deshacerse.
                             </p>
                           )}
                           <div className="flex flex-wrap gap-2">
