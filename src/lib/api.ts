@@ -1744,7 +1744,8 @@ export const api = {
   },
 
   // El jefe del grupo, un docente del curso lectivo o un administrador asegura el equipo
-  async insureProject(id_project: number): Promise<ProjectPublic> {
+  // `force`: los docentes del curso y el administrador aseguran fuera del cupo (con al menos un integrante activo)
+  async insureProject(id_project: number, force = false): Promise<ProjectPublic> {
     if (USE_MOCK) {
       await delay();
       const err: any = new Error('Project not found');
@@ -1752,7 +1753,7 @@ export const api = {
       throw err;
     }
 
-    return request<ProjectPublic>(`/projects/${id_project}/insure`, { method: 'POST' });
+    return request<ProjectPublic>(`/projects/${id_project}/insure${force ? '?force=true' : ''}`, { method: 'POST' });
   },
 
   // Un docente del curso lectivo o un administrador desasegura el equipo: vuelve a Desasegurado

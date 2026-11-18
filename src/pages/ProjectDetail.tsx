@@ -263,6 +263,7 @@ const expelError = (err: any): string => {
 const insureError = (err: any): string => {
   const detail = String(err.message || '');
   if (err.status === 409) {
+    if (detail.includes('force insurance')) return 'Para asegurar el equipo hace falta al menos un integrante activo';
     const min = detail.match(/At least (\d+)/);
     if (min) return `Para asegurar el equipo hacen falta al menos ${min[1]} integrantes activos`;
     const max = detail.match(/At most (\d+)/);
@@ -603,12 +604,12 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
     }
   };
 
-  const handleInsure = async () => {
+  const handleInsure = async (force: boolean) => {
     if (!project) return;
     setIsInsuring(true);
     setInsureErrorText(null);
     try {
-      await api.insureProject(project.id_project);
+      await api.insureProject(project.id_project, force);
       success(`Se aseguró el ${teamLabel(project)}`);
       setIsInsureOpen(false);
       load(true);
@@ -766,12 +767,20 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
   const activeCount = project.members.filter((m) => m.status.code === 'active').length;
   const min = sectionYear?.min_students;
   const max = sectionYear?.max_students;
-  const insureBlocked =
+  // Fuera del cupo: el jefe no puede asegurar; los docentes del curso y el administrador sí, como
+  // excepción, con al menos un integrante activo (el backend lo permite con `force`)
+  const outOfRange =
     min !== undefined && activeCount < min
       ? `${min - activeCount === 1 ? 'Falta 1 integrante activo' : `Faltan ${min - activeCount} integrantes activos`} para el mínimo de ${min}`
       : max !== undefined && activeCount > max
       ? `Tiene ${activeCount - max} ${activeCount - max === 1 ? 'integrante' : 'integrantes'} de más para el máximo de ${max}`
       : null;
+  const forceInsure = canManage && outOfRange !== null;
+  const insureBlocked = !canManage
+    ? outOfRange
+    : activeCount === 0
+    ? 'Para asegurar el equipo hace falta al menos un integrante activo'
+    : null;
   const insureAction = canInsure && (
     <div className="flex flex-col sm:items-end gap-1">
       <div className="flex flex-wrap gap-2 sm:justify-end">
@@ -786,7 +795,7 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
           Asegurar equipo
         </Button>
       </div>
-      {insureBlocked && <p className="text-xs text-ink-muted">{insureBlocked}</p>}
+      {(insureBlocked ?? outOfRange) && <p className="text-xs text-ink-muted">{insureBlocked ?? outOfRange}</p>}
     </div>
   );
   // Desasegurar (SCRUM-25): asegurado y sin aprobar ni cancelar; el jefe no puede
@@ -1051,6 +1060,11 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
         title="Asegurar el equipo"
       >
         {insureErrorText && <Alert className="mb-4">{insureErrorText}</Alert>}
+        {forceInsure && (
+          <Alert tone="warning" className="mb-4">
+            El equipo está fuera del cupo de {min} a {max} integrantes. Se asegurará como excepción, sin cumplir el cupo.
+          </Alert>
+        )}
         <div className="space-y-2 text-sm text-ink">
           <p>
             ¿Asegurar el {teamLabel(project)} con sus {activeCount}{' '}
@@ -1072,7 +1086,7 @@ export const ProjectDetail: React.FC<{ projectId?: number }> = ({ projectId }) =
           <Button type="button" variant="outline" onClick={() => setIsInsureOpen(false)} disabled={isInsuring}>
             Cancelar
           </Button>
-          <Button type="button" onClick={handleInsure} isLoading={isInsuring}>
+          <Button type="button" onClick={() => handleInsure(forceInsure)} isLoading={isInsuring}>
             Asegurar equipo
           </Button>
         </div>
