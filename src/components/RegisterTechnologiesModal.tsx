@@ -50,6 +50,9 @@ export const RegisterTechnologiesModal: React.FC<Props> = ({
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [isCreating, setIsCreating] = useState(false);
+  // Nueva tecnología: formulario propio, sin tener que buscarla antes
+  const [isNewOpen, setIsNewOpen] = useState(false);
+  const [newName, setNewName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
   // El equipo pasó a un estado final: solo queda el motivo y Cerrar
@@ -91,28 +94,46 @@ export const RegisterTechnologiesModal: React.FC<Props> = ({
       return next;
     });
 
-  // Agrega al catálogo la tecnología buscada y la deja elegida
-  const handleCreate = async () => {
-    if (!term) return;
-    setIsCreating(true);
+  // Cierra el formulario de tecnología nueva y limpia la búsqueda
+  const resetCreate = () => {
+    setQuery('');
+    setNewName('');
+    setIsNewOpen(false);
+  };
+
+  // Agrega al catálogo una tecnología (la buscada o la del formulario) y la deja elegida. Si ya
+  // existe en el catálogo, se elige la existente
+  const handleCreate = async (raw: string) => {
+    const name = raw.trim();
+    if (!name) return;
     setErrorText(null);
+    const existing = (catalog ?? []).find((t) => sameName(t.name, name));
+    if (existing) {
+      if (registeredIds.has(existing.id_technology)) setErrorText(`«${existing.name}» ya está registrada en el proyecto.`);
+      else {
+        setSelected((prev) => new Set(prev).add(existing.id_technology));
+        resetCreate();
+      }
+      return;
+    }
+    setIsCreating(true);
     try {
-      const created = await api.createTechnology(term);
+      const created = await api.createTechnology(name);
       setCatalog((prev) =>
         [...(prev ?? []), created].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }))
       );
       setSelected((prev) => new Set(prev).add(created.id_technology));
-      setQuery('');
+      resetCreate();
     } catch (err: any) {
       if (err.status === 409) {
         // Otro usuario la agregó mientras tanto: se recarga el catálogo y se elige la existente
         const items = await loadCatalog();
-        const existing = items?.find((t) => sameName(t.name, term));
-        if (existing && !registeredIds.has(existing.id_technology)) {
-          setSelected((prev) => new Set(prev).add(existing.id_technology));
-          setQuery('');
+        const found = items?.find((t) => sameName(t.name, name));
+        if (found && !registeredIds.has(found.id_technology)) {
+          setSelected((prev) => new Set(prev).add(found.id_technology));
+          resetCreate();
         } else {
-          setErrorText(`«${term}» ya existe en el catálogo.`);
+          setErrorText(`«${name}» ya existe en el catálogo.`);
         }
       } else if (err.status === 403) {
         setErrorText('Solo los docentes y los administradores pueden agregar tecnologías al catálogo.');
@@ -153,8 +174,7 @@ export const RegisterTechnologiesModal: React.FC<Props> = ({
   return (
     <Modal isOpen onClose={() => !busy && onClose()} title="Registrar tecnologías" maxWidth="lg">
       <p className="text-sm text-ink-muted">
-        Seleccione las tecnologías utilizadas en el proyecto del {teamLabel(project)}. Si una tecnología no figura
-        en el catálogo, búsquela por su nombre y agréguela.
+        Seleccione las tecnologías utilizadas en el proyecto del {teamLabel(project)}.
       </p>
 
       {errorText && <Alert className="mt-4">{errorText}</Alert>}
@@ -167,23 +187,82 @@ export const RegisterTechnologiesModal: React.FC<Props> = ({
         </div>
       ) : (
         <>
-          <div className="mt-4">
-            <Input
-              aria-label="Buscar tecnología"
-              placeholder="Buscar tecnología"
-              value={query}
-              maxLength={100}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  if (term && !exactMatch && !busy) handleCreate();
-                }
-              }}
-              leftIcon={<Search className="w-4 h-4" />}
-              disabled={catalog === null}
-            />
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <div className="flex-1 min-w-0">
+              <Input
+                aria-label="Buscar tecnología"
+                placeholder="Buscar tecnología"
+                value={query}
+                maxLength={100}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (term && !exactMatch && !busy) handleCreate(term);
+                  }
+                }}
+                leftIcon={<Search className="w-4 h-4" />}
+                disabled={catalog === null}
+              />
+            </div>
+            {!isNewOpen && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setErrorText(null);
+                  setIsNewOpen(true);
+                }}
+                disabled={catalog === null || busy}
+              >
+                <Plus className="w-4 h-4 mr-1.5" />
+                Nueva tecnología
+              </Button>
+            )}
           </div>
+
+          {isNewOpen && (
+            <div className="mt-3 rounded-lg border border-line bg-canvas p-3 space-y-2">
+              <Input
+                id="new-technology"
+                label="Nombre de la tecnología nueva"
+                value={newName}
+                maxLength={100}
+                autoFocus
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (newName.trim() && !busy) handleCreate(newName);
+                  }
+                }}
+                disabled={busy}
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => handleCreate(newName)}
+                  isLoading={isCreating}
+                  disabled={!newName.trim() || isSaving}
+                >
+                  Agregar al catálogo
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setNewName('');
+                    setIsNewOpen(false);
+                  }}
+                  disabled={busy}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="mt-3 rounded-lg border border-line max-h-72 overflow-y-auto">
             {loadError ? (
@@ -205,7 +284,7 @@ export const RegisterTechnologiesModal: React.FC<Props> = ({
                   <li>
                     <button
                       type="button"
-                      onClick={handleCreate}
+                      onClick={() => handleCreate(term)}
                       disabled={busy}
                       className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm text-primary font-medium hover:bg-tint disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
                     >
