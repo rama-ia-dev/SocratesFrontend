@@ -359,7 +359,7 @@ export const Students: React.FC = () => {
                         ...(user?.is_super_admin
                           ? [
                               {
-                                label: 'Inscribir en otro curso lectivo',
+                                label: 'Cursos lectivos e inscripciones',
                                 icon: <CalendarPlus className="w-3.5 h-3.5 text-primary" />,
                                 onClick: () => setEnrollingStudent(st),
                               },
@@ -417,6 +417,10 @@ export const Students: React.FC = () => {
           onClose={() => setEnrollingStudent(null)}
           onEnrolled={(message) => {
             setEnrollingStudent(null);
+            success(message);
+            fetchStudents();
+          }}
+          onChanged={(message) => {
             success(message);
             fetchStudents();
           }}
