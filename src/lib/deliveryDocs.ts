@@ -1,14 +1,12 @@
 import type { DeliveryComment } from '../types/api';
 
 /**
- * SOLUCIÓN PROVISORIA para la planilla de notas de la cátedra (documentos y notas finales).
+ * Documentos de cada devolución y notas finales de la planilla de la cátedra.
  *
- * El backend todavía no guarda a qué documento corresponde una devolución ni las notas finales.
- * Hasta que los guarde:
- * - el documento viaja como prefijo del texto del comentario ("[Estudio Inicial] …") y la
- *   pantalla lo separa al mostrarlo;
- * - las notas finales se guardan solo en el navegador (localStorage).
- * Cuando el backend tenga los campos, este archivo se reemplaza por las llamadas a la API.
+ * - El documento al que se refiere una devolución viaja como prefijo del texto del comentario
+ *   ("[Estudio Inicial] …") y la pantalla lo separa al mostrarlo. Los tres documentos son fijos.
+ * - Las notas finales se guardan, por ahora, solo en el navegador (localStorage), hasta que el
+ *   backend las guarde.
  */
 
 export const DOCUMENTS = ['Estudio Inicial', 'Definición del producto', 'Planificación y seguimiento'] as const;

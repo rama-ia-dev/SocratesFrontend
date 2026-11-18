@@ -375,7 +375,11 @@ export const DeliveryModal: React.FC<{
                 </Button>
                 {reviewing && (
                   <>
-                    <Button variant="outline" onClick={() => setConfirmReject(true)} disabled={busy !== null}>
+                    <Button
+                      variant="outline"
+                      onClick={() => setConfirmReject(true)}
+                      disabled={busy !== null || comments === null || pendingFeedback === 0}
+                    >
                       Pedir modificaciones
                     </Button>
                     <Button
@@ -387,6 +391,11 @@ export const DeliveryModal: React.FC<{
                       Volver a Solicitada
                     </Button>
                   </>
+                )}
+                {reviewing && comments !== null && pendingFeedback === 0 && (
+                  <p className="w-full text-xs text-ink-muted">
+                    Para pedir modificaciones, la entrega debe tener al menos una devolución sin corregir.
+                  </p>
                 )}
                 {pendingFeedback > 0 && (
                   <p className="w-full text-xs text-warning font-medium">
