@@ -57,16 +57,26 @@ export const DeliveryModal: React.FC<{
 
   const team = `Equipo ${delivery.project.group_number}`;
   const code = delivery.status.code;
-  // Solo se evalúa (notas, devoluciones nuevas, marcar como corregida) cuando el equipo presentó y la
-  // entrega espera la revisión. En los demás estados se puede mirar y dejar anotaciones internas.
-  const awaiting = code !== 'pending_approval';
-  // Por qué no se puede evaluar ahora, según el estado
+  // Qué se puede hacer en cada estado:
+  // - Pendiente de aprobación: el docente revisa la entrega (notas, devoluciones nuevas, marcar corregidas).
+  // - Pendiente de modificación: las correcciones llegan en los documentos de la entrega siguiente;
+  //   al revisarlos se marcan como corregidas y se ajustan las notas, pero las devoluciones nuevas
+  //   van en la entrega siguiente.
+  // - Solicitada y Aprobada: solo se mira y se dejan anotaciones internas.
+  const reviewing = code === 'pending_approval';
+  const correcting = code === 'pending_modification';
+  const canWriteFeedback = reviewing;
+  const canMarkCorrected = reviewing || correcting;
+  const awaiting = !(reviewing || correcting); // notas bloqueadas
+  // Por qué no se puede calificar ahora, según el estado
   const lockedReason =
     code === 'requested'
       ? 'La carga de notas y devoluciones se habilita cuando el equipo presenta la entrega.'
-      : code === 'pending_modification'
-        ? 'Las notas y las devoluciones podrán modificarse cuando el equipo vuelva a presentar la entrega corregida.'
-        : 'La entrega está aprobada: las notas y las devoluciones no pueden modificarse.';
+      : 'La entrega está aprobada: las notas y las devoluciones no pueden modificarse.';
+  // Por qué no se pueden escribir devoluciones nuevas
+  const feedbackLockedReason = correcting
+    ? 'Las devoluciones nuevas se escriben en la entrega siguiente, que es la que presenta las correcciones.'
+    : lockedReason;
 
   const apply = (d: DeliveryPublic) => {
     setDelivery(d);
@@ -125,6 +135,11 @@ export const DeliveryModal: React.FC<{
 
   const changeStatus = (action: 'submit' | 'withdraw' | 'approve' | 'reject', message: string) =>
     run(action, async () => {
+      // Desde Pendiente de modificación el backend solo aprueba una entrega pendiente de aprobación:
+      // primero se registra como entregada (las correcciones llegaron en la entrega siguiente)
+      if (action === 'approve' && code === 'pending_modification') {
+        await api.changeDeliveryStatus(delivery.id_delivery, 'submit');
+      }
       const d = await api.changeDeliveryStatus(delivery.id_delivery, action);
       apply(d);
       setConfirmApprove(false);
@@ -168,7 +183,7 @@ export const DeliveryModal: React.FC<{
   const [content, setContent] = useState('');
   const [contentError, setContentError] = useState<string | null>(null);
   // Solicitada: solo anotaciones internas
-  const commentKind: CommentKind = awaiting ? 'annotation' : kind;
+  const commentKind: CommentKind = canWriteFeedback ? kind : 'annotation';
   // Devoluciones sin corregir: mientras haya alguna, la entrega no se puede aprobar
   const pendingFeedback = (comments ?? []).filter((c) => c.kind === 'feedback' && c.status.code === 'requested').length;
 
@@ -301,7 +316,7 @@ export const DeliveryModal: React.FC<{
         <section className="space-y-2 border-t border-line pt-4">
           <SectionTitle>Estado</SectionTitle>
           <p className="text-ink-muted">{statusHelp(code)}</p>
-          {(code === 'requested' || code === 'pending_modification') && (
+          {code === 'requested' && (
             <div className="space-y-1.5">
               <Button
                 onClick={() => changeStatus('submit', `Se registró la entrega del ${team}`)}
@@ -313,14 +328,14 @@ export const DeliveryModal: React.FC<{
               {linkMissing && <p className="text-xs text-ink-muted">Cargue el enlace para poder registrarla.</p>}
             </div>
           )}
-          {code === 'pending_approval' &&
+          {(reviewing || correcting) &&
             (confirmApprove || confirmReject ? (
               // El texto arriba y los botones abajo: en celular no entran al costado
               <Alert tone="warning">
                 <p>
                   {confirmApprove
                     ? 'La aprobación es definitiva: la entrega no podrá cambiar de estado y no será posible modificar las notas ni escribir devoluciones nuevas. Antes de aprobarla, se recomienda verificar que las notas estén cargadas.'
-                    : 'Al solicitar modificaciones, el equipo deberá corregir la entrega. Hasta que vuelva a presentarla y se registre como entregada, no será posible modificar las notas ni escribir devoluciones.'}
+                    : 'Al solicitar modificaciones, el equipo deberá presentar las correcciones en los documentos de la entrega siguiente. En esta entrega no será posible escribir devoluciones nuevas; sí será posible marcar como corregidas las devoluciones resueltas y modificar las notas.'}
                 </p>
                 <div className="mt-2.5 flex flex-wrap gap-2">
                   {confirmApprove ? (
@@ -358,17 +373,21 @@ export const DeliveryModal: React.FC<{
                 <Button onClick={() => setConfirmApprove(true)} disabled={busy !== null || comments === null || pendingFeedback > 0}>
                   Aprobar
                 </Button>
-                <Button variant="outline" onClick={() => setConfirmReject(true)} disabled={busy !== null}>
-                  Pedir modificaciones
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => changeStatus('withdraw', 'La entrega volvió a Solicitada')}
-                  isLoading={busy === 'withdraw'}
-                  disabled={busy !== null && busy !== 'withdraw'}
-                >
-                  Volver a Solicitada
-                </Button>
+                {reviewing && (
+                  <>
+                    <Button variant="outline" onClick={() => setConfirmReject(true)} disabled={busy !== null}>
+                      Pedir modificaciones
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => changeStatus('withdraw', 'La entrega volvió a Solicitada')}
+                      isLoading={busy === 'withdraw'}
+                      disabled={busy !== null && busy !== 'withdraw'}
+                    >
+                      Volver a Solicitada
+                    </Button>
+                  </>
+                )}
                 {pendingFeedback > 0 && (
                   <p className="w-full text-xs text-warning font-medium">
                     {pendingFeedback === 1
@@ -494,15 +513,15 @@ export const DeliveryModal: React.FC<{
                 id="comment-kind"
                 label="Tipo"
                 value={commentKind}
-                disabled={busy !== null || awaiting}
+                disabled={busy !== null || !canWriteFeedback}
                 onChange={(e) => setKind(e.target.value as CommentKind)}
                 options={[
-                  ...(awaiting ? [] : [{ value: 'feedback', label: 'Devolución para el equipo' }]),
+                  ...(canWriteFeedback ? [{ value: 'feedback', label: 'Devolución para el equipo' }] : []),
                   { value: 'annotation', label: 'Anotación interna' },
                 ]}
                 helperText={
-                  awaiting
-                    ? lockedReason
+                  !canWriteFeedback
+                    ? feedbackLockedReason
                     : commentKind === 'annotation'
                       ? 'Nota interna de los docentes del curso y el administrador.'
                       : 'Queda pendiente hasta que se marque como corregida.'
@@ -560,7 +579,7 @@ export const DeliveryModal: React.FC<{
                   <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{text}</p>
                   {c.kind === 'feedback' &&
                     c.status.code === 'requested' &&
-                    !awaiting &&
+                    canMarkCorrected &&
                     (confirmCorrect === c.id_delivery_comment ? (
                       // El texto arriba y los botones abajo: en celular no entran al costado
                       <Alert tone="warning">
