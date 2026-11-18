@@ -59,6 +59,9 @@ const DocState: React.FC<{ state: DocumentState }> = ({ state }) =>
     </span>
   );
 
+// Una entrega está vencida cuando ya pasó su fecha y hora límite (sin hora, al final del día)
+const isDue = (a: ActivityPublic) => new Date(`${a.due_date}T${a.due_time ?? '23:59:59'}`).getTime() < Date.now();
+
 // Cada tarjeta ocupa cuatro filas de la grilla y las comparte con las demás tarjetas de su fila
 // (subgrid): el título, la nota, los documentos y el pie quedan a la misma altura en todas.
 const CARD_ROWS = 'row-span-4 grid grid-rows-subgrid gap-y-2.5';
@@ -94,6 +97,7 @@ const DeliveryCard: React.FC<{
   }
 
   const grade = latestGrade(d, 'activity');
+  const followUp = latestGrade(d, 'follow_up');
   const docs = documentStates(comments);
 
   return (
@@ -111,6 +115,8 @@ const DeliveryCard: React.FC<{
         ) : (
           <span className="block text-sm italic text-ink-subtle">Sin nota</span>
         )}
+        {/* El seguimiento es opcional: aparece solo cuando se cargó */}
+        {followUp && <span className="block text-xs text-ink-muted mt-0.5">Seguimiento: {followUp.score.name}</span>}
       </span>
       <span className="block space-y-1 border-t border-line pt-2">
         {DOCUMENTS.map((doc) => (
@@ -137,7 +143,7 @@ const DeliveryCard: React.FC<{
 const MembersPanel: React.FC<{ team: Team; finals: FinalGrades; onEdit: () => void }> = ({ team, finals, onEdit }) => {
   const any = Boolean(finals.deliveries) || Object.values(finals.students).some((s) => s.regularization || s.exam);
   return (
-    <div className="rounded-lg border border-line">
+    <div className="rounded-lg border border-line bg-white">
       <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-line">
         <span className="text-xs font-semibold text-ink">Integrantes</span>
         <button type="button" onClick={onEdit} className="text-xs text-primary font-medium hover:underline cursor-pointer">
@@ -350,9 +356,20 @@ export const Deliveries: React.FC = () => {
         <EmptyState icon={<Users className="w-5 h-5" />} message="Este curso lectivo no tiene equipos de trabajo" />
       ) : (
         <div className="space-y-4">
-          {teams.map((t) => (
-            <section key={t.id_project} className="rounded-xl border border-line bg-white overflow-hidden">
-              <header className="px-4 sm:px-5 py-3 bg-tint border-b border-accent-light space-y-1.5">
+          {teams.map((t) => {
+            // Al día: todas las entregas con la fecha vencida están aprobadas (las que todavía no
+            // vencieron no cuentan). Sin ninguna vencida no hay nada para estar al día.
+            const due = activities.filter((a) => isDue(a));
+            const upToDate =
+              due.length > 0 && due.every((a) => byKey.get(`${t.id_project}-${a.id_activity}`)?.status.code === 'approved');
+            return (
+            <section
+              key={t.id_project}
+              className={`rounded-xl border overflow-hidden ${upToDate ? 'border-success-line bg-success-soft' : 'border-line bg-white'}`}
+            >
+              <header
+                className={`px-4 sm:px-5 py-3 border-b space-y-1.5 ${upToDate ? 'border-success-line' : 'bg-tint border-accent-light'}`}
+              >
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                   <h2 className="text-[15px] font-semibold text-ink">
                     <Link to={`/equipos/${t.id_project}`} className="hover:text-primary hover:underline">
@@ -360,6 +377,11 @@ export const Deliveries: React.FC = () => {
                     </Link>
                   </h2>
                   {t.name && <span className="text-sm text-ink-muted [overflow-wrap:anywhere]">{t.name}</span>}
+                  {upToDate && (
+                    <span className="self-center" title="Todas las entregas con la fecha vencida están aprobadas">
+                      <Badge variant="public">Al día</Badge>
+                    </span>
+                  )}
                 </div>
               </header>
               {/* En pantalla ancha, los integrantes a la izquierda y las entregas a la derecha; si no, uno arriba del otro */}
@@ -389,7 +411,8 @@ export const Deliveries: React.FC = () => {
                 </div>
               </div>
             </section>
-          ))}
+            );
+          })}
         </div>
       )}
 
