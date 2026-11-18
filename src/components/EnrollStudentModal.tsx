@@ -9,6 +9,9 @@ import { byCourse, courseLabel } from '../lib/courses';
 
 const enrollError = (err: any, target: SectionYearPublic): string => {
   const detail = String(err?.message ?? '');
+  if (err?.status === 409 && detail.includes('approved cursada')) {
+    return 'El estudiante ya aprobó la cursada: no puede inscribirse en otro curso lectivo.';
+  }
   if (err?.status === 409 && detail.includes('already has a registration')) {
     return `Ya tiene una inscripción en un curso lectivo de ${target.year}. Se admite una inscripción por año.`;
   }
@@ -33,8 +36,9 @@ const changeError = (err: any, action: 'move' | 'delete'): string => {
 
 /**
  * Cursos lectivos de un estudiante (SCRUM-610), solo el administrador:
- * - inscribirlo en otro año, desde su año de ingreso, siempre que no tenga una cursada abierta
- *   (para cursar otro año, primero tiene que terminar o abandonar la cursada anterior);
+ * - inscribirlo en otro año, desde su año de ingreso y posterior a su última cursada, siempre que
+ *   no tenga una cursada abierta (para cursar otro año, primero tiene que terminar o abandonar la
+ *   cursada anterior) ni una aprobada (el backend no lo admite);
  * - cambiar la comisión de una inscripción dentro del mismo año, mientras no tenga cursada en ese
  *   curso lectivo (la cursada empieza cuando se suma a un equipo);
  * - quitar una inscripción cargada por error, con la misma condición.
@@ -75,10 +79,15 @@ export const EnrollStudentModal: React.FC<{
   const withCursada = new Set((rows ?? []).filter((r) => r.state !== 'registered').map((r) => r.id_section_year));
   const registrationOf = (id_section_year: number) =>
     (rows ?? []).find((r) => r.id_section_year === id_section_year && r.state === 'registered');
+  // Cursada aprobada: el estudiante ya no se inscribe en otro curso lectivo
+  const approvedCursada = rows?.find((r) => r.state === 'finished_approved') ?? null;
+  // Una nueva inscripción es de un año posterior a su última cursada (y desde su año de ingreso)
+  const lastCursadaYear = Math.max(0, ...(rows ?? []).filter((r) => r.state !== 'registered').map((r) => r.year));
+  const fromYear = Math.max(student.enrollment_year, lastCursadaYear + 1);
   const takenYears = new Set((rows ?? []).filter((r) => r.state === 'registered').map((r) => r.year));
   const own = new Set((rows ?? []).map((r) => r.id_section_year));
   const options = allCourses
-    .filter((sy) => sy.year >= student.enrollment_year && !takenYears.has(sy.year) && !own.has(sy.id_section_year))
+    .filter((sy) => sy.year >= fromYear && !takenYears.has(sy.year) && !own.has(sy.id_section_year))
     .sort((a, b) => b.year - a.year || a.section_name.localeCompare(b.section_name, 'es'));
   const sameYearOptions = (year: number, current: number) =>
     allCourses
@@ -240,7 +249,12 @@ export const EnrollStudentModal: React.FC<{
           </div>
 
           <div className="border-t border-line pt-4">
-            {openCursada ? (
+            {approvedCursada ? (
+              <p className="text-ink-muted">
+                El estudiante aprobó la cursada en {courseLabel(approvedCursada)}: no puede inscribirse en otro curso
+                lectivo.
+              </p>
+            ) : openCursada ? (
               <p className="text-ink-muted">
                 El estudiante tiene una cursada abierta en {courseLabel(openCursada)}. Para inscribirlo en otro año, esa
                 cursada debe finalizar o el estudiante debe dejar su equipo de trabajo.
@@ -261,7 +275,9 @@ export const EnrollStudentModal: React.FC<{
                   { value: '', label: 'Seleccione un curso lectivo' },
                   ...options.map((sy) => ({ value: sy.id_section_year, label: courseLabel(sy) })),
                 ]}
-                helperText={`Se listan los cursos lectivos desde ${student.enrollment_year} (año de ingreso) de los años en los que no tiene inscripción. Las inscripciones anteriores se conservan.`}
+                helperText={`Se listan los cursos lectivos desde ${fromYear} (${
+                  lastCursadaYear >= student.enrollment_year ? 'posteriores a su última cursada' : 'año de ingreso'
+                }) de los años en los que no tiene inscripción. Las inscripciones anteriores se conservan.`}
               />
             )}
           </div>
@@ -271,7 +287,7 @@ export const EnrollStudentModal: React.FC<{
         <Button type="button" variant="outline" onClick={onClose} disabled={busy !== null}>
           Cerrar
         </Button>
-        {rows && !openCursada && options.length > 0 && (
+        {rows && !approvedCursada && !openCursada && options.length > 0 && (
           <Button type="button" onClick={handleEnroll} isLoading={busy === 'enroll'} disabled={busy !== null && busy !== 'enroll'}>
             Inscribir
           </Button>
