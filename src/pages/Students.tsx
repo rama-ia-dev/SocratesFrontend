@@ -314,9 +314,10 @@ export const Students: React.FC = () => {
                     ) : (
                       <ul className="space-y-1">
                         {byCourse(st.section_years ?? []).map((c) => (
-                          <li key={c.id_section_year}>
-                            <span className="block text-sm text-ink">{courseLabel(c)}</span>
-                            {c.status && <span className="block text-xs text-ink-muted">{c.status.name}</span>}
+                          // Solo el curso lectivo: el estado de cada cursada se consulta en "Cursos lectivos
+                          // e inscripciones" (esta lista del backend no trae las cursadas terminadas)
+                          <li key={c.id_section_year} className="text-sm text-ink">
+                            {courseLabel(c)}
                           </li>
                         ))}
                       </ul>
