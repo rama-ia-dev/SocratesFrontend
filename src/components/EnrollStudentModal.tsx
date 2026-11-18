@@ -205,7 +205,7 @@ export const EnrollStudentModal: React.FC<{
                                 { value: '', label: 'Seleccione una comisión' },
                                 ...moves.map((sy) => ({ value: sy.id_section_year, label: courseLabel(sy) })),
                               ]}
-                              helperText="La inscripción pasa a la comisión elegida; no se agrega una nueva."
+                              helperText="La inscripción pasa a la comisión elegida."
                             />
                           ) : (
                             <p>
