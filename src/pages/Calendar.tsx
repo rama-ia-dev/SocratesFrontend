@@ -639,6 +639,17 @@ export const Calendar: React.FC = () => {
     );
   }
 
+  // Alumno: hasta que llega su calendario no se muestra la grilla, porque si no es parte de un equipo
+  // el backend responde 403 y la grilla con los feriados aparecería un instante antes del aviso
+  if (isStudent && firstLoad) {
+    return (
+      <div>
+        <PageHeader title="Calendario" subtitle="Clases, entregas y feriados de su curso lectivo" />
+        <TableSkeleton rows={5} cols={7} />
+      </div>
+    );
+  }
+
   return (
     <div>
       <PageHeader
