@@ -19,6 +19,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { Table, TableHeader, TableRow, TableHead, TableCell } from '../components/ui/Table';
+import { AttendanceStudentInfo, StudentAttendanceModal } from '../components/StudentAttendanceModal';
 
 // Por debajo de este porcentaje la asistencia de un integrante se marca como baja
 const LOW_ATTENDANCE = 80;
@@ -103,6 +104,8 @@ export const TeamAttendancePage: React.FC = () => {
   const [teamsError, setTeamsError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  // Alumno cuyo detalle de asistencia está abierto
+  const [detailStudent, setDetailStudent] = useState<AttendanceStudentInfo | null>(null);
 
   // Cursos lectivos: el administrador ve todos; el docente, aquellos a los que está asignado
   useEffect(() => {
@@ -435,6 +438,9 @@ export const TeamAttendancePage: React.FC = () => {
                                 <TableHead>Presentes</TableHead>
                                 <TableHead>Faltas</TableHead>
                                 <TableHead>Asistencia</TableHead>
+                                <TableHead>
+                                  <span className="sr-only">Detalle</span>
+                                </TableHead>
                               </TableRow>
                             </TableHeader>
                             <tbody>
@@ -442,7 +448,13 @@ export const TeamAttendancePage: React.FC = () => {
                                 <TableRow key={m.id_student_project}>
                                   <TableCell className="font-medium text-ink">
                                     <span className="inline-flex items-center gap-2">
-                                      {m.last_name}, {m.first_name}
+                                      <button
+                                        type="button"
+                                        onClick={() => setDetailStudent(m)}
+                                        className="text-left text-primary hover:underline"
+                                      >
+                                        {m.last_name}, {m.first_name}
+                                      </button>
                                       {m.is_leader && <Badge variant="leader">Jefe</Badge>}
                                     </span>
                                   </TableCell>
@@ -456,6 +468,16 @@ export const TeamAttendancePage: React.FC = () => {
                                   <TableCell>
                                     <AttendanceBar member={m} />
                                   </TableCell>
+                                  <TableCell className="text-right">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setDetailStudent(m)}
+                                      aria-label={`Ver el detalle de asistencia de ${m.first_name} ${m.last_name}`}
+                                    >
+                                      Ver detalle
+                                    </Button>
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </tbody>
@@ -467,9 +489,13 @@ export const TeamAttendancePage: React.FC = () => {
                           {members.map((m) => (
                             <li key={m.id_student_project} className="px-5 py-3 space-y-2">
                               <div className="flex items-center justify-between gap-2">
-                                <span className="text-sm font-medium text-ink">
+                                <button
+                                  type="button"
+                                  onClick={() => setDetailStudent(m)}
+                                  className="text-left text-sm font-medium text-primary hover:underline"
+                                >
                                   {m.last_name}, {m.first_name}
-                                </span>
+                                </button>
                                 {m.is_leader && <Badge variant="leader">Jefe</Badge>}
                               </div>
                               <p className="text-xs text-ink-muted tabular-nums">
@@ -480,6 +506,9 @@ export const TeamAttendancePage: React.FC = () => {
                                   } faltas`}
                               </p>
                               <AttendanceBar member={m} />
+                              <Button variant="outline" size="sm" className="w-full" onClick={() => setDetailStudent(m)}>
+                                Ver detalle
+                              </Button>
                             </li>
                           ))}
                         </ul>
@@ -491,6 +520,19 @@ export const TeamAttendancePage: React.FC = () => {
             </div>
           )}
         </div>
+      )}
+
+      {courseId !== null && (
+        <StudentAttendanceModal
+          student={detailStudent}
+          id_section_year={courseId}
+          course_label={(() => {
+            const c = coursesOfYear.find((x) => x.id_section_year === courseId);
+            return c ? `${c.section_name} ${c.year}` : '';
+          })()}
+          range={range ?? {}}
+          onClose={() => setDetailStudent(null)}
+        />
       )}
     </div>
   );
