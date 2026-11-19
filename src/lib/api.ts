@@ -2049,6 +2049,25 @@ export const api = {
     return request<MyAttendanceList>('/me/attendance');
   },
 
+  // Clases a las que asistió un alumno, con el mismo formato que `/me/attendance` (docente de sus
+  // cursos lectivos o administrador; el docente solo ve los cursos lectivos que dicta). Con
+  // `from`/`to`, el resumen y las clases son las del rango.
+  async getStudentAttendance(
+    id_student: number,
+    range: { from?: string; to?: string } = {}
+  ): Promise<MyAttendanceList> {
+    if (USE_MOCK) {
+      await delay();
+      return { section_years: [], items: [] };
+    }
+
+    const query = new URLSearchParams();
+    if (range.from) query.set('from', range.from);
+    if (range.to) query.set('to', range.to);
+    const qs = query.toString();
+    return request<MyAttendanceList>(`/students/${id_student}/attendance${qs ? `?${qs}` : ''}`);
+  },
+
   // Asistencia de los integrantes activos o finalizados de un equipo en su curso lectivo (docente del
   // curso lectivo o administrador). Con `from`/`to`, el porcentaje se calcula sobre las clases del rango.
   async getProjectAttendance(
