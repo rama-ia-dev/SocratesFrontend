@@ -17,7 +17,8 @@ import { AttendanceClass, AttendanceModal } from '../components/AttendanceModal'
 import { CalendarExcelModal } from '../components/CalendarExcelModal';
 import { CheckInClass, CheckInModal } from '../components/CheckInModal';
 import { SOURCE_TEXT, useHolidays } from '../lib/holidays';
-import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, ExternalLink, FileSpreadsheet, KeyRound, MapPin, Pencil, Plus, SearchX, Trash2 } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { ArrowLeft, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, ExternalLink, FileSpreadsheet, KeyRound, MapPin, Pencil, Plus, SearchX, Trash2 } from 'lucide-react';
 
 const MONTHS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -178,7 +179,12 @@ export const Calendar: React.FC = () => {
   const isSuperAdmin = Boolean(user?.is_super_admin);
   const isStudent = user?.role === 'student';
 
-  const [viewYear, setViewYear] = useState(today.getFullYear());
+  // Si se llegó desde Asistencia ("Tomar asistencia de otra clase"), se puede volver con sus filtros y
+  // el calendario abre en el año y la comisión que se estaban viendo
+  const fromAttendance = (
+    useLocation().state as { fromAttendance?: { section_name?: string; year?: number | null; filters: unknown } } | null
+  )?.fromAttendance;
+  const [viewYear, setViewYear] = useState(fromAttendance?.year ?? today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
 
   // Cursos lectivos que puede ver: todos para el administrador; los asignados para el docente; el de
@@ -194,7 +200,7 @@ export const Calendar: React.FC = () => {
 
   // Filtros del calendario y del listado. La comisión va por nombre: el listado puede abarcar
   // cursos lectivos de más de un año
-  const [sectionFilter, setSectionFilter] = useState('');
+  const [sectionFilter, setSectionFilter] = useState(fromAttendance?.section_name ?? '');
   const [kindFilter, setKindFilter] = useState<EventKind | ''>('');
 
   // Detalle abierto: los eventos de un día del calendario o un evento del listado
@@ -217,7 +223,9 @@ export const Calendar: React.FC = () => {
         setCourses(items);
         // Si el año actual no tiene cursos lectivos, se abre el más reciente que tenga
         const years = items.map((c) => c.year);
-        if (years.length > 0 && !years.includes(today.getFullYear())) setViewYear(Math.max(...years));
+        // (salvo que se llegue desde Asistencia, que ya trae el año que se estaba viendo)
+        if (!fromAttendance?.year && years.length > 0 && !years.includes(today.getFullYear()))
+          setViewYear(Math.max(...years));
       })
       .catch(() => setLoadError('No se pudieron cargar los cursos lectivos'));
   }, [user, isSuperAdmin, isStudent, reloadKey]);
@@ -318,10 +326,11 @@ export const Calendar: React.FC = () => {
     [coursesOfYear, listCourses]
   );
 
-  // Al cambiar de año o de fechas, la comisión elegida puede no tener curso lectivo en ellos
+  // Al cambiar de año o de fechas, la comisión elegida puede no tener curso lectivo en ellos. Se espera
+  // a que lleguen los cursos lectivos: si no, se borraría la comisión con la que se llega desde Asistencia
   useEffect(() => {
-    if (sectionFilter && !sectionOptions.includes(sectionFilter)) setSectionFilter('');
-  }, [sectionOptions, sectionFilter]);
+    if (courses !== null && sectionFilter && !sectionOptions.includes(sectionFilter)) setSectionFilter('');
+  }, [courses, sectionOptions, sectionFilter]);
 
   // Cada curso lectivo se consulta solo dentro de su año (las fechas no salen de él), así ningún
   // pedido supera el máximo de 366 días del backend. Una respuesta vieja se descarta.
@@ -641,6 +650,18 @@ export const Calendar: React.FC = () => {
 
   return (
     <div>
+      {/* Solo si se llegó desde Asistencia: vuelve con los filtros que tenía. Resaltado (no gris), igual
+          que "Volver al Tablero de la cátedra", para que se vea enseguida */}
+      {fromAttendance && (
+        <Link
+          to="/asistencia"
+          state={{ attendanceFilters: fromAttendance.filters }}
+          className="mb-4 flex w-fit items-center gap-1.5 rounded-lg border border-tint-strong bg-tint px-3 py-1.5 text-sm font-medium text-primary hover:bg-tint-strong hover:text-primary-hover transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary"
+        >
+          <ArrowLeft className="w-4 h-4" aria-hidden />
+          Volver a Asistencia
+        </Link>
+      )}
       <PageHeader
         title="Calendario"
         subtitle={
