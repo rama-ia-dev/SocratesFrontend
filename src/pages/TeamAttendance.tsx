@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Search, SearchX, ClipboardCheck, RefreshCw, CalendarDays } from 'lucide-react';
 import { api } from '../lib/api';
 import { fetchAll } from '../lib/pagination';
@@ -36,6 +36,16 @@ interface TeamAttendance {
   members: ProjectAttendanceMember[];
   // Asistencia del equipo completo (asistencias sobre clases de todos sus integrantes)
   percentage: number | null;
+}
+
+/** Filtros de la pantalla: viajan al calendario y vuelven con "Volver a Asistencia". */
+interface AttendanceFilters {
+  year: number | null;
+  courseId: number | null;
+  from: string;
+  to: string;
+  query: string;
+  onlyLow: boolean;
 }
 
 const normalize = (s: string) =>
@@ -94,15 +104,18 @@ export const TeamAttendancePage: React.FC = () => {
   const { user } = useAuth();
   const isSuperAdmin = !!user?.is_super_admin;
   const currentYear = new Date().getFullYear();
+  // Al volver del calendario se restauran los filtros con los que se fue
+  const restored = (useLocation().state as { attendanceFilters?: AttendanceFilters } | null)?.attendanceFilters;
+  const restoredRef = useRef(restored);
 
   const [courses, setCourses] = useState<Course[] | null>(null);
   const [coursesError, setCoursesError] = useState(false);
   const [yearFilter, setYearFilter] = useState<number | null>(null);
   const [courseId, setCourseId] = useState<number | null>(null);
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [query, setQuery] = useState('');
-  const [onlyLow, setOnlyLow] = useState(false);
+  const [from, setFrom] = useState(restored?.from ?? '');
+  const [to, setTo] = useState(restored?.to ?? '');
+  const [query, setQuery] = useState(restored?.query ?? '');
+  const [onlyLow, setOnlyLow] = useState(restored?.onlyLow ?? false);
 
   const [teams, setTeams] = useState<TeamAttendance[] | null>(null);
   const [teamsError, setTeamsError] = useState(false);
@@ -131,6 +144,15 @@ export const TeamAttendancePage: React.FC = () => {
           section_name,
         }));
         setCourses(list);
+        // Al volver del calendario, el curso lectivo con el que se fue (si sigue disponible)
+        const back = restoredRef.current;
+        restoredRef.current = undefined;
+        const backCourse = back && list.find((c) => c.id_section_year === back.courseId);
+        if (backCourse) {
+          setYearFilter(backCourse.year);
+          setCourseId(backCourse.id_section_year);
+          return;
+        }
         // Por defecto, el año en curso; si no tiene cursos lectivos, el más reciente
         const years = list.map((c) => c.year);
         if (years.length > 0) {
@@ -301,6 +323,15 @@ export const TeamAttendancePage: React.FC = () => {
           courses.length > 0 && (
             <Link
               to="/calendario"
+              // El calendario muestra "Volver a Asistencia" solo en este caso, abre la comisión elegida y
+              // devuelve los filtros al volver
+              state={{
+                fromAttendance: {
+                  section_name: coursesOfYear.find((c) => c.id_section_year === courseId)?.section_name,
+                  year: yearFilter,
+                  filters: { year: yearFilter, courseId, from, to, query, onlyLow } satisfies AttendanceFilters,
+                },
+              }}
               className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
             >
               <CalendarDays className="w-4 h-4" aria-hidden />
