@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, SearchX, ClipboardCheck, RefreshCw } from 'lucide-react';
+import { Search, SearchX, ClipboardCheck, RefreshCw, CalendarDays } from 'lucide-react';
 import { api } from '../lib/api';
 import { fetchAll } from '../lib/pagination';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +19,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { EmptyState, TableSkeleton } from '../components/ui/EmptyState';
 import { Table, TableHeader, TableRow, TableHead, TableCell } from '../components/ui/Table';
+import { AttendanceClass, AttendanceModal } from '../components/AttendanceModal';
 
 // Por debajo de este porcentaje la asistencia de un integrante se marca como baja
 const LOW_ATTENDANCE = 80;
@@ -57,6 +58,10 @@ const isLow = (m: ProjectAttendanceMember) => {
   const pct = percentageOf(m);
   return pct !== null && pct < LOW_ATTENDANCE;
 };
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const localIso = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const hhmm = (time: string) => time.slice(0, 5);
 
 const formatPct = (pct: number) =>
   `${pct.toLocaleString('es-AR', { maximumFractionDigits: 1 })} %`;
@@ -103,6 +108,10 @@ export const TeamAttendancePage: React.FC = () => {
   const [teamsError, setTeamsError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+
+  // Clases de hoy en las que se puede tomar asistencia sin pasar por el calendario
+  const [todayClasses, setTodayClasses] = useState<AttendanceClass[]>([]);
+  const [attendanceClass, setAttendanceClass] = useState<AttendanceClass | null>(null);
 
   // Cursos lectivos: el administrador ve todos; el docente, aquellos a los que está asignado
   useEffect(() => {
@@ -195,6 +204,44 @@ export const TeamAttendancePage: React.FC = () => {
       });
   }, [courseId, range, reloadKey]);
 
+  // Clases de hoy: el docente ve las de todos sus cursos lectivos del año (suelen ser pocos); el
+  // administrador, las de la comisión elegida, porque ve todos los cursos lectivos
+  const todayCourses = useMemo(
+    () =>
+      (courses ?? [])
+        .filter((c) => c.year === currentYear && (!isSuperAdmin || c.id_section_year === courseId))
+        .sort((a, b) => a.section_name.localeCompare(b.section_name, 'es')),
+    [courses, currentYear, isSuperAdmin, courseId]
+  );
+  useEffect(() => {
+    const today = localIso(new Date());
+    let active = true;
+    Promise.all(
+      todayCourses.map(async (c) => {
+        const cal = await api.getSectionYearCalendar(c.id_section_year, { from: today, to: today });
+        return cal.classes.map(
+          (cl): AttendanceClass => ({
+            id: cl.id_calendar_class,
+            id_section_year: c.id_section_year,
+            date: cl.date,
+            start: hhmm(cl.start_time),
+            end: hhmm(cl.end_time),
+            title: cl.title || 'Clase',
+            section_name: c.section_name,
+          })
+        );
+      })
+    )
+      .then((lists) => {
+        if (active) setTodayClasses(lists.flat().sort((a, b) => (a.start ?? '').localeCompare(b.start ?? '')));
+      })
+      // Si no se pueden traer, se sigue pudiendo tomar asistencia desde el calendario
+      .catch(() => active && setTodayClasses([]));
+    return () => {
+      active = false;
+    };
+  }, [todayCourses]);
+
   const q = normalize(query.trim());
 
   const visibleTeams = useMemo(() => {
@@ -249,6 +296,18 @@ export const TeamAttendancePage: React.FC = () => {
       <PageHeader
         title="Asistencia"
         subtitle="Asistencia de cada integrante de los equipos de trabajo, sobre las clases con asistencia tomada"
+        action={
+          courses !== null &&
+          courses.length > 0 && (
+            <Link
+              to="/calendario"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+            >
+              <CalendarDays className="w-4 h-4" aria-hidden />
+              Tomar asistencia de otra clase en el calendario
+            </Link>
+          )
+        }
       />
 
       {courses !== null && courses.length === 0 ? (
@@ -263,6 +322,24 @@ export const TeamAttendancePage: React.FC = () => {
         />
       ) : (
         <div className="space-y-4">
+          {/* Clases de hoy: se toma la asistencia acá mismo, con el mismo modal del calendario. En celular
+              el botón va debajo del texto; desde sm, a la derecha. */}
+          {todayClasses.map((c) => (
+            <Alert key={c.id} tone="info">
+              <div className="flex flex-col items-start gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <p>
+                  Hoy hay clase de {c.section_name}
+                  {c.start ? ` de ${c.start}${c.end ? ` a ${c.end}` : ''}` : ''}
+                  {c.title !== 'Clase' ? ` (${c.title})` : ''}.
+                </p>
+                <Button size="sm" className="shrink-0 sm:-my-1" onClick={() => setAttendanceClass(c)}>
+                  <ClipboardCheck className="w-3.5 h-3.5" aria-hidden />
+                  Tomar asistencia
+                </Button>
+              </div>
+            </Alert>
+          ))}
+
           {/* Filtros: curso lectivo y rango de fechas */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
             <Select
@@ -492,6 +569,15 @@ export const TeamAttendancePage: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* Al cerrar se recargan los porcentajes, que pueden haber cambiado */}
+      <AttendanceModal
+        classInfo={attendanceClass}
+        onClose={() => {
+          setAttendanceClass(null);
+          setReloadKey((k) => k + 1);
+        }}
+      />
     </div>
   );
 };
